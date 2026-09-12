@@ -173,7 +173,36 @@ const MainContent: React.FC = () => {
             </div>
 
             {/* Product Grid */}
-            {sortedProducts.length === 0 ? (
+            {products.length === 0 ? (
+              <div className="text-center py-20 px-4 bg-white rounded-3xl border border-[#EAE2D5] shadow-xs space-y-4 max-w-2xl mx-auto">
+                <div className="w-16 h-16 rounded-full bg-[#FAF7F2] text-[#8C8377] flex items-center justify-center mx-auto border border-[#E5DDD2]">
+                  <ShoppingBag className="w-8 h-8 stroke-1 text-[#C5A880]" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="font-display text-xl font-bold text-[#1C3B2B]">
+                    Katalog Busana Masih Kosong
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#7A7266] max-w-md mx-auto leading-relaxed">
+                    Seluruh produk dan foto varian telah berhasil dihapus dari toko dan database. Anda dapat mengimpor produk baru secara otomatis melalui file Excel/XLS atau link Shopee & TikTok di panel pengelola.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      if (isAuthenticatedAdmin) {
+                        setIsAdminMode(true);
+                      } else {
+                        setIsAdminLoginModalOpen(true);
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-xs font-semibold rounded-xl transition-all shadow-sm inline-flex items-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4 text-[#C5A880]" />
+                    <span>Buka Panel Admin & Tambah Koleksi Baru</span>
+                  </button>
+                </div>
+              </div>
+            ) : sortedProducts.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-[#EAE2D5] space-y-4">
                 <div className="w-16 h-16 rounded-full bg-[#FAF7F2] text-[#8C8377] flex items-center justify-center mx-auto">
                   <Search className="w-8 h-8 stroke-1" />

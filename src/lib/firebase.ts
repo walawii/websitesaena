@@ -9,7 +9,8 @@ import {
   setDoc, 
   updateDoc, 
   deleteDoc,
-  collection
+  collection,
+  writeBatch
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Product, Order, AvailableCoupon, ProductReview, StoreWarehouseInfo } from '../types';
@@ -118,7 +119,7 @@ export async function initializeDatabaseIfNeeded(): Promise<void> {
       handleFirestoreError(err, OperationType.LIST, 'products');
     });
 
-    if (productSnapshot && productSnapshot.empty) {
+    if (productSnapshot && productSnapshot.empty && INITIAL_PRODUCTS.length > 0) {
       console.log('Seeding initial products to Firestore...');
       for (const prod of INITIAL_PRODUCTS) {
         await setDoc(doc(db, 'products', prod.id), sanitizeForFirestore({
@@ -291,3 +292,30 @@ export async function deleteProductFromFirestore(productId: string): Promise<voi
     handleFirestoreError(err, OperationType.DELETE, path);
   }
 }
+
+export async function deleteAllProductsFromFirestore(): Promise<number> {
+  let totalDeleted = 0;
+  const path = 'products';
+  try {
+    while (true) {
+      const productsRef = collection(db, 'products');
+      const snapshot = await getDocs(productsRef);
+      if (snapshot.empty) break;
+
+      const docsToDelete = snapshot.docs.slice(0, 450);
+      const batch = writeBatch(db);
+      for (const docSnap of docsToDelete) {
+        batch.delete(doc(db, 'products', docSnap.id));
+      }
+      await batch.commit();
+      totalDeleted += docsToDelete.length;
+
+      if (snapshot.docs.length <= docsToDelete.length) break;
+    }
+    return totalDeleted;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+    return totalDeleted;
+  }
+}
+

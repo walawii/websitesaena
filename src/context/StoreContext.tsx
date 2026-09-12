@@ -25,6 +25,7 @@ import {
   syncProductToFirestore, 
   updateProductStockInFirestore, 
   deleteProductFromFirestore,
+  deleteAllProductsFromFirestore,
   syncOrderStatusInFirestore,
   handleFirestoreError,
   OperationType
@@ -133,9 +134,11 @@ interface StoreContextType {
   updateColorStock: (productId: string, colorName: string, newStock: number) => Promise<void>;
   updateProduct: (updatedProduct: Product) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
+  deleteAllProducts: () => Promise<number>;
   quickRestock: (productId: string, amount: number) => void;
   updateProductPrice: (productId: string, newPrice: number) => void;
   addNewProduct: (newProd: Partial<Product>) => Promise<Product>;
+  addMultipleProducts: (newProds: Partial<Product>[]) => Promise<Product[]>;
   
   // Reviews
   addProductReview: (productId: string, review: Omit<ProductReview, 'id' | 'date'>) => void;
@@ -160,8 +163,19 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('saena_products_v1');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+    try {
+      const saved = localStorage.getItem('saena_products_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // If Firestore is empty, we don't restore old mock products
+          return parsed.filter((p: Product) => !p.id.startsWith('saena-0'));
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return [];
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -305,17 +319,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const unsubProducts = onSnapshot(
       collection(db, productsPath),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteProducts: Product[] = [];
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data() as Product;
-            remoteProducts.push(data);
-          });
-          if (isMounted) {
-            setProducts(remoteProducts);
-            setIsFirebaseConnected(true);
-            setFirebaseSyncStatus('connected');
-          }
+        const remoteProducts: Product[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as Product;
+          remoteProducts.push(data);
+        });
+        if (isMounted) {
+          setProducts(remoteProducts);
+          setIsFirebaseConnected(true);
+          setFirebaseSyncStatus('connected');
         }
       },
       (error) => {
@@ -635,6 +647,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const deleteAllProducts = async (): Promise<number> => {
+    setProducts([]);
+    setCart([]);
+    setWishlist([]);
+    setSelectedProductForDetail(null);
+    try {
+      localStorage.removeItem('saena_products_v1');
+      localStorage.removeItem('saena_cart_v1');
+      localStorage.removeItem('saena_wishlist_v1');
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    try {
+      setFirebaseSyncStatus('syncing');
+      const count = await deleteAllProductsFromFirestore();
+      setFirebaseSyncStatus('connected');
+      setIsFirebaseConnected(true);
+      sendPushNotification(
+        'Katalog Toko Dikosongkan 🗑️',
+        'Semua produk dan foto varian telah berhasil dihapus dari toko dan database Firestore.',
+        'system'
+      );
+      return count;
+    } catch (err) {
+      console.warn('Delete all products from Firestore error:', err);
+      return 0;
+    }
+  };
+
   const updateStock = (productId: string, key: string, newStock: number) => {
     updateColorStock(productId, key, newStock);
   };
@@ -732,6 +774,91 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     return fullProduct;
+  };
+
+  const addMultipleProducts = async (newProds: Partial<Product>[]): Promise<Product[]> => {
+    if (!newProds.length) return [];
+
+    const now = Date.now();
+    const createdProducts: Product[] = newProds.map((newProd, idx) => {
+      const id = newProd.id || `saena-${now.toString().slice(-4)}-${idx + 1}`;
+      const initialColors = newProd.colors?.length ? newProd.colors : [
+        { name: 'Emerald Forest', hex: '#1C3B2B', stock: 15, image: 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop' }
+      ];
+
+      const initialStock: Record<string, number> = {};
+      initialColors.forEach(col => {
+        initialStock[col.name] = typeof col.stock === 'number' ? col.stock : 10;
+      });
+      const total = Object.values(initialStock).reduce((a, b) => a + b, 0);
+
+      const colorImages = initialColors.map(c => c.image).filter(Boolean) as string[];
+      const combinedImages = Array.from(new Set([...(newProd.images || []), ...colorImages])).filter(Boolean);
+
+      const fullProduct: Product = {
+        id,
+        name: newProd.name || `Koleksi Baru saena.id #${idx + 1}`,
+        slug: (newProd.name || `koleksi-baru-${idx + 1}`).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        category: newProd.category || 'abaya-gamis',
+        price: newProd.price || 499000,
+        originalPrice: newProd.originalPrice || (newProd.price ? Math.round(newProd.price * 1.15 / 5000) * 5000 : 599000),
+        rating: 5.0,
+        reviewCount: 0,
+        description: newProd.description || 'Busana muslimah eksklusif saena.id dengan cutting rapi, bahan jatuh berkelas, dan jahitan standar butik.',
+        shortDescription: newProd.shortDescription,
+        sourceUrl: newProd.sourceUrl,
+        sku: newProd.sku || `SKU-${now.toString().slice(-4)}-${idx + 1}`,
+        weight: newProd.weight || 450,
+        dimensions: newProd.dimensions || { length: 25, width: 20, height: 4 },
+        discount: newProd.discount,
+        currency: newProd.currency || 'IDR',
+        material: newProd.material || 'Mulberry Silk & Ceruty Babydoll Premium',
+        careInstructions: newProd.careInstructions?.length ? newProd.careInstructions : [
+          'Cuci dengan tangan suhu air normal',
+          'Gunakan deterjen cair lembut',
+          'Keringkan di tempat teduh',
+          'Setrika suhu rendah atau gunakan garment steamer'
+        ],
+        features: newProd.features?.length ? newProd.features : [
+          'Busui Friendly (Aksen zipper depan)',
+          'Wudhu Friendly (Manset lengan rapi)',
+          'Bahan adem, jatuh, dan tidak terawang',
+          'Jahitan halus standar butik'
+        ],
+        colors: initialColors,
+        sizes: newProd.sizes?.length ? newProd.sizes : ['All Size', 'M', 'L', 'XL'],
+        stock: initialStock,
+        totalStock: total,
+        images: combinedImages.length ? combinedImages : [
+          'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop'
+        ],
+        isNewArrival: true,
+        reviews: []
+      };
+
+      return fullProduct;
+    });
+
+    setProducts(prev => [...createdProducts, ...prev]);
+
+    // Save batch concurrently to Firestore
+    try {
+      setFirebaseSyncStatus('syncing');
+      await Promise.allSettled(
+        createdProducts.map(prod => syncProductToFirestore(prod))
+      );
+      setFirebaseSyncStatus('connected');
+      setIsFirebaseConnected(true);
+      sendPushNotification(
+        'Impor Excel Berhasil 📊',
+        `${createdProducts.length} produk baru berhasil dimasukkan ke katalog dan disinkronkan ke database Firestore.`,
+        'system'
+      );
+    } catch (err) {
+      console.warn('Batch Firestore sync notice:', err);
+    }
+
+    return createdProducts;
   };
 
   // Reviews
@@ -1137,9 +1264,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateColorStock,
         updateProduct,
         deleteProduct,
+        deleteAllProducts,
         quickRestock,
         updateProductPrice,
         addNewProduct,
+        addMultipleProducts,
         addProductReview,
         sendPushNotification,
         markNotificationAsRead,

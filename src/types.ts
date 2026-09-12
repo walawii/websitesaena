@@ -35,6 +35,17 @@ export interface Product {
   rating: number;
   reviewCount: number;
   description: string;
+  shortDescription?: string;
+  sourceUrl?: string;
+  sku?: string;
+  weight?: number; // Berat Paket (gram)
+  dimensions?: {
+    length?: number;
+    width?: number;
+    height?: number;
+  };
+  discount?: number;
+  currency?: string;
   material: string;
   careInstructions: string[];
   features: string[];

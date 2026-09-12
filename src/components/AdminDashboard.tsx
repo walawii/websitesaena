@@ -27,11 +27,14 @@ import {
   ShieldCheck,
   Check,
   LogOut,
-  Trash2
+  Trash2,
+  FileSpreadsheet
 } from 'lucide-react';
 import { OrderStatus, Category, Product } from '../types';
 import { ProductEditModal } from './ProductEditModal';
 import { CreateProductModal } from './CreateProductModal';
+import { ImportMarketplaceModal } from './ImportMarketplaceModal';
+import { ExcelImportModal } from './ExcelImportModal';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -46,6 +49,7 @@ export const AdminDashboard: React.FC = () => {
     quickRestock,
     updateProductPrice,
     addNewProduct,
+    deleteAllProducts,
     sendPushNotification,
     setIsAdminMode,
     setActiveWhatsAppOrder,
@@ -66,9 +70,14 @@ export const AdminDashboard: React.FC = () => {
   // Delete Product State
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
-  // New Product Modal State
+  // New Product & Marketplace Import Modal States
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isImportMarketplaceOpen, setIsImportMarketplaceOpen] = useState(false);
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
+  const [importedInitialData, setImportedInitialData] = useState<any | null>(null);
 
   // Push Broadcast State
   const [pushTitle, setPushTitle] = useState('✨ Flash Sale Spesial Ramadhan saena.id!');
@@ -633,13 +642,51 @@ export const AdminDashboard: React.FC = () => {
                 </p>
               </div>
 
-              <button
-                onClick={() => setIsAddProductOpen(true)}
-                className="px-4 py-2 bg-[#1C3B2B] text-white text-xs font-semibold rounded-xl hover:bg-[#28523C] shadow-sm flex items-center gap-1.5 transition-all self-start sm:self-auto"
-              >
-                <Plus className="w-4 h-4 text-[#C5A880]" />
-                <span>Tambah Busana Baru</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+                <button
+                  id="open-excel-import-btn"
+                  onClick={() => setIsExcelImportOpen(true)}
+                  className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                  title="Impor produk massal menggunakan format spreadsheet Excel (.xlsx / .xls)"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-100" />
+                  <span>Upload Excel / XLS</span>
+                </button>
+
+                <button
+                  id="open-marketplace-import-btn"
+                  onClick={() => setIsImportMarketplaceOpen(true)}
+                  className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                  title="Impor produk otomatis hanya dengan menempelkan link Shopee atau TikTok"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-stone-950" />
+                  <span>Impor Link Shopee / TikTok</span>
+                </button>
+
+                <button
+                  id="open-manual-add-product-btn"
+                  onClick={() => {
+                    setImportedInitialData(null);
+                    setIsAddProductOpen(true);
+                  }}
+                  className="px-4 py-2 bg-[#1C3B2B] text-white text-xs font-semibold rounded-xl hover:bg-[#28523C] shadow-sm flex items-center gap-1.5 transition-all"
+                >
+                  <Plus className="w-4 h-4 text-[#C5A880]" />
+                  <span>Tambah Busana Baru</span>
+                </button>
+
+                {products.length > 0 && (
+                  <button
+                    id="open-delete-all-products-btn"
+                    onClick={() => setIsDeleteAllModalOpen(true)}
+                    className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-200 text-xs font-semibold rounded-xl shadow-2xs flex items-center gap-1.5 transition-all"
+                    title="Hapus semua produk dari katalog dan database Firestore"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Hapus Semua Produk</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Inventory Table */}
@@ -655,7 +702,40 @@ export const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F2ECE4]">
-                  {products.map(product => {
+                  {products.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center">
+                        <div className="max-w-md mx-auto space-y-3">
+                          <div className="w-12 h-12 rounded-full bg-[#F3EFEA] text-[#8C8377] flex items-center justify-center mx-auto">
+                            <Trash2 className="w-6 h-6 stroke-1 text-[#C5A880]" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-[#1C3B2B]">Katalog Saat Ini Kosong</h4>
+                            <p className="text-xs text-[#7A7266] mt-1">
+                              Semua produk dan gambar telah dihapus dari toko dan database. Anda dapat mengunggah file Excel / XLS baru atau menempelkan tautan Shopee/TikTok untuk mengisi katalog.
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 pt-1">
+                            <button
+                              onClick={() => setIsExcelImportOpen(true)}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1 transition-all"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                              <span>Upload Excel</span>
+                            </button>
+                            <button
+                              onClick={() => setIsImportMarketplaceOpen(true)}
+                              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1 transition-all"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Impor Link Shopee / TikTok</span>
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    products.map(product => {
                     const isLow = product.totalStock <= 10;
                     const isOut = product.totalStock === 0;
 
@@ -857,7 +937,7 @@ export const AdminDashboard: React.FC = () => {
                         </td>
                       </tr>
                     );
-                  })}
+                  }))}
                 </tbody>
               </table>
             </div>
@@ -1169,10 +1249,39 @@ export const AdminDashboard: React.FC = () => {
 
       </div>
 
+      {/* MODAL: Otomatisasi Impor Produk dari Shopee atau TikTok */}
+      <ImportMarketplaceModal
+        isOpen={isImportMarketplaceOpen}
+        onClose={() => setIsImportMarketplaceOpen(false)}
+        onOpenManualWithData={(data) => {
+          setImportedInitialData(data);
+          setIsImportMarketplaceOpen(false);
+          setIsAddProductOpen(true);
+        }}
+      />
+
+      {/* MODAL: Impor Massal Produk via Format Excel / XLS */}
+      <ExcelImportModal
+        isOpen={isExcelImportOpen}
+        onClose={() => setIsExcelImportOpen(false)}
+      />
+
       {/* MODAL: Tambah Busana Baru (Rincian Stok per Warna, Deskripsi & Foto per Warna Tersimpan ke Database) */}
       <CreateProductModal
         isOpen={isAddProductOpen}
-        onClose={() => setIsAddProductOpen(false)}
+        onClose={() => {
+          setIsAddProductOpen(false);
+          setImportedInitialData(null);
+        }}
+        initialData={importedInitialData}
+        onOpenMarketplaceImport={() => {
+          setIsAddProductOpen(false);
+          setIsImportMarketplaceOpen(true);
+        }}
+        onOpenExcelImport={() => {
+          setIsAddProductOpen(false);
+          setIsExcelImportOpen(true);
+        }}
       />
 
       {/* Edit Product Modal (Rincian Stok, Deskripsi & Foto per Warna) */}
@@ -1255,6 +1364,71 @@ export const AdminDashboard: React.FC = () => {
                   <>
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Ya, Hapus Produk</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus SEMUA Produk */}
+      {isDeleteAllModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#EAE2D5] space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-display text-base font-bold text-[#1C3B2B]">
+                  Kosongkan Semua Produk dari Toko?
+                </h3>
+                <p className="text-xs text-[#7A7266]">
+                  Tindakan ini akan menghapus <strong>seluruh produk ({products.length} item)</strong> beserta semua foto varian warna dan stoknya secara permanen dari katalog etalase dan database Cloud Firestore.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 text-[11px] text-rose-800">
+              ⚠️ <strong>Peringatan:</strong> Tindakan ini tidak dapat dibatalkan. Seluruh katalog toko dan database Firestore akan dikosongkan.
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#EAE2D5]">
+              <button
+                type="button"
+                onClick={() => setIsDeleteAllModalOpen(false)}
+                disabled={isDeletingAll}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#524B40] hover:bg-[#F3EFEA] transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                id="confirm-delete-all-products-btn"
+                disabled={isDeletingAll}
+                onClick={async () => {
+                  setIsDeletingAll(true);
+                  try {
+                    await deleteAllProducts();
+                    setIsDeleteAllModalOpen(false);
+                  } catch (err) {
+                    console.error('Error deleting all products:', err);
+                  } finally {
+                    setIsDeletingAll(false);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+              >
+                {isDeletingAll ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menghapus Semua...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Ya, Hapus Semua Produk</span>
                   </>
                 )}
               </button>

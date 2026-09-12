@@ -13,7 +13,8 @@ import {
   RefreshCw, 
   AlertCircle,
   Link,
-  ChevronDown
+  ChevronDown,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Category, ProductColor } from '../types';
 import { useStore } from '../context/StoreContext';
@@ -22,36 +23,75 @@ import { compressAndEncodeImage, CURATED_COLOR_PRESETS } from '../utils/imageHel
 interface CreateProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialData?: Partial<{
+    name: string;
+    category: Category;
+    price: number;
+    originalPrice: number;
+    material: string;
+    description: string;
+    colors: ProductColor[];
+    images: string[];
+    careInstructions: string[];
+    features: string[];
+    sizes: string[];
+  }> | null;
+  onOpenMarketplaceImport?: () => void;
+  onOpenExcelImport?: () => void;
 }
 
-export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose }) => {
+export const CreateProductModal: React.FC<CreateProductModalProps> = ({ 
+  isOpen, 
+  onClose,
+  initialData,
+  onOpenMarketplaceImport,
+  onOpenExcelImport
+}) => {
   const { addNewProduct, formatPrice, sendPushNotification } = useStore();
 
   // Basic info states
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState<Category>('abaya-gamis');
-  const [price, setPrice] = useState<number>(495000);
-  const [originalPrice, setOriginalPrice] = useState<number>(595000);
-  const [material, setMaterial] = useState('Arabian Mulberry Silk Premium');
+  const [name, setName] = useState(initialData?.name || '');
+  const [category, setCategory] = useState<Category>(initialData?.category || 'abaya-gamis');
+  const [price, setPrice] = useState<number>(initialData?.price || 495000);
+  const [originalPrice, setOriginalPrice] = useState<number>(initialData?.originalPrice || 595000);
+  const [material, setMaterial] = useState(initialData?.material || 'Arabian Mulberry Silk Premium');
   const [description, setDescription] = useState(
+    initialData?.description ||
     'Koleksi busana syar\'i eksklusif dengan siluet anggun, jahitan butik presisi, ramah wudhu (zipper manset), dan bukaan depan (busui friendly). Nyaman dipakai sepanjang hari dengan drape kain jatuh mewah.'
   );
 
-  // Colors state: start with 2 elegant starter variants
-  const [colors, setColors] = useState<ProductColor[]>([
-    {
-      name: 'Emerald Forest',
-      hex: '#1C3B2B',
-      stock: 15,
-      image: CURATED_COLOR_PRESETS[0].url
-    },
-    {
-      name: 'Champagne Mocca',
-      hex: '#9E866C',
-      stock: 12,
-      image: CURATED_COLOR_PRESETS[1].url
+  // Colors state
+  const [colors, setColors] = useState<ProductColor[]>(
+    initialData?.colors && initialData.colors.length > 0
+      ? initialData.colors
+      : [
+          {
+            name: 'Emerald Forest',
+            hex: '#1C3B2B',
+            stock: 15,
+            image: CURATED_COLOR_PRESETS[0].url
+          },
+          {
+            name: 'Champagne Mocca',
+            hex: '#9E866C',
+            stock: 12,
+            image: CURATED_COLOR_PRESETS[1].url
+          }
+        ]
+  );
+
+  // Sync when initialData changes
+  React.useEffect(() => {
+    if (initialData) {
+      if (initialData.name) setName(initialData.name);
+      if (initialData.category) setCategory(initialData.category);
+      if (typeof initialData.price === 'number') setPrice(initialData.price);
+      if (typeof initialData.originalPrice === 'number') setOriginalPrice(initialData.originalPrice);
+      if (initialData.material) setMaterial(initialData.material);
+      if (initialData.description) setDescription(initialData.description);
+      if (initialData.colors && initialData.colors.length > 0) setColors(initialData.colors);
     }
-  ]);
+  }, [initialData]);
 
   // UI state
   const [isSaving, setIsSaving] = useState(false);
@@ -237,6 +277,49 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
             <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2.5">
               <Check className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>Koleksi busana baru & foto varian berhasil disimpan ke database Firestore!</span>
+            </div>
+          )}
+
+          {/* Quick Marketplace & Excel Import Shortcut Banner */}
+          {(onOpenMarketplaceImport || onOpenExcelImport) && (
+            <div className="p-4 rounded-xl bg-stone-950 border border-amber-500/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 shadow-inner">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-amber-200">
+                    Otomatisasi Input Produk
+                  </h4>
+                  <p className="text-[11px] text-stone-400">
+                    Gunakan file Excel (.xlsx / .xls) untuk impor massal atau tempel link Shopee/TikTok.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end lg:self-auto shrink-0">
+                {onOpenExcelImport && (
+                  <button
+                    type="button"
+                    id="open-excel-from-create-modal-btn"
+                    onClick={onOpenExcelImport}
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-sm flex items-center gap-1.5"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+                    <span>Impor Excel (.xlsx)</span>
+                  </button>
+                )}
+                {onOpenMarketplaceImport && (
+                  <button
+                    type="button"
+                    id="open-marketplace-from-create-modal-btn"
+                    onClick={onOpenMarketplaceImport}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs transition-colors shadow-sm flex items-center gap-1.5"
+                  >
+                    <Link className="w-3.5 h-3.5" />
+                    <span>Impor via Link</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
