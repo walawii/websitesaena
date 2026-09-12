@@ -1,0 +1,134 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Koleksi busana muslimah premium saena.id",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "name": { "type": "string", "maxLength": 150 },
+        "sku": { "type": "string", "maxLength": 50 },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "category": { "type": "string", "maxLength": 50 },
+        "stock": { "type": "object" },
+        "totalStock": { "type": "number" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "isBestSeller": { "type": "boolean" },
+        "isNewArrival": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "images": { "type": "array" },
+        "sizes": { "type": "array" },
+        "colors": { "type": "array" },
+        "fabric": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "careInstructions": { "type": "string", "maxLength": 1000 },
+        "tags": { "type": "array" },
+        "weightGrams": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "price", "category", "stock"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Pesanan busana dan transaksi pelanggan saena.id",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "customer": { "type": "object" },
+        "items": { "type": "array" },
+        "shipping": { "type": "object" },
+        "payment": { "type": "object" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "couponCode": { "type": "string", "maxLength": 30 },
+        "shippingCost": { "type": "number" },
+        "total": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "currencyRate": { "type": "number" },
+        "status": { "type": "string", "maxLength": 30 },
+        "trackingNumber": { "type": "string", "maxLength": 60 },
+        "trackingHistory": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "customer", "items", "shipping", "payment", "total", "status"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Voucher diskon belanja saena.id",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "code": { "type": "string", "maxLength": 30 },
+        "discountPercent": { "type": "number" },
+        "maxDiscount": { "type": "number" },
+        "minSpend": { "type": "number" },
+        "expiryDate": { "type": "string" },
+        "usageCount": { "type": "number" },
+        "maxUsage": { "type": "number" },
+        "description": { "type": "string", "maxLength": 300 },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "code", "discountPercent", "isActive"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Ulasan pelanggan terverifikasi",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "productId": { "type": "string", "maxLength": 64 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "rating": { "type": "number" },
+        "review": { "type": "string", "maxLength": 1000 },
+        "verified": { "type": "boolean" },
+        "date": { "type": "string" },
+        "fitRating": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "productId", "customerName", "rating", "review"]
+    },
+    "StoreSetting": {
+      "title": "StoreSetting",
+      "description": "Pengaturan warehouse origin dan metadata toko",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "storeName": { "type": "string", "maxLength": 100 },
+        "originSubdistrict": { "type": "string", "maxLength": 100 },
+        "originCity": { "type": "string", "maxLength": 100 },
+        "originProvince": { "type": "string", "maxLength": 100 },
+        "originPostalCode": { "type": "string", "maxLength": 20 },
+        "warehouseName": { "type": "string", "maxLength": 150 },
+        "address": { "type": "string", "maxLength": 300 },
+        "contactWhatsApp": { "type": "string", "maxLength": 30 }
+      },
+      "required": ["id", "storeName", "originCity"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Koleksi katalog produk busana muslimah"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Daftar pesanan transaksi dan resi ekspedisi"
+    },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Voucher diskon aktif"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Ulasan kepuasan produk dari pelanggan"
+    },
+    "/store_settings/{settingId}": {
+      "schema": "StoreSetting",
+      "description": "Informasi butik dan alamat warehouse pengiriman"
+    }
+  }
+}
