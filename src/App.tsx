@@ -11,6 +11,8 @@ import { OrderTrackingModal } from './components/OrderTrackingModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { NotificationToast } from './components/NotificationToast';
+import { MengantarLabelModal } from './components/MengantarLabelModal';
+import { MengantarConfigModal } from './components/MengantarConfigModal';
 import { Footer } from './components/Footer';
 import { 
   Filter, 
@@ -34,7 +36,9 @@ const MainContent: React.FC = () => {
     selectedProductForDetail,
     setSelectedProductForDetail,
     selectedCategory,
+    setSelectedCategory,
     searchQuery,
+    setSearchQuery,
     sortBy,
     setSortBy,
     priceRange,
@@ -43,7 +47,13 @@ const MainContent: React.FC = () => {
     formatPrice,
     isAuthenticatedAdmin,
     setIsAdminMode,
-    setIsAdminLoginModalOpen
+    setIsAdminLoginModalOpen,
+    reseedDatabase,
+    isMengantarLabelModalOpen,
+    setIsMengantarLabelModalOpen,
+    activeMengantarLabelOrder,
+    isMengantarConfigModalOpen,
+    setIsMengantarConfigModalOpen
   } = useStore();
 
   // Global Admin Access Shortcut: Ctrl + Shift + A (or Cmd + Shift + A)
@@ -186,7 +196,14 @@ const MainContent: React.FC = () => {
                     Seluruh produk dan foto varian telah berhasil dihapus dari toko dan database. Anda dapat mengimpor produk baru secara otomatis melalui file Excel/XLS atau link Shopee & TikTok di panel pengelola.
                   </p>
                 </div>
-                <div className="pt-2">
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => reseedDatabase()}
+                    className="px-5 py-2.5 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-xs font-semibold rounded-xl transition-all shadow-sm inline-flex items-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4 text-[#C5A880]" />
+                    <span>Muat Koleksi Produk Terbaru</span>
+                  </button>
                   <button
                     onClick={() => {
                       if (isAuthenticatedAdmin) {
@@ -195,10 +212,9 @@ const MainContent: React.FC = () => {
                         setIsAdminLoginModalOpen(true);
                       }
                     }}
-                    className="px-5 py-2.5 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-xs font-semibold rounded-xl transition-all shadow-sm inline-flex items-center gap-2"
+                    className="px-5 py-2.5 bg-white border border-[#DCD2C3] hover:bg-[#FAF8F5] text-[#1C3B2B] text-xs font-semibold rounded-xl transition-all shadow-xs inline-flex items-center gap-2"
                   >
-                    <Sparkles className="w-4 h-4 text-[#C5A880]" />
-                    <span>Buka Panel Admin & Tambah Koleksi Baru</span>
+                    <span>Buka Panel Admin</span>
                   </button>
                 </div>
               </div>
@@ -218,10 +234,10 @@ const MainContent: React.FC = () => {
                 <button
                   onClick={() => {
                     setPriceRange([0, 1500000]);
-                    useStore().setSearchQuery('');
-                    useStore().setSelectedCategory('all');
+                    setSearchQuery('');
+                    setSelectedCategory('all');
                   }}
-                  className="px-5 py-2 bg-[#1C3B2B] text-white text-xs font-semibold rounded-full"
+                  className="px-5 py-2 bg-[#1C3B2B] text-white text-xs font-semibold rounded-full cursor-pointer hover:bg-[#28523C] transition-all"
                 >
                   Reset Semua Filter
                 </button>
@@ -385,6 +401,18 @@ const MainContent: React.FC = () => {
       <OrderTrackingModal />
       <AdminLoginModal />
       <NotificationToast />
+
+      {/* Mengantar.com Modals */}
+      <MengantarLabelModal
+        order={activeMengantarLabelOrder}
+        isOpen={isMengantarLabelModalOpen}
+        onClose={() => setIsMengantarLabelModalOpen(false)}
+      />
+
+      <MengantarConfigModal
+        isOpen={isMengantarConfigModalOpen}
+        onClose={() => setIsMengantarConfigModalOpen(false)}
+      />
 
     </div>
   );

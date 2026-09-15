@@ -11,11 +11,14 @@ import {
   CustomerDetails,
   ShippingMethod,
   PaymentChannel,
-  ProductReview
+  ProductReview,
+  MengantarStoreConfig,
+  MengantarOrderData
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_ORDERS, SHIPPING_SERVICES, AVAILABLE_COUPONS } from '../data/mockData';
 import { translations } from '../translations';
 import confetti from 'canvas-confetti';
+import { DEFAULT_MENGANTAR_CONFIG, createMengantarOrderApi } from '../utils/mengantarClient';
 import { 
   db, 
   testConnection, 
@@ -82,6 +85,17 @@ interface StoreContextType {
   isAdminLoginModalOpen: boolean;
   selectedProductForDetail: Product | null;
   activeWhatsAppOrder: Order | null;
+  
+  // Mengantar.com Integration
+  mengantarConfig: MengantarStoreConfig;
+  updateMengantarConfig: (cfg: Partial<MengantarStoreConfig>) => void;
+  dispatchOrderToMengantar: (orderId: string) => Promise<{ success: boolean; message: string; trackingNumber?: string; mengantarOrderId?: string }>;
+  activeMengantarLabelOrder: Order | null;
+  setActiveMengantarLabelOrder: (o: Order | null) => void;
+  isMengantarLabelModalOpen: boolean;
+  setIsMengantarLabelModalOpen: (open: boolean) => void;
+  isMengantarConfigModalOpen: boolean;
+  setIsMengantarConfigModalOpen: (open: boolean) => void;
   
   // Search & Filter
   searchQuery: string;
@@ -168,14 +182,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // If Firestore is empty, we don't restore old mock products
-          return parsed.filter((p: Product) => !p.id.startsWith('saena-0'));
+          return parsed;
         }
       }
     } catch {
       // ignore
     }
-    return [];
+    return INITIAL_PRODUCTS;
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -264,6 +277,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [activeWhatsAppOrder, setActiveWhatsAppOrder] = useState<Order | null>(null);
   const [activeOrder, setActiveOrder] = useState<Order | null>(() => orders[0] || null);
 
+  // Mengantar.com Integration State
+  const [mengantarConfig, setMengantarConfig] = useState<MengantarStoreConfig>(() => {
+    try {
+      const saved = localStorage.getItem('saena_mengantar_config_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return DEFAULT_MENGANTAR_CONFIG;
+  });
+  const [activeMengantarLabelOrder, setActiveMengantarLabelOrder] = useState<Order | null>(null);
+  const [isMengantarLabelModalOpen, setIsMengantarLabelModalOpen] = useState(false);
+  const [isMengantarConfigModalOpen, setIsMengantarConfigModalOpen] = useState(false);
+
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -325,13 +352,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           remoteProducts.push(data);
         });
         if (isMounted) {
-          setProducts(remoteProducts);
+          if (remoteProducts.length > 0) {
+            setProducts(remoteProducts);
+          } else if (INITIAL_PRODUCTS.length > 0) {
+            setProducts(INITIAL_PRODUCTS);
+            // Auto seed to Firestore if remote collection is empty
+            INITIAL_PRODUCTS.forEach(p => syncProductToFirestore(p).catch(() => {}));
+          }
           setIsFirebaseConnected(true);
           setFirebaseSyncStatus('connected');
         }
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, productsPath);
+        if (isMounted) {
+          setProducts(prev => prev.length > 0 ? prev : INITIAL_PRODUCTS);
+        }
       }
     );
 
@@ -729,7 +765,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const addNewProduct = async (newProd: Partial<Product>): Promise<Product> => {
     const id = `saena-${Date.now().toString().slice(-4)}`;
     const initialColors = newProd.colors?.length ? newProd.colors : [
-      { name: 'Emerald Forest', hex: '#1C3B2B', stock: 10, image: 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop' }
+      { name: 'Emerald Forest', hex: '#1C3B2B', stock: 10, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop' }
     ];
     const initialStock: Record<string, number> = {};
     initialColors.forEach(col => {
@@ -758,7 +794,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       stock: initialStock,
       totalStock: total,
       images: combinedImages.length ? combinedImages : [
-        'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop'
+        'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop'
       ],
       isNewArrival: true,
       reviews: []
@@ -783,7 +819,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const createdProducts: Product[] = newProds.map((newProd, idx) => {
       const id = newProd.id || `saena-${now.toString().slice(-4)}-${idx + 1}`;
       const initialColors = newProd.colors?.length ? newProd.colors : [
-        { name: 'Emerald Forest', hex: '#1C3B2B', stock: 15, image: 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop' }
+        { name: 'Emerald Forest', hex: '#1C3B2B', stock: 15, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop' }
       ];
 
       const initialStock: Record<string, number> = {};
@@ -830,7 +866,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         stock: initialStock,
         totalStock: total,
         images: combinedImages.length ? combinedImages : [
-          'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop'
+          'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop'
         ],
         isNewArrival: true,
         reviews: []
@@ -1024,6 +1060,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       newOrder.id
     );
 
+    // Auto-dispatch COD orders to Mengantar.com if enabled
+    if (paymentChannel === 'cod' && mengantarConfig.autoCreateOnPaid) {
+      setTimeout(() => {
+        dispatchOrderToMengantar(newOrder.id).catch(err => {
+          console.warn('Auto dispatch COD to Mengantar error:', err);
+        });
+      }, 700);
+    }
+
     return newOrder;
   };
 
@@ -1081,6 +1126,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Automatically trigger WhatsApp notification modal
     setIsWhatsAppModalOpen(true);
+
+    // Automatically dispatch paid order to Mengantar.com to generate resi
+    if (mengantarConfig.autoCreateOnPaid) {
+      setTimeout(() => {
+        dispatchOrderToMengantar(orderId).catch(err => {
+          console.warn('Auto dispatch paid order to Mengantar error:', err);
+        });
+      }, 700);
+    }
   };
 
   // Admin or system update order status
@@ -1156,6 +1210,85 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
   };
 
+  const updateMengantarConfig = (newCfg: Partial<MengantarStoreConfig>) => {
+    setMengantarConfig(prev => {
+      const updated = { ...prev, ...newCfg };
+      try {
+        localStorage.setItem('saena_mengantar_config_v1', JSON.stringify(updated));
+      } catch (e) {
+        // ignore
+      }
+      return updated;
+    });
+  };
+
+  const dispatchOrderToMengantar = async (
+    orderId: string
+  ): Promise<{ success: boolean; message: string; trackingNumber?: string; mengantarOrderId?: string }> => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    if (!targetOrder) {
+      return { success: false, message: 'Pesanan tidak ditemukan di sistem' };
+    }
+
+    const apiRes = await createMengantarOrderApi(targetOrder, mengantarConfig);
+    if (!apiRes.success || !apiRes.data) {
+      return { success: false, message: apiRes.message || 'Gagal menerbitkan pesanan ke Mengantar.com' };
+    }
+
+    const mengantarData = apiRes.data;
+    const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+
+    let updatedOrderObj: Order | null = null;
+    setOrders(prev => prev.map(ord => {
+      if (ord.id === orderId) {
+        const trackingHistory = [
+          ...ord.trackingHistory,
+          {
+            time: nowStr,
+            location: 'Central Warehouse Tamansari Tasikmalaya (Mengantar.com Hub)',
+            description: `Pesanan berhasil diterbitkan di Mengantar.com (${mengantarData.mengantarOrderId}). Nomor resi ${mengantarData.courier}: ${mengantarData.trackingNumber}. Jadwal pickup kurir: ${mengantarData.pickupTime}.`
+          }
+        ];
+
+        updatedOrderObj = {
+          ...ord,
+          trackingNumber: mengantarData.trackingNumber,
+          status: ord.status === 'menunggu_pembayaran' ? ord.status : 'sedang_dikemas',
+          mengantar: mengantarData,
+          trackingHistory
+        };
+        return updatedOrderObj;
+      }
+      return ord;
+    }));
+
+    if (updatedOrderObj) {
+      if (activeOrder?.id === orderId) {
+        setActiveOrder(updatedOrderObj);
+      }
+      setActiveMengantarLabelOrder(updatedOrderObj);
+
+      // Sync updated order with Mengantar resi to Firestore
+      syncOrderToFirestore(updatedOrderObj).catch(err => {
+        console.warn('Sync Mengantar order to Firestore error:', err);
+      });
+
+      sendPushNotification(
+        `Mengantar.com: Resi Terbit! 📦`,
+        `Pesanan ${orderId} terdaftar di Mengantar (${mengantarData.courier} - ${mengantarData.trackingNumber}).`,
+        'order',
+        orderId
+      );
+    }
+
+    return {
+      success: true,
+      message: apiRes.message || 'Pesanan berhasil terhubung ke Mengantar.com!',
+      trackingNumber: mengantarData.trackingNumber,
+      mengantarOrderId: mengantarData.mengantarOrderId
+    };
+  };
+
   const loginAsAdmin = (secret: string): { success: boolean; message: string } => {
     const trimmed = secret.trim();
     // Valid admin credentials:
@@ -1229,6 +1362,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         logoutAdmin,
         selectedProductForDetail,
         activeWhatsAppOrder,
+        mengantarConfig,
+        updateMengantarConfig,
+        dispatchOrderToMengantar,
+        activeMengantarLabelOrder,
+        setActiveMengantarLabelOrder,
+        isMengantarLabelModalOpen,
+        setIsMengantarLabelModalOpen,
+        isMengantarConfigModalOpen,
+        setIsMengantarConfigModalOpen,
         searchQuery,
         selectedCategory,
         sortBy,

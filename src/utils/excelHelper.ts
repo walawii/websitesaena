@@ -43,7 +43,7 @@ export const EXCEL_IMPORT_COLUMNS = [
 
 // Curated high quality fallback photos
 export const CURATED_FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=800&auto=format&fit=crop',
@@ -155,7 +155,7 @@ export const SAMPLE_EXCEL_ROWS = [
     'Panjang Paket': 30,
     'Lebar Paket': 22,
     'Tinggi Paket': 4,
-    'Foto Produk 1': 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop',
+    'Foto Produk 1': 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop',
     'Foto Produk 2': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
     'Foto Produk 3': '',
     'Foto Produk 4': '',
@@ -164,7 +164,7 @@ export const SAMPLE_EXCEL_ROWS = [
     'Foto Produk 7': '',
     'Foto Produk 8': '',
     'Foto Produk 9': '',
-    'Gambar Variasi 1': 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop',
+    'Gambar Variasi 1': 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop',
     'Gambar Variasi 2': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
     'Gambar Variasi 3': 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop',
     'Gambar Variasi 4': '',
@@ -205,7 +205,7 @@ export const SAMPLE_EXCEL_ROWS = [
     'Foto Produk 9': '',
     'Gambar Variasi 1': 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=800&auto=format&fit=crop',
     'Gambar Variasi 2': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
-    'Gambar Variasi 3': 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop',
+    'Gambar Variasi 3': 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop',
     'Gambar Variasi 4': '',
     'Gambar Variasi 5': '',
     'Gambar Variasi 6': '',

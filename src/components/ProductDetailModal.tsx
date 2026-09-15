@@ -121,6 +121,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   src={displayedImage}
                   alt={`${product.name} - ${selectedColor.name}`}
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
+                  }}
                   className="w-full h-full object-cover object-center transition-all duration-300"
                 />
                 <button
@@ -142,7 +145,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                         activeImageIndex === idx ? 'border-[#1C3B2B] ring-2 ring-[#1C3B2B]/20' : 'border-transparent opacity-70 hover:opacity-100'
                       }`}
                     >
-                      <img src={img} alt="thumb" className="w-full h-full object-cover" />
+                      <img 
+                        src={img} 
+                        alt="thumb" 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
+                        }}
+                        className="w-full h-full object-cover" 
+                      />
                     </button>
                   ))}
                 </div>

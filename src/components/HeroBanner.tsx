@@ -4,7 +4,18 @@ import { Sparkles, ArrowRight, ShieldCheck, Truck, Clock, RefreshCw } from 'luci
 import { Category } from '../types';
 
 export const HeroBanner: React.FC = () => {
-  const { t, setSelectedCategory, selectedCategory, setIsOrderTrackingOpen } = useStore();
+  const { 
+    t, 
+    setSelectedCategory, 
+    selectedCategory, 
+    setIsOrderTrackingOpen,
+    products,
+    setSelectedProductForDetail,
+    formatPrice
+  } = useStore();
+
+  const heroProduct = products.find(p => p.id === 'saena-01') || products[0];
+  const heroImage = heroProduct?.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop';
 
   const categoryList: { id: Category; label: string }[] = [
     { id: 'all', label: t.categories.all },
@@ -110,28 +121,37 @@ export const HeroBanner: React.FC = () => {
               <div className="absolute -inset-2 rounded-3xl border border-[#C5A880]/50 rotate-1 pointer-events-none" />
               
               {/* Main Image */}
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl aspect-[4/5] bg-[#EAE2D5]">
+              <div 
+                onClick={() => heroProduct && setSelectedProductForDetail(heroProduct)}
+                className="relative rounded-2xl overflow-hidden shadow-2xl aspect-[4/5] bg-[#EAE2D5] cursor-pointer group"
+                title="Klik untuk melihat detail produk Madina Silk Abaya"
+              >
                 <img
-                  src="https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=900&auto=format&fit=crop"
-                  alt="Madina Silk Abaya saena.id"
-                  className="w-full h-full object-cover object-center transform hover:scale-105 transition-transform duration-700"
+                  src={heroImage}
+                  alt={heroProduct?.name || "Madina Silk Abaya saena.id"}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
+                  }}
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
                 />
                 
-                {/* Floating Floating Badge on Photo */}
-                <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md p-3.5 rounded-xl shadow-lg border border-[#EDE4D6] flex items-center justify-between">
+                {/* Floating Badge on Photo */}
+                <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md p-3.5 rounded-xl shadow-lg border border-[#EDE4D6] flex items-center justify-between group-hover:border-[#C5A880] transition-colors">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-[#B38F5B] tracking-wider">
+                    <span className="text-[10px] uppercase font-bold text-[#B38F5B] tracking-wider flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-[#B38F5B]" />
                       Signature Edition
                     </span>
-                    <h4 className="text-xs sm:text-sm font-semibold text-[#1C3B2B]">
-                      Madina Silk Abaya with French Khimar
+                    <h4 className="text-xs sm:text-sm font-semibold text-[#1C3B2B] line-clamp-1">
+                      {heroProduct?.name || "Madina Silk Abaya with French Khimar"}
                     </h4>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs sm:text-sm font-bold text-[#1C3B2B]">
-                      Rp 685.000
+                  <div className="text-right shrink-0 pl-2">
+                    <span className="text-xs sm:text-sm font-bold text-[#1C3B2B] block">
+                      {formatPrice(heroProduct?.price || 685000)}
                     </span>
-                    <span className="block text-[10px] text-[#2E7D32] font-semibold">
+                    <span className="inline-block text-[10px] text-[#2E7D32] font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-md">
                       Tersedia
                     </span>
                   </div>

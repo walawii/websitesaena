@@ -28,7 +28,11 @@ import {
   Check,
   LogOut,
   Trash2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Printer,
+  Building2,
+  QrCode,
+  FileText
 } from 'lucide-react';
 import { OrderStatus, Category, Product } from '../types';
 import { ProductEditModal } from './ProductEditModal';
@@ -36,6 +40,7 @@ import { CreateProductModal } from './CreateProductModal';
 import { ImportMarketplaceModal } from './ImportMarketplaceModal';
 import { ExcelImportModal } from './ExcelImportModal';
 import { DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
+import { testMengantarConnectionApi } from '../utils/mengantarClient';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -58,11 +63,21 @@ export const AdminDashboard: React.FC = () => {
     isFirebaseConnected,
     firebaseSyncStatus,
     reseedDatabase,
-    logoutAdmin
+    logoutAdmin,
+    mengantarConfig,
+    dispatchOrderToMengantar,
+    setActiveMengantarLabelOrder,
+    setIsMengantarLabelModalOpen,
+    setIsMengantarConfigModalOpen
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'inventory' | 'push' | 'database'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'inventory' | 'push' | 'database' | 'mengantar'>('analytics');
   const [orderFilterStatus, setOrderFilterStatus] = useState<string>('all');
+  const [dispatchingOrderId, setDispatchingOrderId] = useState<string | null>(null);
+  const [isBatchDispatching, setIsBatchDispatching] = useState(false);
+  const [batchDispatchMsg, setBatchDispatchMsg] = useState<string | null>(null);
+  const [testingMengantar, setTestingMengantar] = useState(false);
+  const [mengantarTestResult, setMengantarTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [isReseeding, setIsReseeding] = useState(false);
   const [reseedDone, setReseedDone] = useState(false);
@@ -315,6 +330,23 @@ export const AdminDashboard: React.FC = () => {
               }`} />
             </div>
           </button>
+
+          <button
+            onClick={() => setActiveTab('mengantar')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all border-b-2 whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'mengantar'
+                ? 'border-[#1C3B2B] text-[#1C3B2B] bg-white shadow-2xs'
+                : 'border-transparent text-[#787063] hover:text-[#1C3B2B]'
+            }`}
+          >
+            <Truck className="w-4 h-4 text-emerald-600" />
+            <div className="flex items-center gap-1.5">
+              <span>Mengantar.com</span>
+              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
+                {orders.filter(o => o.mengantar).length} Resi
+              </span>
+            </div>
+          </button>
         </div>
 
         {/* TAB 1: ANALYTICS & REPORTS */}
@@ -473,25 +505,73 @@ export const AdminDashboard: React.FC = () => {
         {/* TAB 2: ORDER MANAGEMENT */}
         {activeTab === 'orders' && (
           <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-4">
-            {/* Origin Warehouse Header Banner */}
-            <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#E2D8CA] flex flex-wrap items-center justify-between gap-2">
+            {/* Origin Warehouse Header Banner with Mengantar Integration Status */}
+            <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#E2D8CA] flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs">
                 <Truck className="w-4 h-4 text-[#1C3B2B]" />
-                <span className="font-bold text-[#1C3B2B]">Pusat Gudang Pengiriman:</span>
-                <span className="text-[#3D3830]">Kecamatan Tamansari, Kota Tasikmalaya, Jawa Barat (46196)</span>
+                <span className="font-bold text-[#1C3B2B]">Gudang Asal & Ekspedisi:</span>
+                <span className="text-[#3D3830]">Tamansari, Tasikmalaya (46196)</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                  <CheckCircle2 className="w-3 h-3" /> Mengantar.com ({mengantarConfig.environment})
+                </span>
               </div>
-              <span className="text-[10px] bg-[#1C3B2B] text-white font-medium px-2.5 py-0.5 rounded-full">
-                Acuan Resmi: JNE Express & J&T Express
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsMengantarConfigModalOpen(true)}
+                  className="text-xs bg-white text-[#1C3B2B] hover:bg-[#F4EFE6] border border-[#D5C9B8] font-bold px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+                >
+                  <span>⚙️ Atur Mengantar</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    const pendingPaid = orders.filter(o => (o.status === 'dibayar' || o.status === 'sedang_dikemas') && !o.mengantar);
+                    if (pendingPaid.length === 0) {
+                      setBatchDispatchMsg('Semua pesanan lunas sudah terhubung dengan Mengantar.com.');
+                      setTimeout(() => setBatchDispatchMsg(null), 4000);
+                      return;
+                    }
+                    setIsBatchDispatching(true);
+                    setBatchDispatchMsg(`Memproses ${pendingPaid.length} pesanan ke Mengantar...`);
+                    let count = 0;
+                    for (const ord of pendingPaid) {
+                      try {
+                        await dispatchOrderToMengantar(ord.id);
+                        count++;
+                      } catch (err) {
+                        console.warn(err);
+                      }
+                    }
+                    setIsBatchDispatching(false);
+                    setBatchDispatchMsg(`Berhasil kirim ${count} pesanan ke Mengantar.com! Resi siap cetak.`);
+                    setTimeout(() => setBatchDispatchMsg(null), 5000);
+                  }}
+                  disabled={isBatchDispatching}
+                  className="text-xs bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white font-bold px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
+                >
+                  {isBatchDispatching ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Truck className="w-3 h-3 text-[#C5A880]" />
+                  )}
+                  <span>Kirim Semua Pesanan Lunas</span>
+                </button>
+              </div>
             </div>
+
+            {batchDispatchMsg && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{batchDispatchMsg}</span>
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-[#1C3B2B]">
-                  Manajemen Pesanan Masuk & Pengiriman
+                  Manajemen Pesanan Masuk & Pengiriman Mengantar.com
                 </h3>
                 <p className="text-xs text-[#7A7266]">
-                  Ubah status pesanan untuk langsung memicu notifikasi push ke perangkat pelanggan
+                  Kelola status, kirim order ke Mengantar.com, dan cetak label resi thermal (100x150 mm)
                 </p>
               </div>
 
@@ -534,8 +614,8 @@ export const AdminDashboard: React.FC = () => {
                     <th className="pb-2.5">Item Busana</th>
                     <th className="pb-2.5">Total Tagihan</th>
                     <th className="pb-2.5">Kurir & No. Resi</th>
-                    <th className="pb-2.5">Status Pesanan (Ubah)</th>
-                    <th className="pb-2.5">Aksi</th>
+                    <th className="pb-2.5">Status Pesanan</th>
+                    <th className="pb-2.5">Aksi & Mengantar</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F2ECE4]">
@@ -553,7 +633,7 @@ export const AdminDashboard: React.FC = () => {
                         <span className="text-[10px] text-[#7A7266] block">
                           WA: {order.customer.whatsapp}
                         </span>
-                        <span className="text-[10px] text-[#7A7266] block">
+                        <span className="text-[10px] text-[#7A7266] block truncate max-w-[140px]">
                           {order.customer.city}
                         </span>
                       </td>
@@ -576,12 +656,28 @@ export const AdminDashboard: React.FC = () => {
                       </td>
 
                       <td className="py-3">
-                        <span className="font-semibold text-[#1F2421] block">
-                          {order.shipping.courier}
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-[#1F2421]">
+                            {order.mengantar?.courier || order.shipping.courier}
+                          </span>
+                          {order.mengantar ? (
+                            <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-200">
+                              Mengantar
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-gray-500 bg-gray-100 px-1 py-0.2 rounded">
+                              Manual
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono text-[11px] text-[#1C3B2B] bg-[#EFE9E0] px-1.5 py-0.5 rounded block mt-0.5 font-bold">
+                          {order.mengantar?.trackingNumber || order.trackingNumber}
                         </span>
-                        <span className="font-mono text-[11px] text-[#1C3B2B] bg-[#EFE9E0] px-1.5 py-0.5 rounded">
-                          {order.trackingNumber}
-                        </span>
+                        {order.mengantar?.pickupTime && (
+                          <span className="text-[10px] text-[#7A7266] block mt-0.5">
+                            Pickup: {order.mengantar.pickupTime}
+                          </span>
+                        )}
                       </td>
 
                       {/* Status changer select */}
@@ -610,17 +706,54 @@ export const AdminDashboard: React.FC = () => {
                       </td>
 
                       <td className="py-3">
-                        <button
-                          onClick={() => {
-                            setActiveWhatsAppOrder(order);
-                            setIsWhatsAppModalOpen(true);
-                          }}
-                          className="px-2.5 py-1 bg-[#25D366] text-white text-[11px] font-semibold rounded-lg hover:bg-[#20BA5A] flex items-center gap-1 transition-colors"
-                          title="Kirim Invoice WhatsApp"
-                        >
-                          <Smartphone className="w-3 h-3" />
-                          <span>WhatsApp</span>
-                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setActiveWhatsAppOrder(order);
+                              setIsWhatsAppModalOpen(true);
+                            }}
+                            className="px-2 py-1 bg-[#25D366] text-white text-[11px] font-semibold rounded-lg hover:bg-[#20BA5A] flex items-center gap-1 transition-colors"
+                            title="Kirim Invoice WhatsApp"
+                          >
+                            <Smartphone className="w-3 h-3" />
+                            <span>WA</span>
+                          </button>
+
+                          {order.mengantar ? (
+                            <button
+                              onClick={() => {
+                                setActiveMengantarLabelOrder(order);
+                                setIsMengantarLabelModalOpen(true);
+                              }}
+                              className="px-2 py-1 bg-[#1C3B2B] text-[#F3EFEA] text-[11px] font-semibold rounded-lg hover:bg-[#2A4D3B] flex items-center gap-1 transition-colors shadow-2xs"
+                              title="Cetak Label Resi Thermal Mengantar (100x150 mm)"
+                            >
+                              <Printer className="w-3 h-3 text-[#C5A880]" />
+                              <span>Cetak Resi</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                setDispatchingOrderId(order.id);
+                                try {
+                                  await dispatchOrderToMengantar(order.id);
+                                } finally {
+                                  setDispatchingOrderId(null);
+                                }
+                              }}
+                              disabled={dispatchingOrderId === order.id}
+                              className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50"
+                              title="Kirim Pesanan ke Mengantar.com untuk Terbitkan Resi Kurir"
+                            >
+                              {dispatchingOrderId === order.id ? (
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Truck className="w-3 h-3" />
+                              )}
+                              <span>Kirim Mengantar</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1247,6 +1380,308 @@ export const AdminDashboard: React.FC = () => {
                   <span className="text-[11px] text-[#8C8377] block">Ekspedisi Aktif:</span>
                   <span className="font-bold text-[#1C3B2B]">JNE, J&T, SiCepat</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: MENGANTAR.COM INTEGRATION */}
+        {activeTab === 'mengantar' && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Mengantar Banner Header */}
+            <div className="bg-[#1C3B2B] text-white p-6 rounded-2xl border border-[#C5A880]/30 shadow-md relative overflow-hidden">
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#C5A880] text-[#1C3B2B]">
+                      Agregator Ekspedisi
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                      mengantarConfig.environment === 'production' 
+                        ? 'bg-emerald-900/80 border-emerald-500 text-emerald-300' 
+                        : 'bg-amber-900/80 border-amber-500 text-amber-300'
+                    }`}>
+                      Mode: {mengantarConfig.environment === 'production' ? 'Live Production API' : 'Sandbox (Simulasi)'}
+                    </span>
+                  </div>
+                  <h3 className="font-display text-2xl font-bold tracking-tight text-[#F3E8CE]">
+                    Integrasi Resmi Mengantar.com
+                  </h3>
+                  <p className="text-xs text-[#D8CFBC] max-w-xl leading-relaxed">
+                    Sistem otomatisasi penjemputan paket (courier pickup), penerbitan nomor resi resmi otomatis (AWB), cetak label thermal 100×150 mm, dan pelacakan status ekspedisi real-time dari Butik saena.id Tamansari Tasikmalaya.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={async () => {
+                      setTestingMengantar(true);
+                      setMengantarTestResult(null);
+                      try {
+                        const res = await testMengantarConnectionApi(mengantarConfig.apiKey, mengantarConfig.environment);
+                        setMengantarTestResult(res);
+                      } catch (err: any) {
+                        setMengantarTestResult({ success: false, message: err?.message || 'Gagal tersambung' });
+                      } finally {
+                        setTestingMengantar(false);
+                      }
+                    }}
+                    disabled={testingMengantar}
+                    className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-[#F3EFEA] border border-white/20 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-xs disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${testingMengantar ? 'animate-spin' : ''}`} />
+                    <span>Uji Koneksi API</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsMengantarConfigModalOpen(true)}
+                    className="px-4 py-2.5 bg-[#C5A880] hover:bg-[#b59870] text-[#1C3B2B] text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-xs"
+                  >
+                    <span>⚙️ Atur Kredensial & Gudang</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Test Result Toast */}
+              {mengantarTestResult && (
+                <div className={`mt-4 p-3 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+                  mengantarTestResult.success 
+                    ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200' 
+                    : 'bg-rose-950/80 border-rose-500/50 text-rose-200'
+                }`}>
+                  {mengantarTestResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  <span>{mengantarTestResult.message}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Metric Status Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-1">
+                <span className="text-[11px] text-[#7A7266] block font-medium">Status API Key</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2.5 h-2.5 rounded-full ${mengantarConfig.apiKey ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  <span className="text-sm font-bold text-[#1C3B2B]">
+                    {mengantarConfig.apiKey ? 'Terpasang & Siap' : 'Sandbox Demo Mode'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#8C8377]">
+                  {mengantarConfig.apiKey ? 'Terkoneksi ke server Mengantar.com' : 'Gunakan API key resmi untuk live pickup'}
+                </p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-1">
+                <span className="text-[11px] text-[#7A7266] block font-medium">Otomatisasi Order</span>
+                <span className="text-sm font-bold text-[#1C3B2B] block">
+                  {mengantarConfig.autoCreateOnPaid ? 'Aktif (Saat Lunas)' : 'Manual (Tombol Kirim)'}
+                </span>
+                <p className="text-[10px] text-[#8C8377]">
+                  Resi diterbitkan otomatis saat pembayaran pelanggan sukses
+                </p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-1">
+                <span className="text-[11px] text-[#7A7266] block font-medium">Pesanan Terdaftar</span>
+                <span className="text-sm font-bold text-[#1C3B2B] block">
+                  {orders.filter(o => o.mengantar).length} dari {orders.length} Pesanan
+                </span>
+                <p className="text-[10px] text-[#8C8377]">
+                  Label thermal & kode booking AWB siap cetak
+                </p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-1">
+                <span className="text-[11px] text-[#7A7266] block font-medium">Gudang Titik Pickup</span>
+                <span className="text-sm font-bold text-[#1C3B2B] block truncate">
+                  Tamansari, Tasikmalaya
+                </span>
+                <p className="text-[10px] text-[#8C8377]">
+                  Jadwal Pickup: {mengantarConfig.pickupTimeSlot}
+                </p>
+              </div>
+            </div>
+
+            {/* Courier Partners Showcase */}
+            <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-[#1C3B2B]">
+                    Ekspedisi Kurir Didukung Mengantar.com
+                  </h4>
+                  <p className="text-xs text-[#7A7266]">
+                    Pickup langsung di butik atau drop point terdekat
+                  </p>
+                </div>
+                <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">
+                  Semua Kurir Terintegrasi
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                {[
+                  { name: 'JNE Express', code: 'JNE' },
+                  { name: 'J&T Express', code: 'J&T' },
+                  { name: 'SiCepat', code: 'SICEPAT' },
+                  { name: 'Anteraja', code: 'ANTERAJA' },
+                  { name: 'Ninja Xpress', code: 'NINJA' },
+                  { name: 'Lion Parcel', code: 'LION' },
+                  { name: 'ID Express', code: 'IDE' },
+                  { name: 'SAP Express', code: 'SAP' }
+                ].map(c => (
+                  <div key={c.code} className="p-2.5 bg-[#FAF8F5] border border-[#EAE2D5] rounded-xl text-center">
+                    <span className="block text-xs font-bold text-[#1C3B2B]">{c.name}</span>
+                    <span className="text-[9px] text-emerald-700 font-medium">Pickup Aktif</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Table of Orders with Mengantar Dispatch Tools */}
+            <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold text-[#1C3B2B]">
+                    Daftar Pesanan & Status Pengiriman Mengantar
+                  </h4>
+                  <p className="text-xs text-[#7A7266]">
+                    Kirim pesanan baru ke Mengantar atau cetak label pengiriman thermal
+                  </p>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    const pendingPaid = orders.filter(o => !o.mengantar);
+                    if (pendingPaid.length === 0) {
+                      setBatchDispatchMsg('Semua pesanan sudah terhubung ke Mengantar.com.');
+                      setTimeout(() => setBatchDispatchMsg(null), 4000);
+                      return;
+                    }
+                    setIsBatchDispatching(true);
+                    setBatchDispatchMsg(`Mendaftarkan ${pendingPaid.length} pesanan ke Mengantar...`);
+                    let count = 0;
+                    for (const ord of pendingPaid) {
+                      try {
+                        await dispatchOrderToMengantar(ord.id);
+                        count++;
+                      } catch (e) {
+                        console.warn(e);
+                      }
+                    }
+                    setIsBatchDispatching(false);
+                    setBatchDispatchMsg(`Berhasil menghubungkan ${count} pesanan ke Mengantar.com!`);
+                    setTimeout(() => setBatchDispatchMsg(null), 5000);
+                  }}
+                  disabled={isBatchDispatching}
+                  className="px-3.5 py-1.5 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50 self-start sm:self-auto"
+                >
+                  {isBatchDispatching ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Truck className="w-3.5 h-3.5 text-[#C5A880]" />
+                  )}
+                  <span>Proses Semua ke Mengantar</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#EAE2D5] text-[#7A7266] font-semibold">
+                      <th className="pb-2.5">Order ID</th>
+                      <th className="pb-2.5">Penerima</th>
+                      <th className="pb-2.5">Tujuan</th>
+                      <th className="pb-2.5">Status Toko</th>
+                      <th className="pb-2.5">Status Mengantar</th>
+                      <th className="pb-2.5">Nomor Resi / AWB</th>
+                      <th className="pb-2.5">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F2ECE4]">
+                    {orders.map(order => (
+                      <tr key={order.id} className="hover:bg-[#FAF8F5]">
+                        <td className="py-3 font-bold text-[#1C3B2B]">
+                          {order.id}
+                          <span className="block text-[10px] text-[#8C8377] font-normal">{order.createdAt}</span>
+                        </td>
+                        <td className="py-3">
+                          <span className="font-bold text-[#1F2421] block">{order.customer.fullName}</span>
+                          <span className="text-[10px] text-[#7A7266] block">{order.customer.whatsapp}</span>
+                        </td>
+                        <td className="py-3">
+                          <span className="text-[11px] text-[#1F2421] block font-medium">{order.customer.city}</span>
+                          <span className="text-[10px] text-[#7A7266] block truncate max-w-[160px]">{order.customer.address}</span>
+                        </td>
+                        <td className="py-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-800">
+                            {order.status.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          {order.mengantar ? (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Terbit Resi
+                              </span>
+                              <span className="block text-[10px] text-gray-500 font-mono mt-0.5">
+                                {order.mengantar.mengantarOrderId}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              Belum Diterbitkan
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 font-mono font-bold text-[#1C3B2B]">
+                          {order.mengantar?.trackingNumber || order.trackingNumber}
+                          <span className="block text-[10px] text-gray-500 font-sans font-normal">
+                            Kurir: {order.mengantar?.courier || order.shipping.courier}
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-1.5">
+                            {order.mengantar ? (
+                              <button
+                                onClick={() => {
+                                  setActiveMengantarLabelOrder(order);
+                                  setIsMengantarLabelModalOpen(true);
+                                }}
+                                className="px-2.5 py-1 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors shadow-2xs"
+                                title="Cetak Label Resi Thermal Mengantar (100x150 mm)"
+                              >
+                                <Printer className="w-3 h-3 text-[#C5A880]" />
+                                <span>Cetak Label</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={async () => {
+                                  setDispatchingOrderId(order.id);
+                                  try {
+                                    await dispatchOrderToMengantar(order.id);
+                                  } finally {
+                                    setDispatchingOrderId(null);
+                                  }
+                                }}
+                                disabled={dispatchingOrderId === order.id}
+                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50"
+                              >
+                                {dispatchingOrderId === order.id ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Truck className="w-3 h-3" />
+                                )}
+                                <span>Kirim ke Mengantar</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

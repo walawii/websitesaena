@@ -498,7 +498,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
                           <td className="p-3">
                             <div className="flex items-start gap-2.5">
                               <img
-                                src={item.images[0] || 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop'}
+                                src={item.images[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop'}
                                 alt={item.name}
                                 className="w-11 h-13 object-cover rounded-lg border border-stone-800 shrink-0 bg-stone-900"
                                 referrerPolicy="no-referrer"

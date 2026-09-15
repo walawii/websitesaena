@@ -143,7 +143,33 @@ export interface Order {
     location: string;
     description: string;
   }[];
+  mengantar?: MengantarOrderData;
   notes?: string;
+}
+
+export interface MengantarOrderData {
+  mengantarOrderId: string;
+  trackingNumber: string;
+  courier: string;
+  serviceType: string;
+  status: 'MENUNGGU_PICKUP' | 'PICKUP' | 'DIKIRIM' | 'TIBA_DI_TUJUAN' | 'SELESAI' | 'BATAL';
+  pickupTime?: string;
+  labelUrl?: string;
+  shippingFee: number;
+  syncedAt: string;
+  isCod: boolean;
+  codAmount?: number;
+  airwayBillUrl?: string;
+  barcodeNumber?: string;
+  estimatedDelivery?: string;
+}
+
+export interface MengantarStoreConfig {
+  apiKey: string;
+  environment: 'production' | 'sandbox';
+  autoCreateOnPaid: boolean;
+  defaultCourier: string;
+  pickupTimeSlot: string;
 }
 
 export interface AvailableCoupon {

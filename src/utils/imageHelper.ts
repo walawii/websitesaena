@@ -16,7 +16,7 @@ export const CURATED_COLOR_PRESETS: ColorPresetImage[] = [
     name: 'Emerald Forest Silk Abaya',
     colorTone: 'Emerald / Hijau Botol',
     hex: '#1C3B2B',
-    url: 'https://images.unsplash.com/photo-1585250004680-753f50549c4b?q=80&w=800&auto=format&fit=crop'
+    url: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop'
   },
   {
     id: 'preset-taupe',

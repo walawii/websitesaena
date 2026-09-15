@@ -51,6 +51,7 @@
         "status": { "type": "string", "maxLength": 30 },
         "trackingNumber": { "type": "string", "maxLength": 60 },
         "trackingHistory": { "type": "array" },
+        "mengantar": { "type": "object" },
         "notes": { "type": "string", "maxLength": 500 },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
@@ -104,7 +105,10 @@
         "originPostalCode": { "type": "string", "maxLength": 20 },
         "warehouseName": { "type": "string", "maxLength": 150 },
         "address": { "type": "string", "maxLength": 300 },
-        "contactWhatsApp": { "type": "string", "maxLength": 30 }
+        "contactWhatsApp": { "type": "string", "maxLength": 30 },
+        "mengantarApiKey": { "type": "string", "maxLength": 200 },
+        "mengantarAutoCreate": { "type": "boolean" },
+        "mengantarEnvironment": { "type": "string", "maxLength": 50 }
       },
       "required": ["id", "storeName", "originCity"]
     }

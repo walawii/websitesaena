@@ -1,7 +1,7 @@
 import React from 'react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
-import { Star, Heart, Eye, ShoppingBag } from 'lucide-react';
+import { Star, Heart, Eye, ShoppingBag, Sparkles } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -44,6 +44,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           src={product.images[0]}
           alt={product.name}
           referrerPolicy="no-referrer"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop';
+          }}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
         />
@@ -56,8 +59,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </span>
           )}
           {product.isNewArrival && (
-            <span className="px-2.5 py-0.5 bg-[#1C3B2B] text-white text-[10px] font-semibold rounded-full tracking-wider uppercase shadow-sm">
-              New
+            <span className="px-2.5 py-0.5 bg-[#1C3B2B] text-[#F3E8CE] border border-[#C5A880]/40 text-[10px] font-semibold rounded-full tracking-wider uppercase shadow-xs flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5 text-[#C5A880]" />
+              Terbaru
             </span>
           )}
           {isLowStock && (
