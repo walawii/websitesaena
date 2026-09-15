@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { SHIPPING_SERVICES, SHIPPING_ORIGIN } from '../data/mockData';
+import { SHIPPING_SERVICES, SHIPPING_ORIGIN, DEFAULT_WHATSAPP_LOCAL, DEFAULT_WHATSAPP_DISPLAY } from '../data/mockData';
 import { 
   CustomerDetails, 
   ShippingMethod, 
@@ -50,7 +50,7 @@ export const CheckoutModal: React.FC = () => {
   // Customer Shipping Address Form (Default: Kecamatan Tamansari, Kota Tasikmalaya)
   const [customer, setCustomer] = useState<CustomerDetails>({
     fullName: 'Fatimah Zahra',
-    whatsapp: '081234567890',
+    whatsapp: DEFAULT_WHATSAPP_LOCAL,
     email: 'fatimah.zahra@example.com',
     address: 'Jl. Tamansari No. 45, RT 02 / RW 04, Kel. Mugarsari',
     province: 'Jawa Barat',
@@ -360,7 +360,7 @@ export const CheckoutModal: React.FC = () => {
                     <input
                       type="tel"
                       required
-                      placeholder="08xxxxxxxxxx"
+                      placeholder={`Contoh: ${DEFAULT_WHATSAPP_LOCAL}`}
                       value={customer.whatsapp}
                       onChange={(e) => setCustomer({ ...customer, whatsapp: e.target.value })}
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"

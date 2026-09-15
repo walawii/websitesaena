@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_CLEAN } from '../data/mockData';
 import { 
   Heart, 
   ShieldCheck, 
@@ -64,7 +65,7 @@ export const Footer: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#C5A880] shrink-0" />
-                <span>WhatsApp Customer Service: +62 812-3456-7890</span>
+                <span>WhatsApp Customer Service: {DEFAULT_WHATSAPP_DISPLAY}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#C5A880] shrink-0" />
@@ -126,12 +127,12 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a 
-                  href="https://wa.me/6281234567890?text=Halo%20Admin%20saena.id,%20saya%20ingin%20konsultasi%20ukuran%20busana" 
+                  href={`https://wa.me/${DEFAULT_WHATSAPP_CLEAN}?text=Halo%20Admin%20saena.id,%20saya%20ingin%20konsultasi%20ukuran%20busana`} 
                   target="_blank" 
                   rel="noreferrer"
                   className="hover:text-white transition-colors block"
                 >
-                  Konsultasi Ukuran & Bahan via WhatsApp
+                  Konsultasi Ukuran & Bahan via WhatsApp ({DEFAULT_WHATSAPP_DISPLAY})
                 </a>
               </li>
               <li>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { DEFAULT_WHATSAPP_CLEAN, DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
 import { 
   X, 
   Send, 
@@ -8,7 +9,8 @@ import {
   ExternalLink, 
   ShieldCheck, 
   Sparkles,
-  Smartphone
+  Smartphone,
+  MessageCircle
 } from 'lucide-react';
 
 export const WhatsAppModal: React.FC = () => {
@@ -60,12 +62,13 @@ ${order.customer.address}, ${order.customer.city}, ${order.customer.province} ($
 Klik link berikut untuk memantau perjalanan kurir Anda:
 https://saena.id/lacak?order=${order.id}
 
-Apabila membutuhkan bantuan atau konsultasi ukuran, silakan balas pesan resmi ini.
+Apabila membutuhkan bantuan atau konsultasi ukuran, silakan hubungi Customer Service di ${DEFAULT_WHATSAPP_DISPLAY}.
 _Wassalamu'alaikum wr. wb._
-*Customer Care saena.id*`;
+*Customer Care saena.id* (${DEFAULT_WHATSAPP_NUMBER})`;
 
   const cleanPhone = order.customer.whatsapp.replace(/^0/, '62').replace(/\D/g, '');
-  const waUrl = `https://wa.me/${cleanPhone || '6281234567890'}?text=${encodeURIComponent(waMessage)}`;
+  const waUrl = `https://wa.me/${cleanPhone || DEFAULT_WHATSAPP_CLEAN}?text=${encodeURIComponent(waMessage)}`;
+  const adminWaUrl = `https://wa.me/${DEFAULT_WHATSAPP_CLEAN}?text=${encodeURIComponent(`Halo Admin saena.id, saya ingin konfirmasi pesanan No. Invoice #${order.id} atas nama ${order.customer.fullName}.`)}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(waMessage);
@@ -163,6 +166,17 @@ _Wassalamu'alaikum wr. wb._
               <Send className="w-4 h-4" />
               <span>{isSimulatedSent ? 'Membuka WhatsApp...' : 'Buka Obrolan WhatsApp Resmi'}</span>
             </button>
+
+            <a
+              href={adminWaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="py-3 px-4 bg-[#FAF7F2] hover:bg-[#F2ECE4] text-[#1C3B2B] border border-[#D5C9B8] text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5"
+              title={`Chat WhatsApp Admin Butik: ${DEFAULT_WHATSAPP_DISPLAY}`}
+            >
+              <MessageCircle className="w-4 h-4 text-[#25D366]" />
+              <span>Chat Admin ({DEFAULT_WHATSAPP_DISPLAY})</span>
+            </a>
 
             <button
               onClick={() => setIsWhatsAppModalOpen(false)}

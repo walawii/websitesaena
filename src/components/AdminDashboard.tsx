@@ -35,6 +35,7 @@ import { ProductEditModal } from './ProductEditModal';
 import { CreateProductModal } from './CreateProductModal';
 import { ImportMarketplaceModal } from './ImportMarketplaceModal';
 import { ExcelImportModal } from './ExcelImportModal';
+import { DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -1229,7 +1230,7 @@ export const AdminDashboard: React.FC = () => {
                   Verified Origin
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                 <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#EAE2D5]">
                   <span className="text-[11px] text-[#8C8377] block">Kecamatan Asal:</span>
                   <span className="font-bold text-[#1C3B2B]">Kec. Tamansari</span>
@@ -1239,8 +1240,12 @@ export const AdminDashboard: React.FC = () => {
                   <span className="font-bold text-[#1C3B2B]">Kota Tasikmalaya, Jawa Barat</span>
                 </div>
                 <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#EAE2D5]">
+                  <span className="text-[11px] text-[#8C8377] block">WhatsApp Toko:</span>
+                  <span className="font-bold text-[#1C3B2B]">{DEFAULT_WHATSAPP_DISPLAY}</span>
+                </div>
+                <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#EAE2D5]">
                   <span className="text-[11px] text-[#8C8377] block">Ekspedisi Aktif:</span>
-                  <span className="font-bold text-[#1C3B2B]">JNE Express, J&T Express, SiCepat</span>
+                  <span className="font-bold text-[#1C3B2B]">JNE, J&T, SiCepat</span>
                 </div>
               </div>
             </div>

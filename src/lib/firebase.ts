@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Product, Order, AvailableCoupon, ProductReview, StoreWarehouseInfo } from '../types';
-import { INITIAL_PRODUCTS, INITIAL_ORDERS, AVAILABLE_COUPONS, SHIPPING_ORIGIN } from '../data/mockData';
+import { INITIAL_PRODUCTS, INITIAL_ORDERS, AVAILABLE_COUPONS, SHIPPING_ORIGIN, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
 
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
@@ -108,7 +108,7 @@ export async function initializeDatabaseIfNeeded(): Promise<void> {
         originPostalCode: SHIPPING_ORIGIN.postalCode,
         warehouseName: SHIPPING_ORIGIN.warehouseName,
         address: SHIPPING_ORIGIN.address,
-        contactWhatsApp: '081234567890',
+        contactWhatsApp: DEFAULT_WHATSAPP_NUMBER,
         createdAt: new Date().toISOString()
       }));
     }
@@ -219,7 +219,7 @@ export async function forceReseedAllDatabase(): Promise<void> {
     originPostalCode: SHIPPING_ORIGIN.postalCode,
     warehouseName: SHIPPING_ORIGIN.warehouseName,
     address: SHIPPING_ORIGIN.address,
-    contactWhatsApp: '081234567890',
+    contactWhatsApp: DEFAULT_WHATSAPP_NUMBER,
     createdAt: new Date().toISOString()
   }));
 }

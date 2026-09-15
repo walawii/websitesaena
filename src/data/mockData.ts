@@ -1,5 +1,10 @@
 import { Product, ShippingMethod, Order } from '../types';
 
+export const DEFAULT_WHATSAPP_NUMBER = '+6285724023064';
+export const DEFAULT_WHATSAPP_CLEAN = '6285724023064';
+export const DEFAULT_WHATSAPP_LOCAL = '085724023064';
+export const DEFAULT_WHATSAPP_DISPLAY = '+62 857-2402-3064';
+
 export const INITIAL_PRODUCTS: Product[] = [];
 
 export const SHIPPING_ORIGIN = {
@@ -8,7 +13,8 @@ export const SHIPPING_ORIGIN = {
   province: 'Jawa Barat',
   postalCode: '46196',
   warehouseName: 'Central Warehouse & Butik saena.id Tasikmalaya',
-  address: 'Jl. Tamansari No. 108, Kec. Tamansari, Kota Tasikmalaya, Jawa Barat 46196'
+  address: 'Jl. Tamansari No. 108, Kec. Tamansari, Kota Tasikmalaya, Jawa Barat 46196',
+  contactWhatsApp: DEFAULT_WHATSAPP_NUMBER
 };
 
 export const SHIPPING_SERVICES: ShippingMethod[] = [
@@ -83,7 +89,7 @@ export const INITIAL_ORDERS: Order[] = [
     createdAt: '2026-09-11 14:32',
     customer: {
       fullName: 'Nurul Kamilah S.Ked',
-      whatsapp: '081234567890',
+      whatsapp: DEFAULT_WHATSAPP_LOCAL,
       email: 'nurul.kamilah@example.com',
       address: 'Jl. Menteng Asri Raya No. 42, RT 03 / RW 05',
       province: 'DKI Jakarta',
