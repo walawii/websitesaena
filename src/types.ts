@@ -287,3 +287,40 @@ export interface StoreWarehouseInfo {
   address: string;
   contactWhatsApp: string;
 }
+
+export interface LandingPageConfig {
+  id: string; // `lp-${productId}`
+  productId: string;
+  slug: string;
+  isActive: boolean;
+  theme: 'emerald' | 'gold' | 'rose' | 'midnight';
+  announcementText: string;
+  showCountdown: boolean;
+  countdownMinutes: number;
+  headline: string;
+  subheadline: string;
+  badge: string;
+  discountHighlightText?: string;
+  painPoints: string[];
+  solutions: string[];
+  benefits: Array<{
+    title: string;
+    description: string;
+  }>;
+  craftsmanshipTitle: string;
+  craftsmanshipDesc: string;
+  socialProofHeading: string;
+  guaranteeHeading: string;
+  guaranteeText: string;
+  faqs: Array<{
+    q: string;
+    a: string;
+  }>;
+  primaryCtaText: string;
+  primaryCtaAction: 'checkout' | 'whatsapp';
+  whatsappCustomText?: string;
+  urgencyStockRemaining: number;
+  showStickyBar: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

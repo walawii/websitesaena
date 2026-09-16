@@ -3,6 +3,7 @@ import { useStore } from '../context/StoreContext';
 import { Sparkles, ArrowRight, ShieldCheck, Truck, Clock, RefreshCw } from 'lucide-react';
 import { Category } from '../types';
 import { ShopeeLogo, TikTokLogo, SHOPEE_STORE_URL, TIKTOK_STORE_URL } from './MarketplaceOrderLinks';
+import { FALLBACK_PRODUCT_IMAGE } from '../utils/imageHelper';
 
 export const HeroBanner: React.FC = () => {
   const { 
@@ -15,8 +16,8 @@ export const HeroBanner: React.FC = () => {
     formatPrice
   } = useStore();
 
-  const heroProduct = products.find(p => p.id === 'saena-01') || products[0];
-  const heroImage = heroProduct?.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop';
+  const heroProduct = products.find(p => p.images && p.images.length > 0) || products[0];
+  const heroImage = heroProduct?.images?.[0] || FALLBACK_PRODUCT_IMAGE;
 
   const categoryList: { id: Category; label: string }[] = [
     { id: 'all', label: t.categories.all },
@@ -47,9 +48,11 @@ export const HeroBanner: React.FC = () => {
               {t.hero.title}
             </h1>
 
-            <p className="text-sm sm:text-base text-[#524B42] max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
-              {t.hero.subtitle}
-            </p>
+            {Boolean(t.hero.subtitle) && (
+              <p className="text-sm sm:text-base text-[#524B42] max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                {t.hero.subtitle}
+              </p>
+            )}
 
             {/* CTAs */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3.5 pt-2">
@@ -161,7 +164,7 @@ export const HeroBanner: React.FC = () => {
                   alt={heroProduct?.name || "Madina Silk Abaya saena.id"}
                   referrerPolicy="no-referrer"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
+                    (e.target as HTMLImageElement).src = FALLBACK_PRODUCT_IMAGE;
                   }}
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
                 />

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Product, ProductColor } from '../types';
 import { useStore } from '../context/StoreContext';
-import { compressAndEncodeImage, CURATED_COLOR_PRESETS } from '../utils/imageHelper';
+import { compressAndEncodeImage, CURATED_COLOR_PRESETS, sanitizeProductImageList } from '../utils/imageHelper';
 import { cleanHtmlDescription } from '../utils/textHelper';
 
 interface ProductEditModalProps {
@@ -77,7 +77,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
       name: `Varian Warna ${colors.length + 1}`,
       hex: '#2E3D30',
       stock: 10,
-      image: product.images[0] || CURATED_COLOR_PRESETS[0].url
+      image: product.images[0] || ''
     };
     setColors(prev => [...prev, newColor]);
   };
@@ -136,7 +136,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
 
       // Collect all unique images
       const allImages = colors.map(c => c.image).filter(Boolean) as string[];
-      const uniqueImages = Array.from(new Set([...allImages, ...product.images])).filter(Boolean);
+      const uniqueImages = sanitizeProductImageList(Array.from(new Set([...allImages, ...product.images])));
 
       const updatedProductData: Product = {
         ...product,
@@ -154,7 +154,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
         })),
         stock: newStockMap,
         totalStock: totalStockCalculated,
-        images: uniqueImages.length ? uniqueImages : product.images
+        images: uniqueImages
       };
 
       await updateProduct(updatedProductData);
@@ -556,6 +556,19 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
                           className="w-full bg-transparent text-xs text-stone-300 placeholder-stone-600 focus:outline-none"
                         />
                       </div>
+
+                      {/* Clear photo button */}
+                      {Boolean(colorItem.image) && (
+                        <button
+                          type="button"
+                          onClick={() => handleColorChange(idx, 'image', '')}
+                          title="Hapus foto dari varian ini"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-rose-400 hover:text-rose-300 bg-rose-950/30 hover:bg-rose-950/60 border border-rose-900/50 text-xs transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus Foto</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { MarketplaceOrderOptions } from './MarketplaceOrderLinks';
 import { cleanHtmlDescription } from '../utils/textHelper';
+import { FALLBACK_PRODUCT_IMAGE } from '../utils/imageHelper';
 
 interface ProductDetailModalProps {
   product: Product;
@@ -65,7 +66,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
   const isOutOfStock = stockForSelectedVariant <= 0;
 
   // Active displayed image (color-specific image takes precedence when selected)
-  const displayedImage = selectedColor?.image || product.images[activeImageIndex] || product.images[0];
+  const displayedImage = selectedColor?.image || (product.images && product.images[activeImageIndex]) || (product.images && product.images[0]) || FALLBACK_PRODUCT_IMAGE;
 
   // Helper to open lightbox at specific image
   const openLightboxAtIndex = (idx: number) => {
@@ -169,7 +170,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   alt={`${product.name} - ${selectedColor.name}`}
                   referrerPolicy="no-referrer"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
+                    (e.target as HTMLImageElement).src = FALLBACK_PRODUCT_IMAGE;
                   }}
                   className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
                 />
@@ -232,7 +233,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                           alt={`Foto ${idx + 1}`} 
                           referrerPolicy="no-referrer"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
+                            (e.target as HTMLImageElement).src = FALLBACK_PRODUCT_IMAGE;
                           }}
                           className="w-full h-full object-cover" 
                         />
@@ -703,7 +704,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                 referrerPolicy="no-referrer"
                 onClick={() => setIsZoomed(!isZoomed)}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=1200&auto=format&fit=crop";
+                  (e.target as HTMLImageElement).src = FALLBACK_PRODUCT_IMAGE;
                 }}
                 className={`max-h-[70vh] sm:max-h-[78vh] max-w-[92vw] sm:max-w-[85vw] object-contain rounded-xl shadow-2xl transition-transform duration-300 select-none ${
                   isZoomed ? 'scale-150 cursor-zoom-out' : 'scale-100 cursor-zoom-in'

@@ -2,6 +2,7 @@ import React from 'react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
 import { Star, Heart, Eye, ShoppingBag, Sparkles } from 'lucide-react';
+import { FALLBACK_PRODUCT_IMAGE } from '../utils/imageHelper';
 
 interface ProductCardProps {
   product: Product;
@@ -41,11 +42,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       {/* Product Image Container */}
       <div className="relative aspect-[3/4] bg-[#F2ECE4] overflow-hidden">
         <img
-          src={product.images[0]}
+          src={product.images && product.images.length > 0 ? product.images[0] : FALLBACK_PRODUCT_IMAGE}
           alt={product.name}
           referrerPolicy="no-referrer"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop';
+            (e.target as HTMLImageElement).src = FALLBACK_PRODUCT_IMAGE;
           }}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
@@ -135,9 +136,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </h3>
 
           {/* Material specs */}
-          <p className="text-[11px] text-[#787063] line-clamp-1 mb-3">
-            {product.material}
-          </p>
+          {product.material && 
+           product.material.trim() !== '' && 
+           product.material.trim().toLowerCase() !== 'mulberry silk & ceruty babydoll premium' && (
+            <p className="text-[11px] text-[#787063] line-clamp-1 mb-3">
+              {product.material}
+            </p>
+          )}
         </div>
 
         {/* Colors Swatches & Price */}

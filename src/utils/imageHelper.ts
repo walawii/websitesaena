@@ -1,5 +1,5 @@
 /**
- * Utilities for image handling, compression, and curated Muslimah fashion presets
+ * Utilities for image handling, compression, and clean product image sanitization
  */
 
 export interface ColorPresetImage {
@@ -10,90 +10,81 @@ export interface ColorPresetImage {
   url: string;
 }
 
+export const FALLBACK_PRODUCT_IMAGE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" fill="none"><rect width="600" height="800" fill="%23F7F3EE"/><rect x="24" y="24" width="552" height="752" rx="16" stroke="%23E5DDD0" stroke-width="2" stroke-dasharray="8 8"/><circle cx="300" cy="360" r="54" fill="%23EFE9E0"/><path d="M300 325c-8 0-14 6-14 13 0 5 3 9 7 11l-38 26c-3 2-4 5-3 8 1 3 4 5 7 5h92c3 0 6-2 7-5 1-3 0-6-3-8l-38-26c4-2 7-6 7-11 0-7-6-13-14-13z" fill="%231C3B2B"/><text x="300" y="450" font-family="serif" font-size="22" font-weight="bold" fill="%231C3B2B" text-anchor="middle" letter-spacing="2">SAENA.ID</text><text x="300" y="475" font-family="sans-serif" font-size="12" fill="%238C8275" text-anchor="middle" letter-spacing="1">BUSANA MUSLIMAH EKSKLUSIF</text><text x="300" y="510" font-family="sans-serif" font-size="11" fill="%23B5A998" text-anchor="middle">Foto Produk Belum Diunggah</text></svg>`;
+
+export const BANNED_DUMMY_IMAGE_PATTERNS = [
+  'photo-1567401893414', // clothes rack
+  'photo-1620799140408', // dark shirt
+  'photo-1610030469983', // sari
+  'photo-1596755094514', // woman in white outdoors
+  'photo-1584917865442', // red handbag
+  'photo-1594938298603', // man in blue suit
+  'photo-1583391733956', // generic model
+  'photo-1515886657613',
+  'photo-1490481651871',
+  'photo-1611591475819',
+  'photo-1535632066927',
+  'photo-1602810318383',
+  'photo-1618354691373',
+  'photo-1539109136881',
+  'photo-1518895949257',
+  'photo-1496747611176',
+  'photo-1572804013309'
+];
+
+export function isBannedDummyImage(url: string | undefined | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  return BANNED_DUMMY_IMAGE_PATTERNS.some(pat => url.includes(pat));
+}
+
+export function sanitizeProductImageList(images: (string | undefined | null)[] | undefined): string[] {
+  if (!images || !Array.isArray(images)) return [];
+  return images
+    .filter((img): img is string => typeof img === 'string' && img.trim().length > 0 && !isBannedDummyImage(img));
+}
+
 export const CURATED_COLOR_PRESETS: ColorPresetImage[] = [
   {
     id: 'preset-emerald',
-    name: 'Emerald Forest Silk Abaya',
+    name: 'Emerald Forest Silk',
     colorTone: 'Emerald / Hijau Botol',
     hex: '#1C3B2B',
-    url: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop'
+    url: FALLBACK_PRODUCT_IMAGE
   },
   {
     id: 'preset-taupe',
-    name: 'Champagne Taupe Mocca Pashmina',
+    name: 'Champagne Taupe Mocca',
     colorTone: 'Champagne / Taupe / Mocca',
     hex: '#9E866C',
-    url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop'
+    url: FALLBACK_PRODUCT_IMAGE
   },
   {
     id: 'preset-onyx',
-    name: 'Midnight Onyx Black Gamis',
+    name: 'Midnight Onyx Black',
     colorTone: 'Midnight Onyx / Jet Black',
     hex: '#1A1A1A',
-    url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop'
+    url: FALLBACK_PRODUCT_IMAGE
   },
   {
     id: 'preset-mauve',
-    name: 'Dusty Mauve Lilac Kaftan',
+    name: 'Dusty Mauve Lilac',
     colorTone: 'Dusty Mauve / Lilac Pink',
     hex: '#A37081',
-    url: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=800&auto=format&fit=crop'
+    url: FALLBACK_PRODUCT_IMAGE
   },
   {
     id: 'preset-sage',
-    name: 'Soft Sage Mint Floral',
+    name: 'Soft Sage Mint',
     colorTone: 'Sage Mint / Hijau Lembut',
     hex: '#7A8B7B',
-    url: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop'
+    url: FALLBACK_PRODUCT_IMAGE
   },
   {
     id: 'preset-white',
-    name: 'Pure White Silk Mukena',
+    name: 'Pure White Silk',
     colorTone: 'Pure White / Off White',
     hex: '#F5F5F0',
-    url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    id: 'preset-sand',
-    name: 'Sand Beige Kurta Linen',
-    colorTone: 'Sand Beige / Cream Nude',
-    hex: '#D2B48C',
-    url: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    id: 'preset-navy',
-    name: 'Royal Navy Stone Kurta',
-    colorTone: 'Navy Blue / Biru Dongker',
-    hex: '#1B2A4A',
-    url: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    id: 'preset-caramel',
-    name: 'Caramel Macchiato Tiered Dress',
-    colorTone: 'Caramel / Terakota / Brown',
-    hex: '#A0522D',
-    url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    id: 'preset-olive',
-    name: 'Olive Moss Textured Crinkle',
-    colorTone: 'Olive Moss / Hijau Lumut',
-    hex: '#556B2F',
-    url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    id: 'preset-gold',
-    name: 'Ottoman Vintage Gold Brooch Set',
-    colorTone: 'Gold / Emas Antik',
-    hex: '#C5A059',
-    url: 'https://images.unsplash.com/photo-1611591475819-20f78c857731?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    id: 'preset-platinum',
-    name: 'Silver Platinum Brooch Pin',
-    colorTone: 'Silver / Perak',
-    hex: '#E5E5E5',
-    url: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?q=80&w=800&auto=format&fit=crop'
+    url: FALLBACK_PRODUCT_IMAGE
   }
 ];
 

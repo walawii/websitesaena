@@ -15,7 +15,8 @@ import {
   MengantarStoreConfig,
   MengantarOrderData,
   DokuStoreConfig,
-  DokuPaymentData
+  DokuPaymentData,
+  LandingPageConfig
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_ORDERS, SHIPPING_SERVICES, AVAILABLE_COUPONS } from '../data/mockData';
 import { translations } from '../translations';
@@ -36,7 +37,27 @@ import {
   handleFirestoreError,
   OperationType
 } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { isBannedDummyImage, sanitizeProductImageList, FALLBACK_PRODUCT_IMAGE } from '../utils/imageHelper';
+
+const cleanProductFromBannedImages = (p: Product): Product => {
+  const cleanedImages = sanitizeProductImageList(p.images || []);
+  const cleanedColors = (p.colors || []).map(col => {
+    if (col.image && isBannedDummyImage(col.image)) {
+      return { ...col, image: undefined };
+    }
+    return col;
+  });
+  const isBannedMaterial = 
+    p.material && p.material.trim().toLowerCase() === 'mulberry silk & ceruty babydoll premium';
+  const cleanedMaterial = isBannedMaterial ? '' : p.material;
+  return {
+    ...p,
+    material: cleanedMaterial,
+    images: cleanedImages,
+    colors: cleanedColors
+  };
+};
 
 export const CURRENCY_CONFIGS: Record<CurrencyCode, CurrencyConfig> = {
   IDR: {
@@ -180,6 +201,13 @@ interface StoreContextType {
   isFirebaseConnected: boolean;
   firebaseSyncStatus: 'connected' | 'syncing' | 'offline';
   reseedDatabase: () => Promise<void>;
+
+  // Landing Pages (Direct-Response Promo)
+  landingPages: Record<string, LandingPageConfig>;
+  saveLandingPage: (config: LandingPageConfig) => Promise<void>;
+  deleteLandingPage: (productId: string) => Promise<void>;
+  activeLandingProductId: string | null;
+  setActiveLandingProductId: (id: string | null) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -191,13 +219,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map(cleanProductFromBannedImages);
         }
       }
     } catch {
       // ignore
     }
-    return INITIAL_PRODUCTS;
+    return INITIAL_PRODUCTS.map(cleanProductFromBannedImages);
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -312,6 +340,65 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
   const [isDokuConfigModalOpen, setIsDokuConfigModalOpen] = useState(false);
 
+  // Landing Pages (Direct-Response Promos)
+  const [landingPages, setLandingPages] = useState<Record<string, LandingPageConfig>>(() => {
+    try {
+      const saved = localStorage.getItem('saena_landing_pages_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return {};
+  });
+
+  const [activeLandingProductId, setActiveLandingProductId] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('landing') || params.get('lp') || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const saveLandingPage = async (config: LandingPageConfig) => {
+    setLandingPages(prev => {
+      const next = { ...prev, [config.productId]: config };
+      try {
+        localStorage.setItem('saena_landing_pages_v1', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Local storage write error for landing page:', e);
+      }
+      return next;
+    });
+
+    try {
+      const docRef = doc(db, 'landing_pages', config.productId);
+      await setDoc(docRef, config);
+    } catch (err) {
+      console.warn('Firestore write notice for landing page:', err);
+    }
+  };
+
+  const deleteLandingPage = async (productId: string) => {
+    setLandingPages(prev => {
+      const next = { ...prev };
+      delete next[productId];
+      try {
+        localStorage.setItem('saena_landing_pages_v1', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Local storage write error:', e);
+      }
+      return next;
+    });
+
+    try {
+      const docRef = doc(db, 'landing_pages', productId);
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.warn('Firestore delete notice for landing page:', err);
+    }
+  };
+
   const updateDokuConfig = (cfg: Partial<DokuStoreConfig>) => {
     setDokuConfig(prev => {
       const updated = { ...prev, ...cfg };
@@ -421,7 +508,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const remoteProducts: Product[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() as Product;
-          remoteProducts.push(data);
+          remoteProducts.push(cleanProductFromBannedImages(data));
         });
         if (isMounted) {
           if (remoteProducts.length > 0) {
@@ -470,10 +557,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     );
 
+    // 3. Landing Pages Real-time Listener
+    const landingPagesPath = 'landing_pages';
+    const unsubLandingPages = onSnapshot(
+      collection(db, landingPagesPath),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteLPs: Record<string, LandingPageConfig> = {};
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as LandingPageConfig;
+            if (data && data.productId) {
+              remoteLPs[data.productId] = data;
+            }
+          });
+          if (isMounted) {
+            setLandingPages(prev => {
+              const merged = { ...prev, ...remoteLPs };
+              try {
+                localStorage.setItem('saena_landing_pages_v1', JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
+          }
+        }
+      },
+      (error) => {
+        console.warn('Firestore landing_pages listener notice:', error);
+      }
+    );
+
     return () => {
       isMounted = false;
       unsubProducts();
       unsubOrders();
+      unsubLandingPages();
     };
   }, []);
 
@@ -550,7 +667,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         new Notification(title, {
           body: message,
-          icon: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=128&auto=format&fit=crop'
+          icon: '/favicon.ico'
         });
       } catch (err) {
         console.warn('Native notification suppressed:', err);
@@ -920,7 +1037,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         dimensions: newProd.dimensions || { length: 25, width: 20, height: 4 },
         discount: newProd.discount,
         currency: newProd.currency || 'IDR',
-        material: newProd.material || 'Mulberry Silk & Ceruty Babydoll Premium',
+        material: newProd.material || '',
         careInstructions: newProd.careInstructions?.length ? newProd.careInstructions : [
           'Cuci dengan tangan suhu air normal',
           'Gunakan deterjen cair lembut',
@@ -1547,7 +1664,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         convertPrice,
         isFirebaseConnected,
         firebaseSyncStatus,
-        reseedDatabase
+        reseedDatabase,
+        landingPages,
+        saveLandingPage,
+        deleteLandingPage,
+        activeLandingProductId,
+        setActiveLandingProductId
       }}
     >
       {children}

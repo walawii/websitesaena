@@ -669,6 +669,86 @@ app.get('/sitemap.xml', (req, res) => {
 </urlset>`);
 });
 
+// API Route: Generate High-Converting Landing Page Copywriting with Gemini 3.8 Flash
+app.post('/api/generate-landing-page', async (req, res) => {
+  try {
+    const { product, angle = 'luxury' } = req.body;
+    if (!product || !product.name) {
+      return res.status(400).json({ success: false, error: 'Product data required' });
+    }
+
+    const ai = getGenAI();
+    if (!ai) {
+      return res.json({ success: false, message: 'Gemini API not configured, using smart local template' });
+    }
+
+    const prompt = `Anda adalah copywriter direct-response kelas dunia untuk brand fashion muslimah butik mewah bernama "saena.id" (asal Tasikmalaya, Jawa Barat).
+Tugas Anda adalah menulis copywriting Landing Page penjualan yang sangat memikat, berkelas, elegan, dan menghasilkan konversi penjualan (CTA) yang sangat tinggi untuk produk berikut:
+
+Nama Produk: ${product.name}
+Kategori: ${product.category}
+Harga Normal: Rp ${product.originalPrice || Math.round(product.price * 1.25)}
+Harga Promo Sekarang: Rp ${product.price}
+Material/Bahan: ${product.material || 'Sutra & Ceruty Premium'}
+Deskripsi: ${product.description || ''}
+Fitur/Kelebihan: ${(product.features || []).join(', ')}
+Sudut Pemasaran (Angle): ${angle}
+
+Tuliskan dalam format JSON murni dengan struktur persis seperti berikut:
+{
+  "announcementText": "teks banner pengumuman atas dengan urgensi dan promo",
+  "headline": "headline utama yang sangat kuat, memicu hasrat membeli dan penasaran",
+  "subheadline": "subheadline yang menyentuh emosi, kenyamanan, dan keanggunan",
+  "badge": "tag pendek eksklusif, contoh: Koleksi Terbatas Hari Raya • Garansi Original",
+  "discountHighlightText": "teks sorotan penghematan, contoh: Hemat Rp 165.000 Khusus Hari Ini",
+  "painPoints": ["masalah 1 yang sering dialami pembeli dengan baju biasa", "masalah 2", "masalah 3"],
+  "solutions": ["solusi 1 yang diberikan produk ini", "solusi 2", "solusi 3"],
+  "benefits": [
+    {"title": "Judul Keunggulan 1", "description": "Deskripsi manfaat emosional dan fungsional"},
+    {"title": "Judul Keunggulan 2", "description": "Deskripsi manfaat emosional dan fungsional"},
+    {"title": "Judul Keunggulan 3", "description": "Deskripsi manfaat emosional dan fungsional"},
+    {"title": "Judul Keunggulan 4", "description": "Deskripsi manfaat emosional dan fungsional"}
+  ],
+  "craftsmanshipTitle": "Judul Bagian Kualitas Seni Jahit Butik Tasikmalaya",
+  "craftsmanshipDesc": "Uraian memikat tentang dedikasi penjahit butik, kehalusan jahitan stik kecil, dan rasa percaya diri saat memakainya",
+  "socialProofHeading": "Judul sosial proof testimoni",
+  "guaranteeHeading": "Judul garansi kepuasan tanpa resiko",
+  "guaranteeText": "Uraian jaminan tukar barang atau uang kembali jika tidak puas",
+  "faqs": [
+    {"q": "pertanyaan 1 pembeli (misal bahan menerawang/tidak)", "a": "jawaban meyakinkan"},
+    {"q": "pertanyaan 2 (estimasi kirim & asal pengiriman)", "a": "jawaban meyakinkan"},
+    {"q": "pertanyaan 3 (bisa COD/bayar di tempat?)", "a": "jawaban meyakinkan"},
+    {"q": "pertanyaan 4 (garansi jika ukuran tidak pas)", "a": "jawaban meyakinkan"}
+  ],
+  "primaryCtaText": "teks tombol CTA yang sangat menggugah (contoh: PESAN SEKARANG - KLAIM DISKON SPESIAL)",
+  "whatsappCustomText": "template pesan WhatsApp pembeli yang sopan dan langsung to the point"
+}
+`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const responseText = response.text?.trim();
+    if (responseText) {
+      const parsed = JSON.parse(responseText);
+      return res.json({
+        success: true,
+        landingPage: parsed
+      });
+    }
+
+    return res.json({ success: false, message: 'Empty AI response' });
+  } catch (error: any) {
+    console.error('Error generating landing page with Gemini:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Start Express + Vite Server
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

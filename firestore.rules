@@ -97,6 +97,12 @@ service cloud.firestore {
       allow create, update, delete: if isValidId(settingId);
     }
 
+    // Landing Pages collection
+    match /landing_pages/{lpId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(lpId);
+    }
+
     // Admins collection
     match /admins/{adminId} {
       allow read: if isSignedIn();

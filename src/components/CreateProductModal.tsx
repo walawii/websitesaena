@@ -69,13 +69,13 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             name: 'Emerald Forest',
             hex: '#1C3B2B',
             stock: 15,
-            image: CURATED_COLOR_PRESETS[0].url
+            image: ''
           },
           {
             name: 'Champagne Mocca',
             hex: '#9E866C',
             stock: 12,
-            image: CURATED_COLOR_PRESETS[1].url
+            image: ''
           }
         ]
   );
@@ -122,7 +122,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       name: `Varian Warna ${colors.length + 1}`,
       hex: presetItem.hex,
       stock: 10,
-      image: presetItem.url
+      image: ''
     };
     setColors(prev => [...prev, newColor]);
   };
@@ -197,7 +197,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         })),
         stock: stockMap,
         totalStock: totalStockCalculated,
-        images: uniqueImages.length > 0 ? uniqueImages : [CURATED_COLOR_PRESETS[0].url]
+        images: uniqueImages
       });
 
       sendPushNotification(
@@ -647,6 +647,19 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                           className="w-full bg-transparent text-xs text-stone-300 placeholder-stone-600 focus:outline-none"
                         />
                       </div>
+
+                      {/* Clear photo button */}
+                      {Boolean(colorItem.image) && (
+                        <button
+                          type="button"
+                          onClick={() => handleColorChange(idx, 'image', '')}
+                          title="Hapus foto dari varian ini"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-rose-400 hover:text-rose-300 bg-rose-950/30 hover:bg-rose-950/60 border border-rose-900/50 text-xs transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus Foto</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

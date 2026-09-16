@@ -44,14 +44,11 @@ export const EXCEL_IMPORT_COLUMNS = [
   'Gambar Variasi 9'
 ] as const;
 
-// Curated high quality fallback photos for modest fashion
+import { FALLBACK_PRODUCT_IMAGE, isBannedDummyImage } from './imageHelper';
+
+// Safe fallback placeholder for modest fashion when no image exists
 export const CURATED_FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop'
+  FALLBACK_PRODUCT_IMAGE
 ];
 
 // Color name to HEX dictionary covering common Indonesian & English modest fashion colors
@@ -197,8 +194,8 @@ export const SAMPLE_EXCEL_ROWS = [
     'Panjang Paket': 30,
     'Lebar Paket': 22,
     'Tinggi Paket': 4,
-    'Foto Produk 1': 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop',
-    'Foto Produk 2': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
+    'Foto Produk 1': '',
+    'Foto Produk 2': '',
     'Foto Produk 3': '',
     'Foto Produk 4': '',
     'Foto Produk 5': '',
@@ -206,9 +203,9 @@ export const SAMPLE_EXCEL_ROWS = [
     'Foto Produk 7': '',
     'Foto Produk 8': '',
     'Foto Produk 9': '',
-    'Gambar Variasi 1': 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop',
-    'Gambar Variasi 2': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
-    'Gambar Variasi 3': 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop',
+    'Gambar Variasi 1': '',
+    'Gambar Variasi 2': '',
+    'Gambar Variasi 3': '',
     'Gambar Variasi 4': '',
     'Gambar Variasi 5': '',
     'Gambar Variasi 6': '',
@@ -236,8 +233,8 @@ export const SAMPLE_EXCEL_ROWS = [
     'Panjang Paket': 20,
     'Lebar Paket': 15,
     'Tinggi Paket': 2,
-    'Foto Produk 1': 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=800&auto=format&fit=crop',
-    'Foto Produk 2': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
+    'Foto Produk 1': '',
+    'Foto Produk 2': '',
     'Foto Produk 3': '',
     'Foto Produk 4': '',
     'Foto Produk 5': '',
@@ -245,9 +242,9 @@ export const SAMPLE_EXCEL_ROWS = [
     'Foto Produk 7': '',
     'Foto Produk 8': '',
     'Foto Produk 9': '',
-    'Gambar Variasi 1': 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=800&auto=format&fit=crop',
-    'Gambar Variasi 2': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=800&auto=format&fit=crop',
-    'Gambar Variasi 3': 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=800&auto=format&fit=crop',
+    'Gambar Variasi 1': '',
+    'Gambar Variasi 2': '',
+    'Gambar Variasi 3': '',
     'Gambar Variasi 4': '',
     'Gambar Variasi 5': '',
     'Gambar Variasi 6': '',
@@ -935,12 +932,12 @@ export function parseExcelWorkbook(data: ArrayBuffer): {
       sizeNames = ['All Size', 'M', 'L', 'XL'];
     }
 
-    // Build ProductColor array
+    // Build ProductColor array (only assign genuine variant images or specific gallery images, never dummy stock photos)
     const colors: ProductColor[] = colorNames.map((cName, cIdx) => {
       const hex = detectColorHex(cName, cIdx);
       const boundVariantImg = colorImagesMap[cName];
-      const galleryImg = acc.images[cIdx] || CURATED_FALLBACK_IMAGES[cIdx % CURATED_FALLBACK_IMAGES.length];
-      const finalImg = boundVariantImg || galleryImg;
+      const candidateImg = boundVariantImg || (acc.images && acc.images[cIdx] ? acc.images[cIdx] : undefined);
+      const finalImg = candidateImg && !isBannedDummyImage(candidateImg) ? candidateImg : undefined;
 
       return {
         name: cName,
@@ -950,16 +947,18 @@ export function parseExcelWorkbook(data: ArrayBuffer): {
       };
     });
 
-    // Ensure images has at least 1 image
-    const finalImages = [...acc.images];
+    // Keep only genuine product images
+    const finalImages: string[] = [];
+    (acc.images || []).forEach(img => {
+      if (img && !isBannedDummyImage(img) && !finalImages.includes(img)) {
+        finalImages.push(img);
+      }
+    });
     colors.forEach(c => {
-      if (c.image && !finalImages.includes(c.image)) {
+      if (c.image && !isBannedDummyImage(c.image) && !finalImages.includes(c.image)) {
         finalImages.push(c.image);
       }
     });
-    if (finalImages.length === 0) {
-      finalImages.push(CURATED_FALLBACK_IMAGES[idx % CURATED_FALLBACK_IMAGES.length]);
-    }
 
     const totalStock = Object.values(stockMap).reduce((sum, val) => sum + val, 0);
 
@@ -977,7 +976,7 @@ export function parseExcelWorkbook(data: ArrayBuffer): {
       sku: acc.sku,
       weight: acc.weight,
       dimensions: acc.dimensions,
-      material: acc.materialText || 'Mulberry Silk & Ceruty Babydoll Premium',
+      material: acc.materialText || '',
       careInstructions: [
         'Cuci dengan tangan suhu air normal',
         'Gunakan deterjen cair lembut khusus kain sutra/abaya',

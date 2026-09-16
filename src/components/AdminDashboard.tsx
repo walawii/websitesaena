@@ -34,7 +34,8 @@ import {
   QrCode,
   FileText,
   Copy,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 import { OrderStatus, Category, Product } from '../types';
 import { ProductEditModal } from './ProductEditModal';
@@ -43,6 +44,7 @@ import { ImportMarketplaceModal } from './ImportMarketplaceModal';
 import { ExcelImportModal } from './ExcelImportModal';
 import { ShopeeStoreScraperModal } from './ShopeeStoreScraperModal';
 import { ShopeeLogo } from './MarketplaceOrderLinks';
+import { LandingPageStudio } from './LandingPageStudio';
 import { DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
 import { testMengantarConnectionApi } from '../utils/mengantarClient';
 import { testDokuConnectionApi } from '../utils/dokuClient';
@@ -79,7 +81,8 @@ export const AdminDashboard: React.FC = () => {
     simulatePaymentSuccess
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'inventory' | 'push' | 'database' | 'mengantar' | 'doku'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'inventory' | 'landing-page' | 'push' | 'database' | 'mengantar' | 'doku'>('analytics');
+  const [selectedLandingProductId, setSelectedLandingProductId] = useState<string | null>(null);
   const [orderFilterStatus, setOrderFilterStatus] = useState<string>('all');
   const [dispatchingOrderId, setDispatchingOrderId] = useState<string | null>(null);
   const [isBatchDispatching, setIsBatchDispatching] = useState(false);
@@ -309,6 +312,22 @@ export const AdminDashboard: React.FC = () => {
           >
             <Layers className="w-4 h-4" />
             <span>Manajemen Stok & Produk ({products.length})</span>
+          </button>
+
+          <button
+            id="admin-tab-landing-page"
+            onClick={() => setActiveTab('landing-page')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all border-b-2 whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'landing-page'
+                ? 'border-[#1C3B2B] text-[#1C3B2B] bg-white shadow-2xs'
+                : 'border-transparent text-[#787063] hover:text-[#1C3B2B]'
+            }`}
+          >
+            <Globe className="w-4 h-4 text-[#C5A880]" />
+            <span>Landing Page Produk</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+              BARU
+            </span>
           </button>
 
           <button
@@ -1096,6 +1115,20 @@ export const AdminDashboard: React.FC = () => {
                               <span>Edit Produk</span>
                             </button>
 
+                            {/* Buat / Buka Landing Page Button */}
+                            <button
+                              id={`build-landing-page-btn-${product.id}`}
+                              onClick={() => {
+                                setSelectedLandingProductId(product.id);
+                                setActiveTab('landing-page');
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-[#FAF6F0] hover:bg-[#EFE9E0] text-[#1C3B2B] text-[11px] font-semibold rounded-lg border border-[#D5C9B8] shadow-2xs transition-colors"
+                              title={`Buat atau edit Landing Page promosi konversi tinggi untuk ${product.name}`}
+                            >
+                              <Globe className="w-3 h-3 text-[#C5A880]" />
+                              <span>Landing Page</span>
+                            </button>
+
                             {/* Quick restock +5 */}
                             <button
                               onClick={() => quickRestock(product.id, 5)}
@@ -1123,6 +1156,13 @@ export const AdminDashboard: React.FC = () => {
               </table>
             </div>
           </div>
+        )}
+
+        {/* TAB 3.5: LANDING PAGE STUDIO */}
+        {activeTab === 'landing-page' && (
+          <LandingPageStudio 
+            initialProductId={selectedLandingProductId} 
+          />
         )}
 
         {/* TAB 4: PUSH PROMOTION BROADCASTER */}

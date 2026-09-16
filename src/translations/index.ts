@@ -16,7 +16,7 @@ export const translations = {
     hero: {
       tag: 'Koleksi Eksklusif Ramadhan & Hari Raya',
       title: 'Anggun, Bersahaja & Penuh Pesona',
-      subtitle: 'Dibuat dengan sutra mulberry premium dan material babydoll bertekstur lembut. Menemani setiap momen berharga Anda.',
+      subtitle: '',
       ctaShop: 'Lihat Koleksi Lengkap',
       ctaLookbook: 'Lacak Pesanan',
       freeShippingNotice: 'Gratis Ongkos Kirim Seluruh Indonesia s/d Akhir Bulan',
@@ -153,7 +153,7 @@ export const translations = {
     hero: {
       tag: 'Exclusive Ramadan & Eid Festive Edition',
       title: 'Graceful, Modest & Timelessly Elegant',
-      subtitle: 'Crafted from pure mulberry silk and lightweight textured babydoll fabrics. Designed for every blessed occasion.',
+      subtitle: '',
       ctaShop: 'Explore Collection',
       ctaLookbook: 'Track My Order',
       freeShippingNotice: 'Complimentary Worldwide Shipping on Orders Over $100',
@@ -290,7 +290,7 @@ export const translations = {
     hero: {
       tag: 'تشكيلة رمضان والعيد الفاخرة',
       title: 'أناقة راقية، حشمة وجمال أصيل',
-      subtitle: 'مصنوعة من أفخر أنواع حرير التوت وأقمشة الشيفون الانسيابية لتليق بمناسباتكم السعيدة.',
+      subtitle: '',
       ctaShop: 'تسوق التشكيلة',
       ctaLookbook: 'تتبع طلبي',
       freeShippingNotice: 'شحن مجاني دولي ومحلي للطلبات المؤهلة',

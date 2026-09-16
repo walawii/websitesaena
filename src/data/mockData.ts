@@ -34,18 +34,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'French Khimar fleksibel 2 gaya (bisa cadar / non-cadar)'
     ],
     colors: [
-      { name: 'Emerald Forest', hex: '#1C3B2B', stock: 15, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Champagne Taupe', hex: '#C5A880', stock: 12, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Midnight Onyx', hex: '#1E1F22', stock: 18, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Emerald Forest', hex: '#1C3B2B', stock: 15 },
+      { name: 'Champagne Taupe', hex: '#C5A880', stock: 12 },
+      { name: 'Midnight Onyx', hex: '#1E1F22', stock: 18 }
     ],
     sizes: ['All Size', 'M', 'L', 'XL'],
     stock: { 'Emerald Forest': 15, 'Champagne Taupe': 12, 'Midnight Onyx': 18 },
     totalStock: 45,
-    images: [
-      'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     isBestSeller: true,
     reviews: [
@@ -88,17 +84,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Ujung pergelangan manset kancing wudhu friendly'
     ],
     colors: [
-      { name: 'Deep Onyx', hex: '#1A1A1A', stock: 14, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Champagne Gold', hex: '#D4AF37', stock: 10, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Royal Navy', hex: '#1B263B', stock: 11, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Deep Onyx', hex: '#1A1A1A', stock: 14 },
+      { name: 'Champagne Gold', hex: '#D4AF37', stock: 10 },
+      { name: 'Royal Navy', hex: '#1B263B', stock: 11 }
     ],
     sizes: ['M', 'L', 'XL'],
     stock: { 'Deep Onyx': 14, 'Champagne Gold': 10, 'Royal Navy': 11 },
     totalStock: 35,
-    images: [
-      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     isBestSeller: true,
     reviews: []
@@ -128,18 +121,15 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Finishing jahit tepi rapi kualitas ekspor'
     ],
     colors: [
-      { name: 'Dusty Mauve', hex: '#8B687F', stock: 20, image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Soft Sage', hex: '#9CAF88', stock: 25, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Champagne Taupe', hex: '#C5A880', stock: 22, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Silver Grey', hex: '#A8A9AD', stock: 18, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Dusty Mauve', hex: '#8B687F', stock: 20 },
+      { name: 'Soft Sage', hex: '#9CAF88', stock: 25 },
+      { name: 'Champagne Taupe', hex: '#C5A880', stock: 22 },
+      { name: 'Silver Grey', hex: '#A8A9AD', stock: 18 }
     ],
     sizes: ['200 x 75 cm'],
     stock: { 'Dusty Mauve': 20, 'Soft Sage': 25, 'Champagne Taupe': 22, 'Silver Grey': 18 },
     totalStock: 85,
-    images: [
-      'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     isBestSeller: true,
     reviews: []
@@ -169,17 +159,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Lembut, tidak pekak di telinga, dan wangi alami'
     ],
     colors: [
-      { name: 'Rose Nude', hex: '#C99A97', stock: 16, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Olive Drab', hex: '#6B8E23', stock: 14, image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Ash Rose', hex: '#B76E79', stock: 19, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Rose Nude', hex: '#C99A97', stock: 16 },
+      { name: 'Olive Drab', hex: '#6B8E23', stock: 14 },
+      { name: 'Ash Rose', hex: '#B76E79', stock: 19 }
     ],
     sizes: ['130 x 130 cm (Syar\'i)'],
     stock: { 'Rose Nude': 16, 'Olive Drab': 14, 'Ash Rose': 19 },
     totalStock: 49,
-    images: [
-      'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     reviews: []
   },
@@ -209,17 +196,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Tali serut pinggang fleksibel di bagian dalam'
     ],
     colors: [
-      { name: 'Royal Emerald', hex: '#0F4D32', stock: 8, image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Maroon Velvet', hex: '#660018', stock: 10, image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Golden Mocca', hex: '#8C6D4F', stock: 7, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Royal Emerald', hex: '#0F4D32', stock: 8 },
+      { name: 'Maroon Velvet', hex: '#660018', stock: 10 },
+      { name: 'Golden Mocca', hex: '#8C6D4F', stock: 7 }
     ],
     sizes: ['All Size Fit to XXL'],
     stock: { 'Royal Emerald': 8, 'Maroon Velvet': 10, 'Golden Mocca': 7 },
     totalStock: 25,
-    images: [
-      'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     isBestSeller: true,
     reviews: []
@@ -250,17 +234,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Potongan flowy bertingkat 3 layer'
     ],
     colors: [
-      { name: 'Lilac Breeze', hex: '#C8A2C8', stock: 12, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Peach Blossom', hex: '#FFDAB9', stock: 15, image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Mint Green', hex: '#98FF98', stock: 11, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Lilac Breeze', hex: '#C8A2C8', stock: 12 },
+      { name: 'Peach Blossom', hex: '#FFDAB9', stock: 15 },
+      { name: 'Mint Green', hex: '#98FF98', stock: 11 }
     ],
     sizes: ['S/M', 'L/XL'],
     stock: { 'Lilac Breeze': 12, 'Peach Blossom': 15, 'Mint Green': 11 },
     totalStock: 38,
-    images: [
-      'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     reviews: []
   },
@@ -290,17 +271,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Pouch dompet kulit sintetis beraksen rantai mutiara'
     ],
     colors: [
-      { name: 'Pure White', hex: '#FFFFFF', stock: 20, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Dusty Mauve', hex: '#8B687F', stock: 18, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Midnight Onyx', hex: '#1E1F22', stock: 15, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Pure White', hex: '#FFFFFF', stock: 20 },
+      { name: 'Dusty Mauve', hex: '#8B687F', stock: 18 },
+      { name: 'Midnight Onyx', hex: '#1E1F22', stock: 15 }
     ],
     sizes: ['Jumbo Dewasa'],
     stock: { 'Pure White': 20, 'Dusty Mauve': 18, 'Midnight Onyx': 15 },
     totalStock: 53,
-    images: [
-      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     isBestSeller: true,
     reviews: []
@@ -329,17 +307,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Mudah dilipat masuk tas kerja maupun koper bepergian'
     ],
     colors: [
-      { name: 'Sage Blossom', hex: '#9CAF88', stock: 25, image: 'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Soft Pink', hex: '#F4C2C2', stock: 20, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Baby Blue', hex: '#89CFF0', stock: 15, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Sage Blossom', hex: '#9CAF88', stock: 25 },
+      { name: 'Soft Pink', hex: '#F4C2C2', stock: 20 },
+      { name: 'Baby Blue', hex: '#89CFF0', stock: 15 }
     ],
     sizes: ['All Size Travel'],
     stock: { 'Sage Blossom': 25, 'Soft Pink': 20, 'Baby Blue': 15 },
     totalStock: 60,
-    images: [
-      'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     reviews: []
   },
@@ -368,17 +343,14 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Saku aktif di dada kiri berlogo emblem saena.id'
     ],
     colors: [
-      { name: 'White Cloud', hex: '#F8F9FA', stock: 16, image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Sage Grey', hex: '#8E9A8E', stock: 14, image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Navy Bold', hex: '#1B2A47', stock: 15, image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop' }
+      { name: 'White Cloud', hex: '#F8F9FA', stock: 16 },
+      { name: 'Sage Grey', hex: '#8E9A8E', stock: 14 },
+      { name: 'Navy Bold', hex: '#1B2A47', stock: 15 }
     ],
     sizes: ['M', 'L', 'XL', 'XXL'],
     stock: { 'White Cloud': 16, 'Sage Grey': 14, 'Navy Bold': 15 },
     totalStock: 45,
-    images: [
-      'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     reviews: []
   },
@@ -407,16 +379,13 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Jarum pin stainless tajam anti tarik serat sutra'
     ],
     colors: [
-      { name: 'Classic White Pearl', hex: '#FDFBF7', stock: 30, image: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?q=80&w=900&auto=format&fit=crop' },
-      { name: 'Peach Champagne Pearl', hex: '#F5D6C6', stock: 20, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop' }
+      { name: 'Classic White Pearl', hex: '#FDFBF7', stock: 30 },
+      { name: 'Peach Champagne Pearl', hex: '#F5D6C6', stock: 20 }
     ],
     sizes: ['One Size (Diameter 4.5 cm)'],
     stock: { 'Classic White Pearl': 30, 'Peach Champagne Pearl': 20 },
     totalStock: 50,
-    images: [
-      'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?q=80&w=900&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=900&auto=format&fit=crop'
-    ],
+    images: [],
     isNewArrival: true,
     reviews: []
   }
@@ -532,7 +501,7 @@ export const INITIAL_ORDERS: Order[] = [
           material: 'Mulberry Silk',
           careInstructions: [],
           features: [],
-          colors: [{ name: 'Emerald Forest', hex: '#1C3B2B', stock: 12, image: '' }],
+          colors: [{ name: 'Emerald Forest', hex: '#1C3B2B', stock: 12 }],
           sizes: ['M'],
           stock: { 'Emerald Forest': 12 },
           totalStock: 12,
@@ -544,23 +513,23 @@ export const INITIAL_ORDERS: Order[] = [
         price: 685000
       },
       {
-        id: 'saena-03-Azkia-Almond',
+        id: 'saena-03-Pearl',
         productId: 'saena-03',
         product: {
           id: 'saena-03',
-          name: 'Azkia Premium Pashmina Silk Gradasi Ceruty',
-          slug: 'azkia-pashmina-silk-gradasi',
+          name: 'Pashmina Silk Ceruty',
+          slug: 'pashmina-silk-ceruty',
           category: 'hijab-pashmina',
           price: 189000,
-          originalPrice: 245000,
-          rating: 5,
+          originalPrice: 220000,
+          rating: 4.8,
           reviewCount: 1,
           reviews: [],
           description: 'Pashmina sutra',
           material: 'Silk Ceruty',
           careInstructions: [],
           features: [],
-          colors: [{ name: 'Pearl Almond', hex: '#E6D7C3', stock: 25, image: '' }],
+          colors: [{ name: 'Pearl Almond', hex: '#E6D7C3', stock: 25 }],
           sizes: ['Standard 200x75'],
           stock: { 'Pearl Almond': 25 },
           totalStock: 25,
@@ -659,7 +628,7 @@ export const INITIAL_ORDERS: Order[] = [
           material: 'Silk Jacquard',
           careInstructions: [],
           features: [],
-          colors: [{ name: 'Pure White Silk', hex: '#FDFBF7', stock: 15, image: '' }],
+          colors: [{ name: 'Pure White Silk', hex: '#FDFBF7', stock: 15 }],
           sizes: ['All Size Jumbo'],
           stock: { 'Pure White Silk': 15 },
           totalStock: 15,

@@ -16,6 +16,7 @@ import { MengantarConfigModal } from './components/MengantarConfigModal';
 import { DokuConfigModal } from './components/DokuConfigModal';
 import { Footer } from './components/Footer';
 import { MarketplaceOrderOptions } from './components/MarketplaceOrderLinks';
+import { ProductLandingPage } from './components/ProductLandingPage';
 import { 
   Filter, 
   SlidersHorizontal, 
@@ -57,7 +58,9 @@ const MainContent: React.FC = () => {
     isMengantarConfigModalOpen,
     setIsMengantarConfigModalOpen,
     isDokuConfigModalOpen,
-    setIsDokuConfigModalOpen
+    setIsDokuConfigModalOpen,
+    activeLandingProductId,
+    setActiveLandingProductId
   } = useStore();
 
   // Global Admin Access Shortcut: Ctrl + Shift + A (or Cmd + Shift + A)
@@ -97,6 +100,27 @@ const MainContent: React.FC = () => {
     if (sortBy === 'latest') return (b.isNewArrival ? 1 : 0) - (a.isNewArrival ? 1 : 0);
     return 0; // featured default
   });
+
+  const activeLandingProduct = activeLandingProductId 
+    ? products.find(p => p.id === activeLandingProductId || p.slug === activeLandingProductId)
+    : null;
+
+  if (!isAdminMode && activeLandingProduct) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F5]">
+        <ProductLandingPage 
+          product={activeLandingProduct} 
+        />
+
+        {/* Essential Modals for Checkout and Purchase */}
+        <CartDrawer />
+        <CheckoutModal />
+        <WhatsAppModal />
+        <OrderTrackingModal />
+        <NotificationToast />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#FAF8F5]">
