@@ -2,7 +2,7 @@ import { LanguageCode } from '../types';
 
 export const translations = {
   id: {
-    storeName: 'saena.id',
+    storeName: 'saena.my.id',
     tagline: 'Kemewahan Busana Muslim Syari & Modern',
     nav: {
       catalog: 'Katalog Koleksi',
@@ -139,7 +139,7 @@ export const translations = {
     }
   },
   en: {
-    storeName: 'saena.id',
+    storeName: 'saena.my.id',
     tagline: 'Luxury Modest & Contemporary Muslim Fashion',
     nav: {
       catalog: 'Collections',
@@ -276,7 +276,7 @@ export const translations = {
     }
   },
   ar: {
-    storeName: 'saena.id',
+    storeName: 'saena.my.id',
     tagline: 'أرقى الأزياء الإسلامية المحتشمة والحديثة',
     nav: {
       catalog: 'التشكيلات',

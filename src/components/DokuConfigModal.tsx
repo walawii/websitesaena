@@ -57,7 +57,7 @@ export const DokuConfigModal: React.FC<DokuConfigModalProps> = ({
 
   const webhookUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/doku/notification` 
-    : 'https://saena.id/api/doku/notification';
+    : 'https://saena.my.id/api/doku/notification';
 
   const handleCopyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);

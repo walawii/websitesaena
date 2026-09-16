@@ -144,10 +144,10 @@ export const MengantarLabelModal: React.FC<MengantarLabelModalProps> = ({
                 <div className="font-bold text-[11px] leading-tight text-[#1C3B2B]">saena.id Boutique</div>
                 <div className="text-[10px] text-neutral-800 leading-tight mt-0.5">+6285724023064</div>
                 <div className="text-[9px] leading-tight mt-1 text-neutral-700">
-                  Central Boutique Warehouse, Jl. Tamansari No. 88
+                  Central Boutique Warehouse, Perum Graha Tresna
                 </div>
                 <div className="text-[9px] font-bold text-neutral-800 mt-1 uppercase">
-                  Kec. Tamansari, Kota Tasikmalaya (46196)
+                  Kota Tasikmalaya (46196)
                 </div>
               </div>
             </div>

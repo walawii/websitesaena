@@ -188,7 +188,7 @@ export const MengantarConfigModal: React.FC<MengantarConfigModalProps> = ({
                 <MapPin className="w-3.5 h-3.5 text-neutral-400 mt-0.5 shrink-0" />
                 <div>
                   <span className="font-semibold block text-neutral-900">Alamat Gudang Butik:</span>
-                  <span>Jl. Tamansari No. 88, Kel. Mugarsari, Kec. Tamansari, Kota Tasikmalaya 46196</span>
+                  <span>Perum Graha Tresna, Kota Tasikmalaya 46196</span>
                 </div>
               </div>
               <div className="flex items-start gap-1.5">

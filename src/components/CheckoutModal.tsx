@@ -50,18 +50,24 @@ export const CheckoutModal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedVA, setCopiedVA] = useState(false);
 
-  // Customer Shipping Address Form (Default: Kecamatan Tamansari, Kota Tasikmalaya)
-  const [customer, setCustomer] = useState<CustomerDetails>({
-    fullName: 'Fatimah Zahra',
-    whatsapp: DEFAULT_WHATSAPP_LOCAL,
-    email: 'fatimah.zahra@example.com',
-    address: 'Jl. Tamansari No. 45, RT 02 / RW 04, Kel. Mugarsari',
-    province: 'Jawa Barat',
-    city: 'Kota Tasikmalaya',
-    subdistrict: 'Kecamatan Tamansari',
-    postalCode: '46196',
-    country: 'Indonesia',
-    notes: 'Mohon cantumkan kartu ucapan Hari Raya'
+  // Customer Shipping Address Form (Defaults to blank/clean for public users, caches to localStorage)
+  const [customer, setCustomer] = useState<CustomerDetails>(() => {
+    try {
+      const saved = localStorage.getItem('saena_customer_info');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      fullName: '',
+      whatsapp: '',
+      email: '',
+      address: '',
+      province: 'Jawa Barat',
+      city: '',
+      subdistrict: '',
+      postalCode: '',
+      country: 'Indonesia',
+      notes: ''
+    };
   });
 
   // Courier selection (default to JNE Reguler as primary courier)
@@ -255,6 +261,10 @@ export const CheckoutModal: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      try {
+        localStorage.setItem('saena_customer_info', JSON.stringify(customer));
+      } catch {}
+
       const shippingWithDynamicCost: ShippingMethod = {
         ...selectedShipping,
         cost: dynamicShippingCost
@@ -350,6 +360,7 @@ export const CheckoutModal: React.FC = () => {
                     <input
                       type="text"
                       required
+                      placeholder="Nama lengkap penerima"
                       value={customer.fullName}
                       onChange={(e) => setCustomer({ ...customer, fullName: e.target.value })}
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
@@ -363,7 +374,7 @@ export const CheckoutModal: React.FC = () => {
                     <input
                       type="tel"
                       required
-                      placeholder={`Contoh: ${DEFAULT_WHATSAPP_LOCAL}`}
+                      placeholder="Nomor WhatsApp aktif (08xxxxxxxxxx)"
                       value={customer.whatsapp}
                       onChange={(e) => setCustomer({ ...customer, whatsapp: e.target.value })}
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
@@ -380,6 +391,7 @@ export const CheckoutModal: React.FC = () => {
                     <input
                       type="email"
                       required
+                      placeholder="email@domain.com"
                       value={customer.email}
                       onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"

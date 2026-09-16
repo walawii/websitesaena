@@ -427,8 +427,8 @@ export const SHIPPING_ORIGIN = {
   city: 'Kota Tasikmalaya',
   province: 'Jawa Barat',
   postalCode: '46196',
-  warehouseName: 'Central Warehouse & Butik saena.id Tasikmalaya',
-  address: 'Jl. Tamansari No. 108, Kec. Tamansari, Kota Tasikmalaya, Jawa Barat 46196',
+  warehouseName: 'Central Warehouse & Butik saena.id (Perum Graha Tresna, Tasikmalaya)',
+  address: 'Perum Graha Tresna, Kota Tasikmalaya, Jawa Barat 46196',
   contactWhatsApp: DEFAULT_WHATSAPP_NUMBER
 };
 

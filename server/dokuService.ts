@@ -135,7 +135,7 @@ export async function processDokuPayment(
           invoice_number: invoiceNumber,
           amount: reqPayload.amount,
           currency: 'IDR',
-          callback_url: reqPayload.callbackUrl || 'https://saena.id/order/status',
+          callback_url: reqPayload.callbackUrl || 'https://saena.my.id/order/status',
           line_items: reqPayload.items.map(item => ({
             name: item.name.slice(0, 50),
             price: item.price,
@@ -148,7 +148,7 @@ export async function processDokuPayment(
         customer: {
           id: `CUST-${reqPayload.customer.whatsapp.replace(/\D/g, '')}`,
           name: reqPayload.customer.fullName,
-          email: reqPayload.customer.email || 'customer@saena.id',
+          email: reqPayload.customer.email || 'customer@saena.my.id',
           phone: reqPayload.customer.whatsapp,
           address: reqPayload.customer.address
         }

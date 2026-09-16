@@ -77,14 +77,14 @@ export const Navbar: React.FC = () => {
             <button 
               onClick={() => setIsAdminMode(false)}
               className="text-left group cursor-pointer focus:outline-none"
-              title="saena.id Muslim Boutique"
+              title="saena.my.id Muslim Boutique"
             >
               <div className="flex items-baseline gap-1">
                 <span className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#1C3B2B] group-hover:text-[#2A5941] transition-colors">
                   saena
                 </span>
-                <span className="text-xs sm:text-sm font-semibold text-[#B38F5B] tracking-widest uppercase">
-                  .id
+                <span className="text-xs sm:text-sm font-semibold text-[#B38F5B] tracking-widest lowercase">
+                  .my.id
                 </span>
               </div>
               <p className="text-[10px] tracking-widest text-[#7C756B] uppercase font-medium -mt-1 hidden sm:block">

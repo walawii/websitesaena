@@ -49,8 +49,8 @@ export const Footer: React.FC = () => {
               <span className="font-display text-2xl font-bold tracking-tight text-white">
                 saena
               </span>
-              <span className="text-sm font-semibold text-[#C5A880] tracking-widest uppercase">
-                .id
+              <span className="text-sm font-semibold text-[#C5A880] tracking-widest lowercase">
+                .my.id
               </span>
             </div>
             
@@ -214,7 +214,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Copyright */}
         <div className="pt-6 border-t border-[#2A3A32] flex flex-col sm:flex-row items-center justify-between text-[#827A6D] text-[11px] gap-3">
-          <p>© 2026 saena.id • Hak Cipta Dilindungi Undang-Undang. Modest Muslim Fashion & Boutique.</p>
+          <p>© 2026 saena.my.id • Hak Cipta Dilindungi Undang-Undang. Modest Muslim Fashion & Boutique.</p>
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <span className="hover:text-white cursor-pointer">Kebijakan Privasi</span>
             <span>•</span>
