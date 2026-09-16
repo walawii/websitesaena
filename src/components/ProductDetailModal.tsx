@@ -7,7 +7,6 @@ import {
   ShoppingBag, 
   Check, 
   Heart, 
-  Ruler, 
   Truck, 
   ShieldCheck, 
   Sparkles,
@@ -36,7 +35,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
   const [selectedColor, setSelectedColor] = useState(product.colors[0] || { name: 'Standard', hex: '#000000' });
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'desc' | 'care' | 'reviews'>('desc');
-  const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
 
   // Review Form State
   const [reviewName, setReviewName] = useState('');
@@ -270,40 +268,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                     );
                   })}
                 </div>
-              </div>
-
-              {/* Size Selector & Size Chart */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-[#3B362F]">
-                    Ukuran: <span className="font-normal text-[#665E52]">{selectedSize}</span>
-                  </label>
-                  <button
-                    onClick={() => setIsSizeChartOpen(!isSizeChartOpen)}
-                    className="text-xs text-[#B38F5B] hover:text-[#8D6B3C] font-medium flex items-center gap-1"
-                  >
-                    <Ruler className="w-3.5 h-3.5" />
-                    <span>{t.product.sizeGuide}</span>
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {product.sizes.map(size => {
-                    return (
-                      <button
-                        key={size}
-                        onClick={() => setSelectedSize(size)}
-                        className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all ${
-                          selectedSize === size
-                            ? 'border-[#1C3B2B] bg-[#1C3B2B] text-white shadow-xs'
-                            : 'border-[#D5C9B8] text-[#3B362F] hover:bg-[#F6F1EA]'
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    );
-                  })}
-                </div>
 
                 {/* Stock status for variant */}
                 <div className="mt-2 text-xs">
@@ -530,86 +494,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
           </div>
 
         </div>
-
-        {/* Size Chart Guide Modal Popup */}
-        {isSizeChartOpen && (
-          <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-30 p-6 flex flex-col justify-between overflow-y-auto">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-[#E2D7C8]">
-                <div className="flex items-center gap-2">
-                  <Ruler className="w-5 h-5 text-[#1C3B2B]" />
-                  <h3 className="font-display text-lg font-bold text-[#1C3B2B]">
-                    Panduan Ukuran Standar Butik saena.id
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setIsSizeChartOpen(false)}
-                  className="p-1 rounded-full text-gray-500 hover:text-black"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="py-4 space-y-4 text-xs text-[#4A453E]">
-                <p>
-                  Semua ukuran menggunakan standar internasional dengan toleransi jahitan ± 1-2 cm. Busana muslim saena.id didesain dengan siluet loose fit yang anggun dan tidak menampakkan lekuk tubuh.
-                </p>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse border border-[#E5DDD2]">
-                    <thead>
-                      <tr className="bg-[#FAF6F0] text-[#1C3B2B] font-bold">
-                        <th className="p-2 border border-[#E5DDD2]">Ukuran</th>
-                        <th className="p-2 border border-[#E5DDD2]">Lingkar Dada (LD)</th>
-                        <th className="p-2 border border-[#E5DDD2]">Panjang Baju (PB)</th>
-                        <th className="p-2 border border-[#E5DDD2]">Panjang Lengan</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="p-2 border border-[#E5DDD2] font-bold">S</td>
-                        <td className="p-2 border border-[#E5DDD2]">96 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">136 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">56 cm</td>
-                      </tr>
-                      <tr className="bg-[#FAF8F5]">
-                        <td className="p-2 border border-[#E5DDD2] font-bold">M</td>
-                        <td className="p-2 border border-[#E5DDD2]">102 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">138 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">57 cm</td>
-                      </tr>
-                      <tr>
-                        <td className="p-2 border border-[#E5DDD2] font-bold">L</td>
-                        <td className="p-2 border border-[#E5DDD2]">108 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">140 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">58 cm</td>
-                      </tr>
-                      <tr className="bg-[#FAF8F5]">
-                        <td className="p-2 border border-[#E5DDD2] font-bold">XL</td>
-                        <td className="p-2 border border-[#E5DDD2]">114 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">142 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">59 cm</td>
-                      </tr>
-                      <tr>
-                        <td className="p-2 border border-[#E5DDD2] font-bold">All Size / Kaftan</td>
-                        <td className="p-2 border border-[#E5DDD2]">120 cm (Free Size)</td>
-                        <td className="p-2 border border-[#E5DDD2]">140 cm</td>
-                        <td className="p-2 border border-[#E5DDD2]">Loose Batwing</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setIsSizeChartOpen(false)}
-              className="w-full py-2.5 bg-[#1C3B2B] text-white rounded-xl text-xs font-semibold"
-            >
-              Tutup Panduan Ukuran
-            </button>
-          </div>
-        )}
 
       </div>
     </div>
