@@ -2,6 +2,7 @@ import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { Sparkles, ArrowRight, ShieldCheck, Truck, Clock, RefreshCw } from 'lucide-react';
 import { Category } from '../types';
+import { ShopeeLogo, TikTokLogo, SHOPEE_STORE_URL, TIKTOK_STORE_URL } from './MarketplaceOrderLinks';
 
 export const HeroBanner: React.FC = () => {
   const { 
@@ -67,6 +68,35 @@ export const HeroBanner: React.FC = () => {
                 <Truck className="w-4 h-4 text-[#B38F5B]" />
                 <span>{t.hero.ctaLookbook}</span>
               </button>
+            </div>
+
+            {/* Marketplace Quick Order Options */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 pt-1 text-xs text-[#524B42]">
+              <span className="text-[#7A7266] font-medium text-[11px] sm:text-xs">Bisa juga order lewat:</span>
+              
+              {/* Shopee (Desktop & Mobile) */}
+              <a
+                href={SHOPEE_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#FFF5F2] border border-[#FFD0C7] text-[#EE4D2D] font-semibold rounded-full shadow-2xs transition-all hover:scale-105"
+                title="Buka Toko Resmi saena.id di Shopee"
+              >
+                <ShopeeLogo className="w-3.5 h-3.5" />
+                <span>Shopee</span>
+              </a>
+
+              {/* TikTok Shop (STRICTLY MOBILE WEB ONLY) */}
+              <a
+                href={TIKTOK_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex md:hidden items-center gap-1.5 px-3 py-1.5 bg-black hover:bg-neutral-800 text-white font-semibold rounded-full shadow-2xs transition-all"
+                title="Buka Toko Resmi saena.id di TikTok Shop"
+              >
+                <TikTokLogo className="w-3.5 h-3.5 text-white" />
+                <span>TikTok Shop</span>
+              </a>
             </div>
 
             {/* 4 Value Propositions Pill Grid */}

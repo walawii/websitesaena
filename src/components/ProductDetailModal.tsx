@@ -13,6 +13,7 @@ import {
   MessageSquare,
   ThumbsUp
 } from 'lucide-react';
+import { MarketplaceOrderOptions } from './MarketplaceOrderLinks';
 
 interface ProductDetailModalProps {
   product: Product;
@@ -328,6 +329,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   <span>{t.product.buyNow}</span>
                 </button>
               </div>
+
+              {/* Official Marketplace Alternative: Shopee & TikTok (TikTok Mobile Only) */}
+              <MarketplaceOrderOptions 
+                productTitle={product.name} 
+                variant="modal"
+                className="mt-1"
+              />
 
               {/* Information Tabs */}
               <div className="pt-4 border-t border-[#EAE2D5]">

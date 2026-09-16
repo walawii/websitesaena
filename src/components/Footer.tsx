@@ -15,6 +15,7 @@ import {
   Facebook,
   Lock
 } from 'lucide-react';
+import { ShopeeLogo, TikTokLogo, SHOPEE_STORE_URL, TIKTOK_STORE_URL } from './MarketplaceOrderLinks';
 
 export const Footer: React.FC = () => {
   const { 
@@ -70,6 +71,38 @@ export const Footer: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#C5A880] shrink-0" />
                 <span>Layanan Pelanggan: Setiap Hari (08:00 - 22:00 WIB)</span>
+              </div>
+            </div>
+
+            {/* Official Marketplace Links */}
+            <div className="pt-2 border-t border-[#2A3A32] space-y-2">
+              <span className="text-[10px] uppercase font-bold text-[#C5A880] tracking-wider block">
+                Bisa Juga Order via Marketplace Resmi:
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Shopee */}
+                <a
+                  href={SHOPEE_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#EE4D2D]/20 hover:bg-[#EE4D2D]/30 border border-[#EE4D2D]/50 text-white rounded-lg text-xs font-semibold transition-colors"
+                  title="Order saena.id di Shopee"
+                >
+                  <ShopeeLogo className="w-4 h-4 shrink-0" />
+                  <span>Shopee (@saena.id)</span>
+                </a>
+
+                {/* TikTok - STRICTLY MOBILE ONLY */}
+                <a
+                  href={TIKTOK_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex md:hidden items-center gap-2 px-3 py-1.5 bg-black/60 hover:bg-black border border-white/30 text-white rounded-lg text-xs font-semibold transition-colors"
+                  title="Order saena.id di TikTok Shop"
+                >
+                  <TikTokLogo className="w-4 h-4 shrink-0 text-white" />
+                  <span>TikTok Shop</span>
+                </a>
               </div>
             </div>
           </div>

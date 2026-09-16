@@ -11,6 +11,7 @@ import {
   Check,
   Percent
 } from 'lucide-react';
+import { ShopeeLogo, TikTokLogo, SHOPEE_STORE_URL, TIKTOK_STORE_URL } from './MarketplaceOrderLinks';
 
 export const CartDrawer: React.FC = () => {
   const {
@@ -321,6 +322,30 @@ export const CartDrawer: React.FC = () => {
               <div className="flex items-center justify-center gap-2 text-[10px] text-[#8C8377]">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#2E7D32]" />
                 <span>Pembayaran Terenkripsi & Otomatis Verifikasi</span>
+              </div>
+
+              {/* Marketplace Alternative */}
+              <div className="pt-2 border-t border-[#F0EAE1] flex flex-wrap items-center justify-center gap-2 text-[11px] text-[#7A7266]">
+                <span>Atau pesan via:</span>
+                <a
+                  href={SHOPEE_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#EE4D2D] font-semibold hover:underline"
+                >
+                  <ShopeeLogo className="w-3 h-3" />
+                  <span>Shopee</span>
+                </a>
+                <span className="hidden md:hidden sm:inline">•</span>
+                <a
+                  href={TIKTOK_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex md:hidden items-center gap-1 text-black font-semibold hover:underline"
+                >
+                  <TikTokLogo className="w-3 h-3 text-black" />
+                  <span>TikTok Shop</span>
+                </a>
               </div>
 
             </div>

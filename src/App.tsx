@@ -15,6 +15,7 @@ import { MengantarLabelModal } from './components/MengantarLabelModal';
 import { MengantarConfigModal } from './components/MengantarConfigModal';
 import { DokuConfigModal } from './components/DokuConfigModal';
 import { Footer } from './components/Footer';
+import { MarketplaceOrderOptions } from './components/MarketplaceOrderLinks';
 import { 
   Filter, 
   SlidersHorizontal, 
@@ -351,6 +352,9 @@ const MainContent: React.FC = () => {
               </div>
 
             </div>
+
+            {/* Official Marketplace Alternative Banner */}
+            <MarketplaceOrderOptions variant="banner" className="mt-8" />
           </section>
 
           {/* Boutique Craftsmanship & Material Highlight */}

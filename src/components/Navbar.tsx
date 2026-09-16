@@ -17,6 +17,7 @@ import {
   Lock
 } from 'lucide-react';
 import { LanguageCode, CurrencyCode } from '../types';
+import { ShopeeLogo, TikTokLogo, SHOPEE_STORE_URL, TIKTOK_STORE_URL } from './MarketplaceOrderLinks';
 
 export const Navbar: React.FC = () => {
   const {
@@ -61,11 +62,42 @@ export const Navbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#EBE3D7] transition-all">
       {/* Top micro announcement bar */}
-      <div className="bg-[#1C3B2B] text-[#E7DECD] text-xs py-1.5 px-4 text-center font-medium tracking-wide flex items-center justify-center gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-[#C5A880] animate-pulse" />
-        <span>{t.hero.freeShippingNotice}</span>
-        <span className="hidden sm:inline text-white/40">|</span>
-        <span className="hidden sm:inline text-[#C5A880]">Gunakan Kupon: SAENARAMADHAN (Diskon 15%)</span>
+      <div className="bg-[#1C3B2B] text-[#E7DECD] text-xs py-1.5 px-3 sm:px-4 font-medium tracking-wide flex items-center justify-between gap-2 border-b border-[#2A523D]">
+        <div className="flex items-center gap-2 mx-auto md:mx-0">
+          <Sparkles className="w-3.5 h-3.5 text-[#C5A880] animate-pulse shrink-0" />
+          <span>{t.hero.freeShippingNotice}</span>
+          <span className="hidden sm:inline text-white/40">|</span>
+          <span className="hidden sm:inline text-[#C5A880]">Kupon: SAENARAMADHAN (15% OFF)</span>
+        </div>
+
+        {/* Order via Marketplace Links */}
+        <div className="flex items-center gap-2.5 text-[11px] shrink-0">
+          <span className="text-[#C5BBAE] hidden lg:inline">Order juga lewat:</span>
+          
+          {/* Shopee */}
+          <a
+            href={SHOPEE_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-white hover:text-[#FFD0C7] transition-colors font-semibold"
+            title="Order di Shopee"
+          >
+            <ShopeeLogo className="w-3.5 h-3.5" />
+            <span>Shopee</span>
+          </a>
+
+          {/* TikTok - STRICTLY MOBILE WEB ONLY */}
+          <a
+            href={TIKTOK_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex md:hidden items-center gap-1 text-white hover:text-neutral-200 transition-colors font-semibold"
+            title="Order di TikTok Shop"
+          >
+            <TikTokLogo className="w-3.5 h-3.5 text-white" />
+            <span>TikTok Shop</span>
+          </a>
+        </div>
       </div>
 
       {/* Main Navigation Bar */}
