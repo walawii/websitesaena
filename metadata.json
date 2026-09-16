@@ -1,6 +1,6 @@
 {
   "name": "saena.id - Busana Muslim Elegan",
-  "description": "Toko online busana muslim modern dan elegan saena.id dengan katalog busana, checkout instan, kalkulator ongkir otomatis, integrasi pembayaran lokal, notifikasi WhatsApp, push update, dan dashboard analitik admin.",
+  "description": "Toko online busana muslim modern dan elegan saena.id dengan katalog busana, checkout instan, kalkulator ongkir kurir Mengantar.com, gerbang pembayaran resmi DOKU.com (QRIS, VA Multi-Bank, E-Wallet, Kartu Kredit & Retail), notifikasi WhatsApp, dan dashboard admin.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

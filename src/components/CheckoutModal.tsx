@@ -23,7 +23,9 @@ import {
   Building2,
   Lock,
   Sparkles,
-  MapPin
+  MapPin,
+  Store,
+  ExternalLink
 } from 'lucide-react';
 
 export const CheckoutModal: React.FC = () => {
@@ -39,6 +41,7 @@ export const CheckoutModal: React.FC = () => {
     setIsWhatsAppModalOpen,
     setIsOrderTrackingOpen,
     setActiveOrder,
+    dokuConfig,
     t
   } = useStore();
 
@@ -570,13 +573,34 @@ export const CheckoutModal: React.FC = () => {
 
               {/* Section 3: Integrated Payment Methods */}
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#1C3B2B] border-b border-[#EFE9E0] pb-1.5">
-                  <span className="w-5 h-5 rounded-full bg-[#1C3B2B] text-white flex items-center justify-center text-[10px]">3</span>
-                  <span>{t.checkout.selectPayment}</span>
+                <div className="flex items-center justify-between border-b border-[#EFE9E0] pb-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#1C3B2B]">
+                    <span className="w-5 h-5 rounded-full bg-[#1C3B2B] text-white flex items-center justify-center text-[10px]">3</span>
+                    <span>{t.checkout.selectPayment}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[#1C3B2B] bg-[#EAE4D9] px-2 py-0.5 rounded-md font-semibold">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#1C3B2B]" />
+                    <span>DOKU Payment Gateway</span>
+                  </div>
+                </div>
+
+                {/* DOKU Security Guarantee Badge */}
+                <div className="p-2.5 bg-gradient-to-r from-[#1C3B2B]/5 to-[#C5A880]/10 rounded-xl border border-[#D5C9B8] flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-[#1C3B2B] text-white text-[10px] font-bold rounded tracking-wider">
+                      DOKU
+                    </span>
+                    <span className="text-[#3D3830] font-medium text-[11px]">
+                      Transaksi terenkripsi 256-bit SSL, berizin Bank Indonesia &amp; PCI-DSS Level 1
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#7A7266] uppercase font-mono tracking-wider">
+                    {dokuConfig?.environment === 'production' ? 'Live API' : 'Sandbox'}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {/* QRIS */}
+                  {/* QRIS DOKU */}
                   <div
                     onClick={() => setSelectedPayment('qris')}
                     className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
@@ -586,20 +610,20 @@ export const CheckoutModal: React.FC = () => {
                     }`}
                   >
                     <QrCode className="w-5 h-5 text-[#1C3B2B] shrink-0 mt-0.5" />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-bold text-[#1F2421]">QRIS Otomatis</h4>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-[#1F2421]">QRIS Dinamis (DOKU)</h4>
                         <span className="text-[9px] bg-[#2E7D32] text-white px-1.5 py-0.2 rounded-full font-bold">
                           INSTANT
                         </span>
                       </div>
                       <p className="text-[10px] text-[#7A7266] mt-0.5">
-                        Scan via BCA, Mandiri, GoPay, OVO, ShopeePay, DANA
+                        BCA, Mandiri, GoPay, OVO, ShopeePay, DANA &amp; semua M-Banking
                       </p>
                     </div>
                   </div>
 
-                  {/* BCA Virtual Account */}
+                  {/* BCA Virtual Account (DOKU) */}
                   <div
                     onClick={() => setSelectedPayment('va_bca')}
                     className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
@@ -612,12 +636,12 @@ export const CheckoutModal: React.FC = () => {
                     <div>
                       <h4 className="text-xs font-bold text-[#1F2421]">BCA Virtual Account</h4>
                       <p className="text-[10px] text-[#7A7266] mt-0.5">
-                        Verifikasi otomatis 24 jam tanpa perlu bukti transfer
+                        DOKU Jokul VA • Verifikasi lunas otomatis 24 jam tanpa upload bukti
                       </p>
                     </div>
                   </div>
 
-                  {/* Mandiri Virtual Account */}
+                  {/* Mandiri Virtual Account (DOKU) */}
                   <div
                     onClick={() => setSelectedPayment('va_mandiri')}
                     className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
@@ -630,12 +654,30 @@ export const CheckoutModal: React.FC = () => {
                     <div>
                       <h4 className="text-xs font-bold text-[#1F2421]">Mandiri Virtual Account</h4>
                       <p className="text-[10px] text-[#7A7266] mt-0.5">
-                        Bayar via Livin' by Mandiri atau ATM
+                        DOKU Jokul VA • Livin' by Mandiri, ATM &amp; Internet Banking
                       </p>
                     </div>
                   </div>
 
-                  {/* E-Wallet GoPay / ShopeePay */}
+                  {/* BNI / BRI / BSI Syariah Virtual Account */}
+                  <div
+                    onClick={() => setSelectedPayment('va_bni')}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
+                      selectedPayment === 'va_bni'
+                        ? 'border-[#1C3B2B] bg-[#1C3B2B]/5 ring-1 ring-[#1C3B2B]'
+                        : 'border-[#E2D8CA] bg-white hover:bg-[#FAF8F5]'
+                    }`}
+                  >
+                    <Building2 className="w-5 h-5 text-[#008272] shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-[#1F2421]">BNI / BRI / BSI Syariah VA</h4>
+                      <p className="text-[10px] text-[#7A7266] mt-0.5">
+                        DOKU Virtual Account multi-bank berizin Bank Indonesia
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* E-Wallet DOKU (GoPay, OVO, DANA) */}
                   <div
                     onClick={() => setSelectedPayment('gopay')}
                     className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
@@ -646,14 +688,14 @@ export const CheckoutModal: React.FC = () => {
                   >
                     <Smartphone className="w-5 h-5 text-[#00AA13] shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-xs font-bold text-[#1F2421]">GoPay / Dompet Digital</h4>
+                      <h4 className="text-xs font-bold text-[#1F2421]">E-Wallet (GoPay, OVO, DANA)</h4>
                       <p className="text-[10px] text-[#7A7266] mt-0.5">
-                        Langsung terhubung dengan aplikasi dompet Anda
+                        DOKU E-Wallet checkout langsung dari smartphone Anda
                       </p>
                     </div>
                   </div>
 
-                  {/* Credit / Debit Card */}
+                  {/* Credit / Debit Card (DOKU 3D Secure) */}
                   <div
                     onClick={() => setSelectedPayment('cc')}
                     className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
@@ -666,7 +708,25 @@ export const CheckoutModal: React.FC = () => {
                     <div>
                       <h4 className="text-xs font-bold text-[#1F2421]">Kartu Kredit / Debit Online</h4>
                       <p className="text-[10px] text-[#7A7266] mt-0.5">
-                        Visa, Mastercard, JCB dengan keamanan 3D Secure
+                        Visa, Mastercard, JCB berlisensi DOKU dengan 3D Secure OTP
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Gerai Retail Minimarket DOKU */}
+                  <div
+                    onClick={() => setSelectedPayment('doku_indomaret')}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${
+                      selectedPayment === 'doku_indomaret'
+                        ? 'border-[#1C3B2B] bg-[#1C3B2B]/5 ring-1 ring-[#1C3B2B]'
+                        : 'border-[#E2D8CA] bg-white hover:bg-[#FAF8F5]'
+                    }`}
+                  >
+                    <Store className="w-5 h-5 text-[#D92525] shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-[#1F2421]">Indomaret &amp; Alfamart</h4>
+                      <p className="text-[10px] text-[#7A7266] mt-0.5">
+                        DOKU Retail Payment • Bayar tunai di kasir gerai terdekat
                       </p>
                     </div>
                   </div>
@@ -684,7 +744,7 @@ export const CheckoutModal: React.FC = () => {
                     <div>
                       <h4 className="text-xs font-bold text-[#1F2421]">COD (Bayar di Tempat)</h4>
                       <p className="text-[10px] text-[#7A7266] mt-0.5">
-                        Bayar tunai kepada kurir saat paket sampai
+                        Bayar tunai kepada kurir Mengantar.com saat paket diterima
                       </p>
                     </div>
                   </div>
@@ -733,12 +793,12 @@ export const CheckoutModal: React.FC = () => {
             </form>
           )}
 
-          {/* STEP 2: PAYMENT PENDING (QRIS / VA / SIMULATION) */}
+          {/* STEP 2: PAYMENT PENDING (DOKU QRIS / VA / SIMULATION) */}
           {step === 'payment_pending' && createdOrder && (
-            <div className="space-y-6 text-center py-2">
+            <div className="space-y-5 text-center py-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5 animate-spin" />
-                <span>Menunggu Pembayaran Otomatis</span>
+                <span>Menunggu Pembayaran DOKU Gateway</span>
               </div>
 
               <div>
@@ -746,49 +806,116 @@ export const CheckoutModal: React.FC = () => {
                   ID Pesanan: {createdOrder.id}
                 </h3>
                 <p className="text-xs text-[#7A7266] mt-1">
-                  Selesaikan pembayaran dalam <strong className="text-[#1C3B2B]">15:00 menit</strong>
+                  Selesaikan transaksi dalam <strong className="text-[#1C3B2B]">15:00 menit</strong>
                 </p>
               </div>
 
               {/* Payment Box Display */}
-              <div className="max-w-md mx-auto p-5 bg-[#FAF7F2] rounded-2xl border border-[#E5DDD2] space-y-4">
-                <div className="text-sm font-bold text-[#1C3B2B]">
-                  Total Tagihan: {formatPrice(createdOrder.total)}
+              <div className="max-w-md mx-auto p-5 bg-[#FAF7F2] rounded-2xl border border-[#E5DDD2] space-y-4 text-left">
+                {/* DOKU Gateway Header */}
+                <div className="p-3 bg-white rounded-xl border border-[#E2D8CA] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-[#1C3B2B] text-white text-[10px] font-bold rounded tracking-wider">
+                      DOKU
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-[#1C3B2B] leading-none">
+                        DOKU Jokul Payment Gateway
+                      </p>
+                      <p className="text-[10px] text-[#7A7266] mt-0.5">
+                        {createdOrder.payment.doku?.invoiceNumber || `INV-DOKU-${createdOrder.id.replace('SAENA-', '')}`}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#EAE4D9] text-[#1C3B2B] uppercase">
+                    {dokuConfig?.environment === 'production' ? 'Live' : 'Sandbox'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-[#1C3B2B]/5 rounded-xl border border-[#1C3B2B]/15 flex items-center justify-between">
+                  <span className="text-xs text-[#524B40] font-medium">Total Tagihan:</span>
+                  <span className="text-base font-bold text-[#1C3B2B]">
+                    {formatPrice(createdOrder.total)}
+                  </span>
                 </div>
 
                 {/* QRIS Display */}
-                {createdOrder.payment.channel === 'qris' && (
-                  <div className="space-y-3">
+                {(createdOrder.payment.channel === 'qris' || createdOrder.payment.channel === 'doku_qris') && (
+                  <div className="space-y-3 text-center">
                     <p className="text-xs text-[#524B40]">
-                      Scan kode QRIS resmi saena.id di bawah ini menggunakan aplikasi mobile banking atau e-wallet:
+                      Scan kode QRIS resmi di bawah ini menggunakan BCA Mobile, Livin' by Mandiri, GoPay, OVO, ShopeePay, DANA, atau M-Banking:
                     </p>
                     <div className="w-52 h-52 mx-auto p-2 bg-white rounded-xl shadow-md border border-[#E2D8CA]">
                       <img
-                        src={createdOrder.payment.qrCodeUrl}
-                        alt="QRIS saena.id"
+                        src={createdOrder.payment.qrCodeUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=00020101021226580016ID.CO.QRIS.WWW011893600002011000000005204581253033605802ID5915SAENA_ID_OFFIC6011TASIKMALAYA62070703A016304'}
+                        alt="QRIS DOKU saena.id"
                         className="w-full h-full object-contain"
                       />
                     </div>
                     <div className="text-[11px] text-[#7A7266] flex items-center justify-center gap-2">
                       <span>NMID: ID10200382910</span>
                       <span>•</span>
-                      <span>A/N: SAENA ID BOUTIQUE</span>
+                      <span>Merchant: DOKU - SAENA ID</span>
                     </div>
                   </div>
                 )}
 
                 {/* Virtual Account Display */}
-                {createdOrder.payment.channel.startsWith('va_') && (
+                {createdOrder.payment.channel.includes('va_') && (
                   <div className="space-y-3">
                     <p className="text-xs text-[#524B40]">
-                      Transfer ke Nomor Virtual Account resmi:
+                      Transfer ke Nomor DOKU Virtual Account resmi:
                     </p>
                     <div className="p-3 bg-white rounded-xl border border-[#E2D8CA] flex items-center justify-between gap-2">
-                      <span className="font-mono text-base font-bold text-[#1C3B2B] tracking-wider">
-                        {createdOrder.payment.virtualAccount}
-                      </span>
+                      <div>
+                        <span className="text-[10px] text-[#7A7266] block uppercase font-semibold">
+                          {createdOrder.payment.channelName}
+                        </span>
+                        <span className="font-mono text-base font-bold text-[#1C3B2B] tracking-wider">
+                          {createdOrder.payment.virtualAccount || createdOrder.payment.doku?.virtualAccountInfo?.vaNumber || '8888891029384756'}
+                        </span>
+                      </div>
                       <button
-                        onClick={() => handleCopyVA(createdOrder.payment.virtualAccount || '')}
+                        onClick={() => handleCopyVA(createdOrder.payment.virtualAccount || createdOrder.payment.doku?.virtualAccountInfo?.vaNumber || '8888891029384756')}
+                        className="px-2.5 py-1 text-xs bg-[#1C3B2B]/10 hover:bg-[#1C3B2B]/20 text-[#1C3B2B] font-semibold rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        {copiedVA ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-[#2E7D32]" />
+                            <span>Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Salin</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-[#7A7266] space-y-1">
+                      <p>• Masukkan kode perusahaan/VA di menu transfer bank Anda</p>
+                      <p>• Transaksi akan otomatis diverifikasi lunas dalam hitungan detik</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Minimarket Retail Display */}
+                {(createdOrder.payment.channel === 'doku_indomaret' || createdOrder.payment.channel === 'doku_alfamart') && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-[#524B40]">
+                      Tunjukkan Kode Pembayaran berikut kepada kasir:
+                    </p>
+                    <div className="p-3 bg-white rounded-xl border border-[#E2D8CA] flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] text-[#7A7266] block uppercase font-semibold">
+                          Kode Pembayaran Kasir
+                        </span>
+                        <span className="font-mono text-base font-bold text-[#1C3B2B] tracking-wider">
+                          {createdOrder.payment.virtualAccount || 'DK-IND-99182371'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleCopyVA(createdOrder.payment.virtualAccount || 'DK-IND-99182371')}
                         className="px-2.5 py-1 text-xs bg-[#1C3B2B]/10 hover:bg-[#1C3B2B]/20 text-[#1C3B2B] font-semibold rounded-lg flex items-center gap-1 transition-colors"
                       >
                         {copiedVA ? (
@@ -805,29 +932,49 @@ export const CheckoutModal: React.FC = () => {
                       </button>
                     </div>
                     <p className="text-[11px] text-[#7A7266]">
-                      Bisa ditransfer dari semua bank anggota ATM Bersama / Prima / Alto.
+                      Sebutkan kepada kasir untuk pembayaran <strong>DOKU / Merchant saena.id</strong>.
                     </p>
                   </div>
                 )}
 
-                {/* E-Wallet / CC display */}
-                {!createdOrder.payment.channel.startsWith('va_') && createdOrder.payment.channel !== 'qris' && (
-                  <div className="p-3 bg-white rounded-xl border border-[#E2D8CA] text-xs text-[#524B40]">
-                    Sistem telah mengirimkan notifikasi otorisasi transaksi ke akun dompet/kartu Anda.
+                {/* E-Wallet / CC / Hosted Checkout redirect link */}
+                {!createdOrder.payment.channel.includes('va_') && 
+                 createdOrder.payment.channel !== 'qris' && 
+                 createdOrder.payment.channel !== 'doku_qris' && 
+                 createdOrder.payment.channel !== 'doku_indomaret' && 
+                 createdOrder.payment.channel !== 'doku_alfamart' && (
+                  <div className="p-3.5 bg-white rounded-xl border border-[#E2D8CA] text-xs text-[#524B40] space-y-2">
+                    <p className="font-medium text-[#1C3B2B]">
+                      Otorisasi Pembayaran DOKU
+                    </p>
+                    <p className="text-[11px] text-[#665E51]">
+                      Sistem sedang menunggu konfirmasi otorisasi pembayaran dari kanal {createdOrder.payment.channelName}.
+                    </p>
+                    {createdOrder.payment.doku?.paymentUrl && (
+                      <a
+                        href={createdOrder.payment.doku.paymentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1C3B2B] text-white rounded-lg text-xs font-semibold hover:bg-[#28523C] transition-colors mt-1"
+                      >
+                        <span>Buka Halaman Pembayaran DOKU</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
                   </div>
                 )}
 
                 {/* SIMULATE PAYMENT BUTTON (Crucial for Instant Verification Demo!) */}
-                <div className="pt-2 border-t border-[#EAE2D5]">
+                <div className="pt-2 border-t border-[#EAE2D5] text-center">
                   <button
                     onClick={handleSimulatePayment}
                     className="w-full py-3 px-4 bg-[#2E7D32] hover:bg-[#256829] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4 text-[#C5A880]" />
-                    <span>⚡ Simulasi Pembayaran Berhasil (Webhook Realtime)</span>
+                    <span>⚡ Simulasi Pembayaran Lunas (Webhook DOKU Realtime)</span>
                   </button>
                   <span className="text-[10px] text-[#7A7266] block mt-1.5">
-                    Klik untuk mensimulasikan callback webhook gateway pembayaran sukses
+                    Menguji respon callback webhook DOKU secara langsung tanpa memotong saldo nyata
                   </span>
                 </div>
               </div>

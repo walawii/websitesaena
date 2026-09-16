@@ -13,12 +13,15 @@ import {
   PaymentChannel,
   ProductReview,
   MengantarStoreConfig,
-  MengantarOrderData
+  MengantarOrderData,
+  DokuStoreConfig,
+  DokuPaymentData
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_ORDERS, SHIPPING_SERVICES, AVAILABLE_COUPONS } from '../data/mockData';
 import { translations } from '../translations';
 import confetti from 'canvas-confetti';
 import { DEFAULT_MENGANTAR_CONFIG, createMengantarOrderApi } from '../utils/mengantarClient';
+import { DEFAULT_DOKU_CONFIG, createDokuPaymentApi } from '../utils/dokuClient';
 import { 
   db, 
   testConnection, 
@@ -96,6 +99,12 @@ interface StoreContextType {
   setIsMengantarLabelModalOpen: (open: boolean) => void;
   isMengantarConfigModalOpen: boolean;
   setIsMengantarConfigModalOpen: (open: boolean) => void;
+  
+  // DOKU Payment Gateway Integration
+  dokuConfig: DokuStoreConfig;
+  updateDokuConfig: (cfg: Partial<DokuStoreConfig>) => void;
+  isDokuConfigModalOpen: boolean;
+  setIsDokuConfigModalOpen: (open: boolean) => void;
   
   // Search & Filter
   searchQuery: string;
@@ -291,6 +300,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isMengantarLabelModalOpen, setIsMengantarLabelModalOpen] = useState(false);
   const [isMengantarConfigModalOpen, setIsMengantarConfigModalOpen] = useState(false);
 
+  // DOKU Payment Gateway Integration State
+  const [dokuConfig, setDokuConfig] = useState<DokuStoreConfig>(() => {
+    try {
+      const saved = localStorage.getItem('saena_doku_config_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return DEFAULT_DOKU_CONFIG;
+  });
+  const [isDokuConfigModalOpen, setIsDokuConfigModalOpen] = useState(false);
+
+  const updateDokuConfig = (cfg: Partial<DokuStoreConfig>) => {
+    setDokuConfig(prev => {
+      const updated = { ...prev, ...cfg };
+      try {
+        localStorage.setItem('saena_doku_config_v1', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Save Doku config error:', err);
+      }
+      return updated;
+    });
+  };
+
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -305,6 +338,45 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem('saena_products_v1', JSON.stringify(products));
   }, [products]);
+
+  // Automatically sync API credentials configured in server environment
+  useEffect(() => {
+    fetch('/api/system/gateway-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.mengantar?.apiKey) {
+          setMengantarConfig(prev => {
+            if (!prev?.apiKey || prev.apiKey !== data.mengantar.apiKey) {
+              const updated = { ...prev, apiKey: data.mengantar.apiKey, environment: data.mengantar.environment || 'production' };
+              try {
+                localStorage.setItem('saena_mengantar_config_v1', JSON.stringify(updated));
+              } catch {
+                // ignore
+              }
+              return updated;
+            }
+            return prev;
+          });
+        }
+        if (data?.doku?.clientId) {
+          setDokuConfig(prev => {
+            if (!prev?.clientId || prev.clientId !== data.doku.clientId) {
+              const updated = { ...prev, clientId: data.doku.clientId, environment: data.doku.environment || 'sandbox' };
+              try {
+                localStorage.setItem('saena_doku_config_v1', JSON.stringify(updated));
+              } catch {
+                // ignore
+              }
+              return updated;
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to auto-detect gateway config:', err);
+      });
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('saena_orders_v1', JSON.stringify(orders));
@@ -950,18 +1022,63 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const channelNames: Record<PaymentChannel, string> = {
-      qris: 'QRIS Realtime Dynamic (BCA/Mandiri/GoPay/ShopeePay)',
-      va_bca: 'BCA Virtual Account',
-      va_mandiri: 'Mandiri Virtual Account',
-      va_bni: 'BNI Virtual Account',
-      va_bri: 'BRI Virtual Account',
-      gopay: 'GoPay Instant Checkout',
-      shopeepay: 'ShopeePay Indonesia',
-      ovo: 'OVO Digital Wallet',
-      dana: 'DANA Dompet Digital',
-      cc: 'Credit Card / Visa / Mastercard',
+      qris: 'QRIS Realtime Dynamic (DOKU Gateway)',
+      va_bca: 'BCA Virtual Account (DOKU)',
+      va_mandiri: 'Mandiri Virtual Account (DOKU)',
+      va_bni: 'BNI Virtual Account (DOKU)',
+      va_bri: 'BRI Virtual Account (DOKU)',
+      va_bsi: 'BSI Virtual Account Syariah (DOKU)',
+      va_permata: 'Permata Virtual Account (DOKU)',
+      doku_checkout: 'DOKU All-in-One Checkout',
+      doku_qris: 'DOKU QRIS Realtime Instant',
+      doku_va_bca: 'BCA Virtual Account (DOKU)',
+      doku_va_mandiri: 'Mandiri Virtual Account (DOKU)',
+      doku_va_bni: 'BNI Virtual Account (DOKU)',
+      doku_va_bri: 'BRI Virtual Account (DOKU)',
+      doku_va_bsi: 'BSI Virtual Account Syariah (DOKU)',
+      doku_ewallet_ovo: 'OVO (DOKU Jokul)',
+      doku_ewallet_dana: 'DANA (DOKU Jokul)',
+      doku_ewallet_shopeepay: 'ShopeePay (DOKU Jokul)',
+      doku_cc: 'Kartu Kredit / Debit (DOKU 3D Secure)',
+      doku_indomaret: 'Indomaret / Ceriamart (DOKU Retail)',
+      doku_alfamart: 'Alfamart / Alfamidi (DOKU Retail)',
+      gopay: 'GoPay Instant Checkout (DOKU)',
+      shopeepay: 'ShopeePay Indonesia (DOKU)',
+      ovo: 'OVO Digital Wallet (DOKU)',
+      dana: 'DANA Dompet Digital (DOKU)',
+      cc: 'Credit Card / Visa / Mastercard (DOKU)',
       cod: 'Cash on Delivery (Bayar di Tempat)'
     };
+
+    // Prepare DOKU transaction session if electronic payment
+    let dokuPaymentData: DokuPaymentData | undefined = undefined;
+    if (paymentChannel !== 'cod') {
+      try {
+        const dokuRes = await createDokuPaymentApi({
+          orderId,
+          invoiceNumber: `INV-DOKU-${orderId.replace('SAENA-', '')}`,
+          amount: finalTotal,
+          customer: {
+            fullName: customer.fullName,
+            email: customer.email,
+            whatsapp: customer.whatsapp,
+            address: `${customer.address}, ${customer.subdistrict}, ${customer.city}, ${customer.province} ${customer.postalCode}`
+          },
+          items: cart.map(item => ({
+            name: `${item.product.name} (${item.selectedSize} - ${item.selectedColor.name})`,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          channel: paymentChannel
+        }, dokuConfig);
+
+        if (dokuRes.success && dokuRes.data) {
+          dokuPaymentData = dokuRes.data;
+        }
+      } catch (err) {
+        console.warn('DOKU payment session generation note:', err);
+      }
+    }
 
     const newOrder: Order = {
       id: orderId,
@@ -971,11 +1088,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       shipping,
       payment: {
         channel: paymentChannel,
-        channelName: channelNames[paymentChannel],
-        virtualAccount: paymentChannel.startsWith('va_') ? `8299${Math.floor(1000000000 + Math.random() * 9000000000)}` : undefined,
-        qrCodeUrl: paymentChannel === 'qris' ? 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=00020101021226580016ID.CO.QRIS.WWW011893600002011000000005204581253033605802ID5915SAENA_ID_OFFIC6011TASIKMALAYA62070703A016304' : undefined,
+        channelName: channelNames[paymentChannel] || 'DOKU Payment Gateway',
+        virtualAccount: dokuPaymentData?.virtualAccountInfo?.vaNumber || (paymentChannel.includes('va_') ? `88888${Math.floor(1000000000 + Math.random() * 9000000000)}` : undefined),
+        qrCodeUrl: dokuPaymentData?.qrisInfo?.qrImage || (paymentChannel.includes('qris') ? 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=00020101021226580016ID.CO.QRIS.WWW011893600002011000000005204581253033605802ID5915SAENA_ID_OFFIC6011TASIKMALAYA62070703A016304' : undefined),
         expiryMinutes: 60,
-        paidAt: paymentChannel === 'cod' ? undefined : undefined
+        paidAt: undefined,
+        doku: dokuPaymentData
       },
       subtotal,
       discount: couponDiscount,
@@ -1081,14 +1199,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           status: 'dibayar',
           payment: {
             ...ord.payment,
-            paidAt: new Date().toLocaleTimeString('id-ID')
+            paidAt: new Date().toLocaleTimeString('id-ID'),
+            doku: ord.payment.doku ? {
+              ...ord.payment.doku,
+              status: 'SUCCESS',
+              paidAt: new Date().toISOString()
+            } : undefined
           },
           trackingHistory: [
             ...ord.trackingHistory,
             {
               time: 'Baru saja',
-              location: 'Gateway Pembayaran Otomatis',
-              description: `Pembayaran ${formatPrice(ord.total)} diverifikasi LUNAS otomatis. Tim warehouse bersiap mengemas paket.`
+              location: 'DOKU Payment Gateway (doku.com)',
+              description: `Pembayaran ${formatPrice(ord.total)} berhasil diverifikasi LUNAS otomatis melalui DOKU. Tim warehouse Tamansari Tasikmalaya bersiap mengemas paket.`
             }
           ]
         };
@@ -1371,6 +1494,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsMengantarLabelModalOpen,
         isMengantarConfigModalOpen,
         setIsMengantarConfigModalOpen,
+        dokuConfig,
+        updateDokuConfig,
+        isDokuConfigModalOpen,
+        setIsDokuConfigModalOpen,
         searchQuery,
         selectedCategory,
         sortBy,

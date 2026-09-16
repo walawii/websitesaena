@@ -32,7 +32,8 @@ import {
   Printer,
   Building2,
   QrCode,
-  FileText
+  FileText,
+  Copy
 } from 'lucide-react';
 import { OrderStatus, Category, Product } from '../types';
 import { ProductEditModal } from './ProductEditModal';
@@ -41,6 +42,7 @@ import { ImportMarketplaceModal } from './ImportMarketplaceModal';
 import { ExcelImportModal } from './ExcelImportModal';
 import { DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
 import { testMengantarConnectionApi } from '../utils/mengantarClient';
+import { testDokuConnectionApi } from '../utils/dokuClient';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -68,16 +70,23 @@ export const AdminDashboard: React.FC = () => {
     dispatchOrderToMengantar,
     setActiveMengantarLabelOrder,
     setIsMengantarLabelModalOpen,
-    setIsMengantarConfigModalOpen
+    setIsMengantarConfigModalOpen,
+    dokuConfig,
+    setIsDokuConfigModalOpen,
+    simulatePaymentSuccess
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'inventory' | 'push' | 'database' | 'mengantar'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'inventory' | 'push' | 'database' | 'mengantar' | 'doku'>('analytics');
   const [orderFilterStatus, setOrderFilterStatus] = useState<string>('all');
   const [dispatchingOrderId, setDispatchingOrderId] = useState<string | null>(null);
   const [isBatchDispatching, setIsBatchDispatching] = useState(false);
   const [batchDispatchMsg, setBatchDispatchMsg] = useState<string | null>(null);
   const [testingMengantar, setTestingMengantar] = useState(false);
   const [mengantarTestResult, setMengantarTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingDoku, setTestingDoku] = useState(false);
+  const [dokuTestResult, setDokuTestResult] = useState<{ success: boolean; message: string; environment?: string } | null>(null);
+  const [copiedDokuWebhook, setCopiedDokuWebhook] = useState(false);
+  const [simulatingDokuOrderId, setSimulatingDokuOrderId] = useState<string | null>(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [isReseeding, setIsReseeding] = useState(false);
   const [reseedDone, setReseedDone] = useState(false);
@@ -344,6 +353,23 @@ export const AdminDashboard: React.FC = () => {
               <span>Mengantar.com</span>
               <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
                 {orders.filter(o => o.mengantar).length} Resi
+              </span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('doku')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all border-b-2 whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'doku'
+                ? 'border-[#1C3B2B] text-[#1C3B2B] bg-white shadow-2xs'
+                : 'border-transparent text-[#787063] hover:text-[#1C3B2B]'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-[#1C3B2B]" />
+            <div className="flex items-center gap-1.5">
+              <span>DOKU.com</span>
+              <span className="text-[9px] bg-[#1C3B2B] text-white font-bold px-1.5 py-0.5 rounded-full">
+                {orders.filter(o => o.payment.doku || o.payment.channel !== 'cod').length} Transaksi
               </span>
             </div>
           </button>
@@ -1680,6 +1706,293 @@ export const AdminDashboard: React.FC = () => {
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: DOKU.COM PAYMENT GATEWAY MANAGEMENT */}
+        {activeTab === 'doku' && (
+          <div className="space-y-6">
+            {/* Header & Status Card */}
+            <div className="bg-white p-6 rounded-2xl border border-[#E5DDD2] shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#EAE2D5] pb-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-[#1C3B2B] text-white flex items-center justify-center shrink-0 shadow-md">
+                    <ShieldCheck className="w-7 h-7 text-[#C5A880]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display text-lg font-bold text-[#1C3B2B]">
+                        DOKU.com Payment Gateway
+                      </h3>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        dokuConfig?.environment === 'production'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        {dokuConfig?.environment === 'production' ? 'Live Production' : 'Sandbox Testnet'}
+                      </span>
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold rounded-full">
+                        Berizin Bank Indonesia
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#7A7266] mt-0.5">
+                      Gerbang pembayaran terintegrasi untuk QRIS Dinamis, Virtual Account Bank, E-Wallet, Kartu Kredit &amp; Gerai Retail
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start md:self-auto">
+                  <button
+                    onClick={async () => {
+                      setTestingDoku(true);
+                      setDokuTestResult(null);
+                      try {
+                        const res = await testDokuConnectionApi(dokuConfig);
+                        setDokuTestResult(res);
+                      } catch (err: any) {
+                        setDokuTestResult({ success: false, message: err.message || 'Koneksi gagal' });
+                      } finally {
+                        setTestingDoku(false);
+                      }
+                    }}
+                    disabled={testingDoku}
+                    className="px-3.5 py-2 bg-white hover:bg-[#FAF8F5] text-[#1C3B2B] border border-[#D5C9B8] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-[#1C3B2B] ${testingDoku ? 'animate-spin' : ''}`} />
+                    <span>{testingDoku ? 'Menguji API...' : 'Uji Koneksi DOKU'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsDokuConfigModalOpen(true)}
+                    className="px-3.5 py-2 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#C5A880]" />
+                    <span>Konfigurasi Kunci API</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Connection Test Result Feedback */}
+              {dokuTestResult && (
+                <div className={`mt-4 p-3 rounded-xl border text-xs flex items-center justify-between animate-in fade-in duration-200 ${
+                  dokuTestResult.success
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                    : 'bg-rose-50 text-rose-900 border-rose-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {dokuTestResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    )}
+                    <span>{dokuTestResult.message}</span>
+                  </div>
+                  <button
+                    onClick={() => setDokuTestResult(null)}
+                    className="text-[11px] underline opacity-70 hover:opacity-100"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              )}
+
+              {/* Credentials & Webhook Details */}
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#EAE2D5]">
+                  <span className="text-[10px] text-[#7A7266] uppercase font-bold block mb-1">
+                    Client ID Merchant
+                  </span>
+                  <span className="font-mono text-[#1C3B2B] font-semibold">
+                    {dokuConfig?.clientId ? `${dokuConfig.clientId.slice(0, 8)}••••••••` : 'MALL-ID-SAENA-TEST (Default)'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#EAE2D5]">
+                  <span className="text-[10px] text-[#7A7266] uppercase font-bold block mb-1">
+                    Kanal Aktif
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="px-1.5 py-0.5 bg-white border border-[#E2D8CA] rounded text-[10px] font-medium text-[#1C3B2B]">
+                      QRIS Dinamis
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-white border border-[#E2D8CA] rounded text-[10px] font-medium text-[#1C3B2B]">
+                      VA BCA/Mandiri/BNI
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-white border border-[#E2D8CA] rounded text-[10px] font-medium text-[#1C3B2B]">
+                      E-Wallet
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-white border border-[#E2D8CA] rounded text-[10px] font-medium text-[#1C3B2B]">
+                      Kartu Kredit
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#EAE2D5]">
+                  <span className="text-[10px] text-[#7A7266] uppercase font-bold block mb-1">
+                    URL Webhook Notification DOKU
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] text-[#1C3B2B] truncate">
+                      {typeof window !== 'undefined' ? `${window.location.origin}/api/doku/notification` : '/api/doku/notification'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const url = typeof window !== 'undefined' ? `${window.location.origin}/api/doku/notification` : '/api/doku/notification';
+                        navigator.clipboard?.writeText(url);
+                        setCopiedDokuWebhook(true);
+                        setTimeout(() => setCopiedDokuWebhook(false), 2000);
+                      }}
+                      className="p-1 bg-[#1C3B2B]/10 hover:bg-[#1C3B2B]/20 text-[#1C3B2B] rounded transition-colors"
+                      title="Salin URL Webhook"
+                    >
+                      {copiedDokuWebhook ? <Check className="w-3.5 h-3.5 text-[#2E7D32]" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* DOKU Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-[#E5DDD2] shadow-xs">
+                <span className="text-xs text-[#7A7266] font-semibold block mb-1">Total Transaksi DOKU</span>
+                <span className="text-xl font-bold text-[#1C3B2B]">
+                  {orders.filter(o => o.payment.doku || o.payment.channel !== 'cod').length}
+                </span>
+                <span className="text-[10px] text-[#7A7266] block mt-0.5">Semua kanal non-COD</span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-[#E5DDD2] shadow-xs">
+                <span className="text-xs text-[#7A7266] font-semibold block mb-1">Volume Penjualan DOKU</span>
+                <span className="text-xl font-bold text-[#2E7D32]">
+                  {formatPrice(
+                    orders
+                      .filter(o => (o.payment.doku || o.payment.channel !== 'cod') && o.status === 'dibayar')
+                      .reduce((acc, curr) => acc + curr.total, 0)
+                  )}
+                </span>
+                <span className="text-[10px] text-[#2E7D32] font-semibold block mt-0.5">Lunas terverifikasi</span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-[#E5DDD2] shadow-xs">
+                <span className="text-xs text-[#7A7266] font-semibold block mb-1">Lunas Otomatis</span>
+                <span className="text-xl font-bold text-emerald-700">
+                  {orders.filter(o => (o.payment.doku || o.payment.channel !== 'cod') && o.status === 'dibayar').length} Pesanan
+                </span>
+                <span className="text-[10px] text-[#7A7266] block mt-0.5">Sinkron Webhook Realtime</span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-[#E5DDD2] shadow-xs">
+                <span className="text-xs text-[#7A7266] font-semibold block mb-1">Menunggu Pembayaran</span>
+                <span className="text-xl font-bold text-amber-700">
+                  {orders.filter(o => (o.payment.doku || o.payment.channel !== 'cod') && o.status === 'menunggu_pembayaran').length} Pesanan
+                </span>
+                <span className="text-[10px] text-amber-600 font-semibold block mt-0.5">Pending Session</span>
+              </div>
+            </div>
+
+            {/* DOKU Transaction History Table */}
+            <div className="bg-white p-6 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#EAE2D5] pb-4">
+                <div>
+                  <h4 className="text-sm font-bold text-[#1C3B2B]">
+                    Log Transaksi Gerbang Pembayaran DOKU
+                  </h4>
+                  <p className="text-xs text-[#7A7266]">
+                    Daftar invoice, status verifikasi perbankan, dan pengujian webhook callback
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#EAE2D5] text-[#7A7266] font-semibold">
+                      <th className="pb-2.5">Order ID</th>
+                      <th className="pb-2.5">Pelanggan</th>
+                      <th className="pb-2.5">Invoice DOKU</th>
+                      <th className="pb-2.5">Metode Bayar</th>
+                      <th className="pb-2.5">Nominal</th>
+                      <th className="pb-2.5">Status Pembayaran</th>
+                      <th className="pb-2.5 text-right">Aksi Simulasi Webhook</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F2ECE4]">
+                    {orders
+                      .filter(o => o.payment.doku || o.payment.channel !== 'cod')
+                      .map(order => {
+                        const isPaid = order.status === 'dibayar';
+                        const dokuInvoice = order.payment.doku?.invoiceNumber || `INV-DOKU-${order.id.replace('SAENA-', '')}`;
+                        return (
+                          <tr key={order.id} className="hover:bg-[#FAF8F5]">
+                            <td className="py-3 font-bold text-[#1C3B2B]">
+                              {order.id}
+                              <span className="block text-[10px] text-[#8C8377] font-normal">{order.createdAt}</span>
+                            </td>
+                            <td className="py-3">
+                              <span className="font-bold text-[#1F2421] block">{order.customer.fullName}</span>
+                              <span className="text-[10px] text-[#7A7266] block">{order.customer.whatsapp}</span>
+                            </td>
+                            <td className="py-3 font-mono text-[11px] text-[#1C3B2B]">
+                              {dokuInvoice}
+                              <span className="block text-[10px] text-gray-500 font-sans">
+                                {order.payment.doku?.status || (isPaid ? 'SUCCESS' : 'PENDING')}
+                              </span>
+                            </td>
+                            <td className="py-3">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FAF2E6] text-[#8C6B38] border border-[#E8D7BE]">
+                                {order.payment.channelName}
+                              </span>
+                            </td>
+                            <td className="py-3 font-bold text-[#1F2421]">
+                              {formatPrice(order.total)}
+                            </td>
+                            <td className="py-3">
+                              {isPaid ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> LUNAS
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  <Clock className="w-2.5 h-2.5 animate-spin" /> Menunggu Bayar
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 text-right">
+                              {isPaid ? (
+                                <span className="text-[11px] text-[#2E7D32] font-semibold flex items-center justify-end gap-1">
+                                  <Check className="w-3.5 h-3.5" /> Webhook Verified
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={async () => {
+                                    setSimulatingDokuOrderId(order.id);
+                                    try {
+                                      await simulatePaymentSuccess(order.id);
+                                    } finally {
+                                      setSimulatingDokuOrderId(null);
+                                    }
+                                  }}
+                                  disabled={simulatingDokuOrderId === order.id}
+                                  className="px-2.5 py-1 bg-[#2E7D32] hover:bg-[#256829] text-white text-[11px] font-semibold rounded-lg inline-flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                                  title="Simulasi respon Webhook DOKU callback pembayaran sukses"
+                                >
+                                  {simulatingDokuOrderId === order.id ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="w-3.5 h-3.5 text-[#C5A880]" />
+                                  )}
+                                  <span>Simulasi Webhook Lunas</span>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>

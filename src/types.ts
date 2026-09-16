@@ -110,7 +110,61 @@ export interface CustomerDetails {
   country: string;
 }
 
-export type PaymentChannel = 'qris' | 'va_bca' | 'va_mandiri' | 'va_bni' | 'va_bri' | 'gopay' | 'shopeepay' | 'ovo' | 'dana' | 'cc' | 'cod';
+export type PaymentChannel = 
+  | 'qris' 
+  | 'va_bca' 
+  | 'va_mandiri' 
+  | 'va_bni' 
+  | 'va_bri' 
+  | 'va_bsi'
+  | 'va_permata'
+  | 'doku_checkout'
+  | 'doku_qris'
+  | 'doku_va_bca'
+  | 'doku_va_mandiri'
+  | 'doku_va_bni'
+  | 'doku_va_bri'
+  | 'doku_va_bsi'
+  | 'doku_ewallet_ovo'
+  | 'doku_ewallet_dana'
+  | 'doku_ewallet_shopeepay'
+  | 'doku_cc'
+  | 'doku_indomaret'
+  | 'doku_alfamart'
+  | 'gopay' 
+  | 'shopeepay' 
+  | 'ovo' 
+  | 'dana' 
+  | 'cc' 
+  | 'cod';
+
+export interface DokuPaymentData {
+  invoiceNumber: string;
+  paymentUrl?: string;
+  paymentMethodType: string;
+  virtualAccountInfo?: {
+    vaNumber: string;
+    bank: string;
+    expiredDate?: string;
+    howToPayUrl?: string;
+  };
+  qrisInfo?: {
+    qrString: string;
+    qrImage?: string;
+    expiredDate?: string;
+  };
+  creditCardInfo?: {
+    url?: string;
+  };
+  retailInfo?: {
+    paymentCode: string;
+    merchant: string;
+    expiredDate?: string;
+  };
+  status: 'PENDING' | 'SUCCESS' | 'EXPIRED' | 'FAILED';
+  paidAt?: string;
+  amount: number;
+}
 
 export interface PaymentDetails {
   channel: PaymentChannel;
@@ -119,6 +173,22 @@ export interface PaymentDetails {
   qrCodeUrl?: string;
   expiryMinutes: number;
   paidAt?: string;
+  doku?: DokuPaymentData;
+}
+
+export interface DokuStoreConfig {
+  clientId: string;
+  secretKey: string;
+  environment: 'sandbox' | 'production';
+  enabled: boolean;
+  autoRedirectToPaymentUrl: boolean;
+  activeChannels: {
+    qris: boolean;
+    virtualAccounts: boolean;
+    eWallet: boolean;
+    creditCard: boolean;
+    convenienceStore: boolean;
+  };
 }
 
 export interface Order {

@@ -13,6 +13,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { NotificationToast } from './components/NotificationToast';
 import { MengantarLabelModal } from './components/MengantarLabelModal';
 import { MengantarConfigModal } from './components/MengantarConfigModal';
+import { DokuConfigModal } from './components/DokuConfigModal';
 import { Footer } from './components/Footer';
 import { 
   Filter, 
@@ -53,7 +54,9 @@ const MainContent: React.FC = () => {
     setIsMengantarLabelModalOpen,
     activeMengantarLabelOrder,
     isMengantarConfigModalOpen,
-    setIsMengantarConfigModalOpen
+    setIsMengantarConfigModalOpen,
+    isDokuConfigModalOpen,
+    setIsDokuConfigModalOpen
   } = useStore();
 
   // Global Admin Access Shortcut: Ctrl + Shift + A (or Cmd + Shift + A)
@@ -412,6 +415,12 @@ const MainContent: React.FC = () => {
       <MengantarConfigModal
         isOpen={isMengantarConfigModalOpen}
         onClose={() => setIsMengantarConfigModalOpen(false)}
+      />
+
+      {/* DOKU.com Payment Gateway Modal */}
+      <DokuConfigModal
+        isOpen={isDokuConfigModalOpen}
+        onClose={() => setIsDokuConfigModalOpen(false)}
       />
 
     </div>
