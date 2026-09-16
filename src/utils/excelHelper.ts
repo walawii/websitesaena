@@ -1,5 +1,8 @@
 import * as XLSX from 'xlsx';
 import { Category, Product, ProductColor } from '../types';
+import { cleanHtmlDescription } from './textHelper';
+
+export { cleanHtmlDescription };
 
 export const EXCEL_IMPORT_COLUMNS = [
   'Nama Produk',
@@ -829,8 +832,8 @@ export function parseExcelWorkbook(data: ArrayBuffer): {
         rowIndex: headerRowIndex + 2 + rowIdx,
         parentSku: rowParentSku,
         name: rowName,
-        description: fields.description || '',
-        shortDescription: fields.shortDescription || undefined,
+        description: cleanHtmlDescription(fields.description || ''),
+        shortDescription: fields.shortDescription ? cleanHtmlDescription(fields.shortDescription) : undefined,
         sourceUrl: fields.sourceUrl || undefined,
         categoryText: fields.category || '',
         materialText: fields.material || '',
@@ -878,7 +881,7 @@ export function parseExcelWorkbook(data: ArrayBuffer): {
       errors.push('Harga produk harus berupa angka valid lebih dari 0.');
     }
 
-    const description = acc.description || acc.shortDescription || 'Koleksi busana muslimah eksklusif saena.id dengan cutting premium berkelas.';
+    const description = cleanHtmlDescription(acc.description || acc.shortDescription) || 'Koleksi busana muslimah eksklusif saena.id dengan cutting premium berkelas.';
     const category = detectCategoryFromText(productName + ' ' + acc.categoryText + ' ' + description);
 
     // Process Variants

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
 import { 
@@ -11,9 +11,15 @@ import {
   ShieldCheck, 
   Sparkles,
   MessageSquare,
-  ThumbsUp
+  ThumbsUp,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import { MarketplaceOrderOptions } from './MarketplaceOrderLinks';
+import { cleanHtmlDescription } from '../utils/textHelper';
 
 interface ProductDetailModalProps {
   product: Product;
@@ -37,6 +43,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'desc' | 'care' | 'reviews'>('desc');
 
+  // Lightbox / Tampilan Besar Modal State
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
   // Review Form State
   const [reviewName, setReviewName] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
@@ -54,6 +66,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
 
   // Active displayed image (color-specific image takes precedence when selected)
   const displayedImage = selectedColor?.image || product.images[activeImageIndex] || product.images[0];
+
+  // Helper to open lightbox at specific image
+  const openLightboxAtIndex = (idx: number) => {
+    const validIdx = Math.max(0, Math.min(idx, Math.max(0, product.images.length - 1)));
+    setLightboxIndex(validIdx);
+    setActiveImageIndex(validIdx);
+    setIsZoomed(false);
+    setIsLightboxOpen(true);
+  };
+
+  // Keyboard navigation listener for Lightbox
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsLightboxOpen(false);
+        setIsZoomed(false);
+      } else if (e.key === 'ArrowLeft') {
+        setLightboxIndex((prev) => (prev > 0 ? prev - 1 : Math.max(0, product.images.length - 1)));
+        setIsZoomed(false);
+      } else if (e.key === 'ArrowRight') {
+        setLightboxIndex((prev) => (prev < product.images.length - 1 ? prev + 1 : 0));
+        setIsZoomed(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLightboxOpen, product.images.length]);
 
   const handleSelectColor = (col: typeof product.colors[0]) => {
     setSelectedColor(col);
@@ -115,7 +155,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
           {/* Left Column: Image Gallery */}
           <div className="md:col-span-6 bg-[#F6F1EA] p-4 sm:p-6 flex flex-col justify-between">
             <div className="space-y-4">
-              <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white shadow-inner">
+              {/* Main Image with Zoom Hint and Click to View Large */}
+              <div 
+                onClick={() => {
+                  const imgIdx = product.images.indexOf(displayedImage);
+                  openLightboxAtIndex(imgIdx >= 0 ? imgIdx : activeImageIndex);
+                }}
+                className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white shadow-inner cursor-zoom-in group"
+                title="Klik atau tap untuk melihat dalam tampilan besar"
+              >
                 <img
                   src={displayedImage}
                   alt={`${product.name} - ${selectedColor.name}`}
@@ -123,38 +171,78 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
                   }}
-                  className="w-full h-full object-cover object-center transition-all duration-300"
+                  className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
                 />
+
+                {/* Floating Zoom Badge */}
+                <div className="absolute bottom-3 right-3 px-2.5 py-1.5 rounded-lg bg-black/65 backdrop-blur-xs text-white text-[11px] font-medium flex items-center gap-1.5 opacity-90 group-hover:opacity-100 group-hover:bg-black/85 transition-all shadow-md pointer-events-none">
+                  <Maximize2 className="w-3.5 h-3.5 text-[#C5A880]" />
+                  <span>Perbesar Foto</span>
+                </div>
+
                 <button
-                  onClick={() => toggleWishlist(product.id)}
-                  className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-[#4A453E] hover:text-[#B34033] shadow"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleWishlist(product.id);
+                  }}
+                  className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-[#4A453E] hover:text-[#B34033] shadow transition-transform hover:scale-105"
                 >
                   <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-[#B34033] text-[#B34033]' : ''}`} />
                 </button>
               </div>
 
-              {/* Thumbnails */}
+              {/* Thumbnails (Tap / Click to view in large modal as requested) */}
               {product.images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {product.images.map((img, idx) => (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-[#7A7266]">
+                    <span className="font-medium">Galeri Foto ({product.images.length})</span>
                     <button
-                      key={idx}
-                      onClick={() => setActiveImageIndex(idx)}
-                      className={`w-16 h-20 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
-                        activeImageIndex === idx ? 'border-[#1C3B2B] ring-2 ring-[#1C3B2B]/20' : 'border-transparent opacity-70 hover:opacity-100'
-                      }`}
+                      type="button"
+                      onClick={() => {
+                        const imgIdx = product.images.indexOf(displayedImage);
+                        openLightboxAtIndex(imgIdx >= 0 ? imgIdx : activeImageIndex);
+                      }}
+                      className="text-[#1C3B2B] hover:text-[#2A563F] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                      title="Buka galeri foto dalam tampilan besar"
                     >
-                      <img 
-                        src={img} 
-                        alt="thumb" 
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
-                        }}
-                        className="w-full h-full object-cover" 
-                      />
+                      <Maximize2 className="w-3 h-3 text-[#1C3B2B]" />
+                      <span>Buka Tampilan Besar</span>
                     </button>
-                  ))}
+                  </div>
+
+                  <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
+                    {product.images.map((img, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setActiveImageIndex(idx);
+                          openLightboxAtIndex(idx);
+                        }}
+                        className={`relative group w-16 h-20 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                          activeImageIndex === idx 
+                            ? 'border-[#1C3B2B] ring-2 ring-[#1C3B2B]/20 scale-105' 
+                            : 'border-transparent opacity-75 hover:opacity-100 hover:border-[#C5A880]'
+                        }`}
+                        title={`Klik atau tap foto ${idx + 1} untuk melihat di tampilan besar`}
+                      >
+                        <img 
+                          src={img} 
+                          alt={`Foto ${idx + 1}`} 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=900&auto=format&fit=crop";
+                          }}
+                          className="w-full h-full object-cover" 
+                        />
+                        {/* Hover/Touch zoom overlay */}
+                        <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                          <Maximize2 className="w-4 h-4 drop-shadow" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -368,17 +456,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
 
                 {/* Tab 1: Description */}
                 {activeTab === 'desc' && (
-                  <div className="pt-3 text-xs text-[#524B40] space-y-2">
-                    <p className="leading-relaxed">{product.description}</p>
-                    <div className="pt-2">
-                      <strong className="text-[#1C3B2B]">Komposisi Material:</strong> {product.material}
+                  <div className="pt-3 text-xs text-[#524B40] space-y-3">
+                    <div className="leading-relaxed whitespace-pre-line text-[#4A453E] space-y-2 font-normal">
+                      {cleanHtmlDescription(product.description) || 'Koleksi busana muslimah istimewa dengan bahan berkualitas tinggi dan potongan elegan.'}
                     </div>
-                    {product.features && (
-                      <ul className="list-disc pl-4 space-y-1 pt-1 text-[#665D4F]">
-                        {product.features.map((f, i) => (
-                          <li key={i}>{f}</li>
-                        ))}
-                      </ul>
+                    {product.material && (
+                      <div className="pt-2 border-t border-[#EAE2D5]/70">
+                        <strong className="text-[#1C3B2B] font-semibold">Komposisi Material:</strong> {cleanHtmlDescription(product.material)}
+                      </div>
+                    )}
+                    {product.features && product.features.length > 0 && (
+                      <div className="pt-1">
+                        <strong className="text-[#1C3B2B] font-semibold block mb-1">Keunggulan & Detail:</strong>
+                        <ul className="list-disc pl-4 space-y-1 text-[#665D4F]">
+                          {product.features.map((f, i) => (
+                            <li key={i}>{cleanHtmlDescription(f)}</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 )}
@@ -389,7 +484,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                     {product.careInstructions.map((inst, i) => (
                       <div key={i} className="flex items-start gap-2">
                         <Check className="w-3.5 h-3.5 text-[#1C3B2B] shrink-0 mt-0.5" />
-                        <span>{inst}</span>
+                        <span>{cleanHtmlDescription(inst)}</span>
                       </div>
                     ))}
                   </div>
@@ -504,6 +599,176 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
         </div>
 
       </div>
+
+      {/* Fullscreen Lightbox / Tampilan Besar Modal */}
+      {isLightboxOpen && (
+        <div 
+          id="product-image-lightbox"
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col justify-between animate-in fade-in duration-200"
+          onClick={() => {
+            setIsLightboxOpen(false);
+            setIsZoomed(false);
+          }}
+        >
+          {/* Lightbox Header Bar */}
+          <div 
+            className="w-full flex items-center justify-between px-4 sm:px-6 py-3.5 bg-black/80 border-b border-stone-800/80 text-white z-10 select-none shadow-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 min-w-0 pr-3">
+              <span className="font-serif text-sm sm:text-base font-bold text-amber-200 truncate">
+                {product.name}
+              </span>
+              <span className="shrink-0 text-xs px-2.5 py-0.5 rounded-full bg-stone-800 text-stone-300 font-mono">
+                Foto {lightboxIndex + 1} / {product.images.length || 1}
+              </span>
+              {selectedColor?.name && (
+                <span className="hidden sm:inline-flex text-xs text-stone-400 items-center gap-1">
+                  • Varian: <strong className="text-white">{selectedColor.name}</strong>
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Zoom In / Out Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setIsZoomed(!isZoomed)}
+                className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                title={isZoomed ? "Perkecil (Fit)" : "Perbesar (150%)"}
+              >
+                {isZoomed ? <ZoomOut className="w-4 h-4 text-amber-400" /> : <ZoomIn className="w-4 h-4 text-amber-400" />}
+                <span className="hidden sm:inline">{isZoomed ? 'Perkecil' : 'Perbesar'}</span>
+              </button>
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLightboxOpen(false);
+                  setIsZoomed(false);
+                }}
+                className="w-9 h-9 rounded-lg bg-stone-800 hover:bg-stone-700 hover:text-red-400 text-stone-200 flex items-center justify-center transition-colors cursor-pointer"
+                title="Tutup Tampilan Besar (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Lightbox Main Stage (Interactive Center) */}
+          <div 
+            className="relative flex-1 flex items-center justify-center p-2 sm:p-6 overflow-hidden select-none"
+            onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (touchStartX === null) return;
+              const touchEndX = e.changedTouches[0].clientX;
+              const diff = touchStartX - touchEndX;
+              if (diff > 50) {
+                // Swipe left -> Next
+                setLightboxIndex((prev) => (prev < product.images.length - 1 ? prev + 1 : 0));
+                setIsZoomed(false);
+              } else if (diff < -50) {
+                // Swipe right -> Prev
+                setLightboxIndex((prev) => (prev > 0 ? prev - 1 : product.images.length - 1));
+                setIsZoomed(false);
+              }
+              setTouchStartX(null);
+            }}
+          >
+            {/* Previous Image Button */}
+            {product.images.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxIndex((prev) => (prev > 0 ? prev - 1 : product.images.length - 1));
+                  setIsZoomed(false);
+                }}
+                className="absolute left-3 sm:left-6 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-sm border border-white/20 transition-all hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
+                title="Foto Sebelumnya (Tombol Panah Kiri)"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
+
+            {/* Central Big Image */}
+            <div 
+              className="relative max-h-full max-w-full flex items-center justify-center transition-all duration-300 overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={product.images[lightboxIndex] || displayedImage}
+                alt={`${product.name} - Foto ${lightboxIndex + 1}`}
+                referrerPolicy="no-referrer"
+                onClick={() => setIsZoomed(!isZoomed)}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=1200&auto=format&fit=crop";
+                }}
+                className={`max-h-[70vh] sm:max-h-[78vh] max-w-[92vw] sm:max-w-[85vw] object-contain rounded-xl shadow-2xl transition-transform duration-300 select-none ${
+                  isZoomed ? 'scale-150 cursor-zoom-out' : 'scale-100 cursor-zoom-in'
+                }`}
+              />
+            </div>
+
+            {/* Next Image Button */}
+            {product.images.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxIndex((prev) => (prev < product.images.length - 1 ? prev + 1 : 0));
+                  setIsZoomed(false);
+                }}
+                className="absolute right-3 sm:right-6 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-sm border border-white/20 transition-all hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
+                title="Foto Berikutnya (Tombol Panah Kanan)"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            )}
+          </div>
+
+          {/* Lightbox Footer: Thumbnails Carousel & Navigation Hint */}
+          <div 
+            className="w-full p-3 sm:p-4 bg-black/80 border-t border-stone-800/80 z-10 flex flex-col items-center gap-2 select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {product.images.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto max-w-full px-2 py-1 scrollbar-thin">
+                {product.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setLightboxIndex(idx);
+                      setActiveImageIndex(idx);
+                      setIsZoomed(false);
+                    }}
+                    className={`relative w-14 h-18 sm:w-16 sm:h-20 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                      lightboxIndex === idx 
+                        ? 'border-amber-400 ring-2 ring-amber-400/50 scale-105 opacity-100 shadow-md' 
+                        : 'border-transparent opacity-50 hover:opacity-90 hover:border-stone-500'
+                    }`}
+                    title={`Lihat Foto ${idx + 1}`}
+                  >
+                    <img 
+                      src={img} 
+                      alt={`Thumb ${idx + 1}`} 
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover" 
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-4 text-[11px] text-stone-400">
+              <span>💡 Klik gambar untuk perbesar/perkecil</span>
+              <span className="hidden sm:inline">• Tekan <b>Esc</b> untuk menutup</span>
+              <span className="hidden sm:inline">• Gunakan tombol panah keyboard atau usap layar</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

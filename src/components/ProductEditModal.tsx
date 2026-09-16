@@ -18,6 +18,7 @@ import {
 import { Product, ProductColor } from '../types';
 import { useStore } from '../context/StoreContext';
 import { compressAndEncodeImage, CURATED_COLOR_PRESETS } from '../utils/imageHelper';
+import { cleanHtmlDescription } from '../utils/textHelper';
 
 interface ProductEditModalProps {
   product: Product;
@@ -28,13 +29,13 @@ interface ProductEditModalProps {
 export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isOpen, onClose }) => {
   const { updateProduct, deleteProduct, formatPrice } = useStore();
 
-  // Form State
+  // Form State (auto-cleaned from Excel HTML artifacts)
   const [name, setName] = useState(product.name);
   const [category, setCategory] = useState(product.category);
   const [price, setPrice] = useState(product.price);
   const [originalPrice, setOriginalPrice] = useState(product.originalPrice || product.price);
-  const [description, setDescription] = useState(product.description || '');
-  const [material, setMaterial] = useState(product.material || '');
+  const [description, setDescription] = useState(() => cleanHtmlDescription(product.description || ''));
+  const [material, setMaterial] = useState(() => cleanHtmlDescription(product.material || ''));
   
   // Colors state (deep clone)
   const [colors, setColors] = useState<ProductColor[]>(() => {
@@ -143,8 +144,8 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
         category,
         price: Number(price) || product.price,
         originalPrice: Number(originalPrice) || Number(price),
-        description: description.trim(),
-        material: material.trim(),
+        description: cleanHtmlDescription(description),
+        material: cleanHtmlDescription(material),
         colors: colors.map(c => ({
           name: c.name.trim(),
           hex: c.hex,
