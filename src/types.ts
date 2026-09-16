@@ -214,7 +214,14 @@ export interface Order {
     description: string;
   }[];
   mengantar?: MengantarOrderData;
+  bigseller?: BigSellerOrderData;
   notes?: string;
+}
+
+export interface BigSellerOrderData {
+  bigsellerOrderId: string;
+  syncedAt: string;
+  status: string;
 }
 
 export interface MengantarOrderData {

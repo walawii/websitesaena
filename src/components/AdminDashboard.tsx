@@ -33,13 +33,16 @@ import {
   Building2,
   QrCode,
   FileText,
-  Copy
+  Copy,
+  Zap
 } from 'lucide-react';
 import { OrderStatus, Category, Product } from '../types';
 import { ProductEditModal } from './ProductEditModal';
 import { CreateProductModal } from './CreateProductModal';
 import { ImportMarketplaceModal } from './ImportMarketplaceModal';
 import { ExcelImportModal } from './ExcelImportModal';
+import { ShopeeStoreScraperModal } from './ShopeeStoreScraperModal';
+import { ShopeeLogo } from './MarketplaceOrderLinks';
 import { DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
 import { testMengantarConnectionApi } from '../utils/mengantarClient';
 import { testDokuConnectionApi } from '../utils/dokuClient';
@@ -101,6 +104,7 @@ export const AdminDashboard: React.FC = () => {
   // New Product & Marketplace Import Modal States
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isImportMarketplaceOpen, setIsImportMarketplaceOpen] = useState(false);
+  const [isShopeeScraperOpen, setIsShopeeScraperOpen] = useState(false);
   const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
   const [importedInitialData, setImportedInitialData] = useState<any | null>(null);
 
@@ -804,6 +808,16 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
                 <button
+                  id="open-shopee-scraper-btn"
+                  onClick={() => setIsShopeeScraperOpen(true)}
+                  className="px-3.5 py-2 bg-gradient-to-r from-[#EE4D2D] to-[#F05537] hover:from-[#d94121] hover:to-[#e04527] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                  title="Automatisasi scrape katalog produk langsung dari toko Shopee"
+                >
+                  <ShopeeLogo className="w-3.5 h-3.5 text-white shrink-0" />
+                  <span>Scrape Toko Shopee</span>
+                </button>
+
+                <button
                   id="open-excel-import-btn"
                   onClick={() => setIsExcelImportOpen(true)}
                   className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
@@ -875,7 +889,14 @@ export const AdminDashboard: React.FC = () => {
                               Semua produk dan gambar telah dihapus dari toko dan database. Anda dapat mengunggah file Excel / XLS baru atau menempelkan tautan Shopee/TikTok untuk mengisi katalog.
                             </p>
                           </div>
-                          <div className="flex items-center justify-center gap-2 pt-1">
+                          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                            <button
+                              onClick={() => setIsShopeeScraperOpen(true)}
+                              className="px-3.5 py-1.5 bg-gradient-to-r from-[#EE4D2D] to-[#F05537] hover:from-[#d94121] hover:to-[#e04527] text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1.5 transition-all"
+                            >
+                              <ShopeeLogo className="w-3.5 h-3.5 text-white" />
+                              <span>Scrape Toko Shopee</span>
+                            </button>
                             <button
                               onClick={() => setIsExcelImportOpen(true)}
                               className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1 transition-all"
@@ -2002,10 +2023,17 @@ export const AdminDashboard: React.FC = () => {
 
       </div>
 
+      {/* MODAL: Automatisasi Scrape Produk Toko Shopee */}
+      <ShopeeStoreScraperModal
+        isOpen={isShopeeScraperOpen}
+        onClose={() => setIsShopeeScraperOpen(false)}
+      />
+
       {/* MODAL: Otomatisasi Impor Produk dari Shopee atau TikTok */}
       <ImportMarketplaceModal
         isOpen={isImportMarketplaceOpen}
         onClose={() => setIsImportMarketplaceOpen(false)}
+        onOpenShopeeStoreScraper={() => setIsShopeeScraperOpen(true)}
         onOpenManualWithData={(data) => {
           setImportedInitialData(data);
           setIsImportMarketplaceOpen(false);

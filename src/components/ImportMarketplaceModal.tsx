@@ -37,13 +37,15 @@ interface ImportMarketplaceModalProps {
   onClose: () => void;
   onImportComplete?: (product: Product) => void;
   onOpenManualWithData?: (data: Partial<ExtractedData>) => void;
+  onOpenShopeeStoreScraper?: () => void;
 }
 
 export const ImportMarketplaceModal: React.FC<ImportMarketplaceModalProps> = ({
   isOpen,
   onClose,
   onImportComplete,
-  onOpenManualWithData
+  onOpenManualWithData,
+  onOpenShopeeStoreScraper
 }) => {
   const { addNewProduct, formatPrice } = useStore();
 
@@ -237,6 +239,29 @@ export const ImportMarketplaceModal: React.FC<ImportMarketplaceModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-[#2D2926]">
+          {/* Direct link to Store-Wide Scraper */}
+          {onOpenShopeeStoreScraper && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 bg-gradient-to-r from-orange-50 via-amber-50 to-emerald-50 border border-orange-200/80 rounded-xl text-xs shadow-2xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#EE4D2D] animate-ping shrink-0" />
+                <span className="text-stone-800 font-medium">
+                  Ingin scrape otomatis seluruh katalog toko Shopee <strong>saena.id</strong> sekaligus?
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenShopeeStoreScraper();
+                }}
+                className="self-end sm:self-auto px-3 py-1.5 bg-gradient-to-r from-[#EE4D2D] to-[#F05537] hover:from-[#d94121] hover:to-[#e04527] text-white font-bold rounded-lg text-[11px] shadow-2xs flex items-center gap-1.5 transition-all shrink-0"
+              >
+                <span>Buka Scraper Toko</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Status Platform Badges */}
           <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#FDFBF7] rounded-xl border border-[#EBE3D5] text-xs">
             <span className="text-[#685F53] font-medium">Mendukung Tautan:</span>

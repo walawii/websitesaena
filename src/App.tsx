@@ -426,7 +426,6 @@ const MainContent: React.FC = () => {
         isOpen={isDokuConfigModalOpen}
         onClose={() => setIsDokuConfigModalOpen(false)}
       />
-
     </div>
   );
 };

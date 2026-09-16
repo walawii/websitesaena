@@ -201,16 +201,20 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-lg font-serif font-bold text-stone-100">
-                  Impor Massal Produk via Excel (.xlsx / .xls)
+                  Impor Massal Produk via Excel (.xlsx / .xls / .csv)
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-[#1C3B2B] text-[#C5A880] text-[10px] font-semibold border border-[#C5A880]/30">
-                  Format Resmi saena.id
+                  Template saena.id
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-blue-950/80 text-blue-300 text-[10px] font-semibold border border-blue-500/40 flex items-center gap-1">
+                  <CheckCircle2 className="w-2.5 h-2.5 text-blue-400" />
+                  BigSeller Export 100% Presisi
                 </span>
               </div>
               <p className="text-xs text-stone-400 mt-0.5">
-                Unggah berkas spreadsheet dengan 37 kolom terstandar (nama, variasi warna, gambar, stok, dan deskripsi).
+                Mendukung file ekspor produk dari BigSeller (Shopee / TikTok / Scrape List) & template standar 37 kolom saena.id.
               </p>
             </div>
           </div>
@@ -284,8 +288,20 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
 
             {showColumnGuide && (
               <div className="p-4 border-t border-stone-800/60 bg-stone-950 space-y-3">
+                <div className="p-3 rounded-lg bg-blue-950/40 border border-blue-800/60 text-[11px] text-blue-200 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5 text-blue-100">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                    Format Ekspor Produk BigSeller Dikenali 100% Otomatis:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-blue-300">
+                    <li><b>Header Ekspor BigSeller</b>: Dikenali otomatis termasuk <code>Nama Produk*</code>, <code>SKU Induk</code> / <code>Parent SKU</code>, <code>Harga</code>, <code>Stok</code>, <code>Nama Variasi 1</code>, <code>Opsi untuk Variasi 1</code>, <code>Foto Sampul</code>, <code>Gambar Variasi</code>, <code>Berat (kg / g)</code>.</li>
+                    <li><b>Multi-Baris Variasi</b>: Produk BigSeller yang memiliki variasi (warna/ukuran) dalam beberapa baris otomatis digabungkan menjadi satu produk tunggal dengan varian lengkap.</li>
+                    <li><b>Ekspor Scrape List / Shopee / TikTok</b>: File Excel hasil ekspor daftar scrape atau produk aktif dari BigSeller dapat langsung diunggah tanpa perlu diubah susunannya.</li>
+                  </ul>
+                </div>
+
                 <p className="text-stone-400 leading-relaxed text-[11px]">
-                  Sistem otomatis memetakan kolom dari tabel Anda ke struktur etalase butik <b>saena.id</b>:
+                  Kolom template standar yang juga didukung:
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {EXCEL_IMPORT_COLUMNS.map((col, cIdx) => (
@@ -298,8 +314,8 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
                   ))}
                 </div>
                 <div className="p-3 rounded-lg bg-stone-900 border border-stone-800 text-[11px] text-stone-300 space-y-1">
-                  <p><b className="text-[#C5A880]">Tips Variasi Warna:</b> Tuliskan nama warna di <i>Opsi Variasi 1</i> (contoh: <code className="text-amber-300">Emerald Forest, Champagne Taupe, Midnight Onyx</code>). Sistem otomatis mendeteksi kode warna hex dan memasangkannya dengan <i>Gambar Variasi 1 s/d 9</i>.</p>
-                  <p><b className="text-[#C5A880]">Tips Foto Produk:</b> Cukup tempel link URL foto langsung (misal Unsplash, CDN Shopee/TikTok/Imgur) di <i>Foto Produk 1 s/d 9</i>.</p>
+                  <p><b className="text-[#C5A880]">Tips Variasi Warna:</b> Tuliskan nama warna di <i>Opsi Variasi 1</i> (contoh: <code className="text-amber-300">Emerald Forest, Champagne Taupe, Midnight Onyx</code>). Sistem otomatis mendeteksi kode warna hex dan memasangkannya dengan <i>Gambar Variasi</i>.</p>
+                  <p><b className="text-[#C5A880]">Tips Foto Produk:</b> Cukup tempel link URL foto langsung (misal Unsplash, CDN Shopee/TikTok/Imgur) di kolom foto.</p>
                 </div>
               </div>
             )}

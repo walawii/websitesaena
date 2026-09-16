@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
 import { processMengantarOrder } from './server/mengantarService';
 import { processDokuPayment } from './server/dokuService';
+import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService';
 
 dotenv.config();
 
@@ -431,6 +432,58 @@ Aturan Penyesuaian Busana:
       error: error.message || 'Terjadi kesalahan saat memproses tautan marketplace.'
     });
   }
+});
+
+// API Route: POST /api/shopee/scrape-shop
+// Automated scraper for Shopee shop catalog
+app.post('/api/shopee/scrape-shop', async (req, res) => {
+  try {
+    const { storeUrl, count, rawData, categoryFilter, priceMarkupPercent } = req.body;
+
+    const targetUrl = typeof storeUrl === 'string' && storeUrl.trim() 
+      ? storeUrl.trim() 
+      : 'https://shopee.co.id/saena.id';
+
+    const safeCount = Math.max(1, Math.min(Number(count) || 8, 30));
+    const markup = typeof priceMarkupPercent === 'number' ? priceMarkupPercent : 0;
+
+    console.log(`[Shopee Scraper] Starting automation for: ${targetUrl} (Count: ${safeCount})`);
+
+    const result = await scrapeShopeeStore({
+      storeUrl: targetUrl,
+      count: safeCount,
+      rawData: typeof rawData === 'string' ? rawData : undefined,
+      categoryFilter: typeof categoryFilter === 'string' ? categoryFilter : undefined,
+      priceMarkupPercent: markup
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[Shopee Scraper] Unexpected error:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Gagal menjalankan scraping otomatis toko Shopee.'
+    });
+  }
+});
+
+// API Route: GET /api/shopee/store-info
+app.get('/api/shopee/store-info', (req, res) => {
+  const queryUrl = (req.query.storeUrl as string) || 'https://shopee.co.id/saena.id';
+  const username = parseShopeeUsername(queryUrl);
+
+  res.json({
+    shopUsername: username,
+    shopUrl: `https://shopee.co.id/${username}`,
+    supportedFeatures: [
+      'Automated Product Extraction',
+      'Anti-bot AI Content Filtering',
+      'Multi-Color & High-Res Image Mapping',
+      'One-Click Batch Import to Firestore',
+      'Excel & JSON Export'
+    ],
+    defaultShop: 'saena.id'
+  });
 });
 
 // API Route: System Credentials Status - Auto-detected from server environment
