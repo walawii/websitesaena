@@ -78,7 +78,8 @@ export const AdminDashboard: React.FC = () => {
     setIsMengantarConfigModalOpen,
     dokuConfig,
     setIsDokuConfigModalOpen,
-    simulatePaymentSuccess
+    confirmOrderPayment,
+    clearAllOrders
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'inventory' | 'landing-page' | 'push' | 'database' | 'mengantar' | 'doku'>('analytics');
@@ -92,7 +93,7 @@ export const AdminDashboard: React.FC = () => {
   const [testingDoku, setTestingDoku] = useState(false);
   const [dokuTestResult, setDokuTestResult] = useState<{ success: boolean; message: string; environment?: string } | null>(null);
   const [copiedDokuWebhook, setCopiedDokuWebhook] = useState(false);
-  const [simulatingDokuOrderId, setSimulatingDokuOrderId] = useState<string | null>(null);
+  const [confirmingPaymentOrderId, setConfirmingPaymentOrderId] = useState<string | null>(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [isReseeding, setIsReseeding] = useState(false);
   const [reseedDone, setReseedDone] = useState(false);
@@ -103,6 +104,10 @@ export const AdminDashboard: React.FC = () => {
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+
+  // Clear Orders State
+  const [isClearOrdersModalOpen, setIsClearOrdersModalOpen] = useState(false);
+  const [isClearingOrders, setIsClearingOrders] = useState(false);
 
   // New Product & Marketplace Import Modal States
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -145,11 +150,8 @@ export const AdminDashboard: React.FC = () => {
 
   const handleBroadcastPush = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pushTitle.trim() || !pushBody.trim()) return;
-
-    sendPushNotification(pushTitle.trim(), pushBody.trim(), 'promo');
-    setBroadcastSent(true);
-    setTimeout(() => setBroadcastSent(false), 4000);
+    // Fungsi broadcast push promosi dinonaktifkan sementara sesuai instruksi operasional
+    return;
   };
 
   return (
@@ -340,6 +342,9 @@ export const AdminDashboard: React.FC = () => {
           >
             <Smartphone className="w-4 h-4" />
             <span>Kirim Notifikasi Push Promosi</span>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+              NONAKTIF
+            </span>
           </button>
 
           <button
@@ -572,6 +577,14 @@ export const AdminDashboard: React.FC = () => {
                   <span>⚙️ Atur Mengantar</span>
                 </button>
                 <button
+                  onClick={() => setIsClearOrdersModalOpen(true)}
+                  className="text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+                  title="Hapus semua daftar pesanan & status pengiriman Mengantar"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                  <span>Hapus Semua Pesanan</span>
+                </button>
+                <button
                   onClick={async () => {
                     const pendingPaid = orders.filter(o => (o.status === 'dibayar' || o.status === 'sedang_dikemas') && !o.mengantar);
                     if (pendingPaid.length === 0) {
@@ -668,7 +681,20 @@ export const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F2ECE4]">
-                  {filteredOrders.map(order => (
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-[#7A7266]">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <Package className="w-10 h-10 text-[#C5A880]/60 stroke-1" />
+                          <p className="font-bold text-sm text-[#1C3B2B]">Daftar Pesanan Kosong</p>
+                          <p className="text-xs text-[#8C8377] max-w-sm">
+                            Semua daftar pesanan & status pengiriman Mengantar telah dibersihkan. Pesanan baru dari pelanggan butik akan otomatis masuk ke sini.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOrders.map(order => (
                     <tr key={order.id} className="hover:bg-[#FAF8F5]">
                       <td className="py-3 font-bold text-[#1C3B2B]">
                         {order.id}
@@ -805,7 +831,7 @@ export const AdminDashboard: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -1165,54 +1191,70 @@ export const AdminDashboard: React.FC = () => {
           />
         )}
 
-        {/* TAB 4: PUSH PROMOTION BROADCASTER */}
+        {/* TAB 4: PUSH PROMOTION BROADCASTER (DINONAKTIFKAN SEMENTARA) */}
         {activeTab === 'push' && (
           <div className="max-w-2xl bg-white p-6 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-5">
+            {/* Disabled Alert Banner */}
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-amber-900">
+                  Fungsi Broadcast Push Dinonaktifkan Sementara
+                </h4>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Fitur pengiriman pesan promosi massal ke perangkat pelanggan dinonaktifkan sementara sesuai instruksi operasional. Seluruh form dan tombol kirim saat ini berada dalam mode nonaktif (disabled).
+                </p>
+              </div>
+            </div>
+
             <div>
               <div className="flex items-center gap-2">
                 <Smartphone className="w-5 h-5 text-[#1C3B2B]" />
                 <h3 className="font-display text-base font-bold text-[#1C3B2B]">
                   Broadcast Push Promosi Eksklusif
                 </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  Mode Nonaktif
+                </span>
               </div>
               <p className="text-xs text-[#7A7266] mt-1">
                 Kirim pesan promosi flash sale atau diskon khusus langsung ke perangkat seluruh pelanggan setia saena.id secara instan.
               </p>
             </div>
 
-            <form onSubmit={handleBroadcastPush} className="space-y-4">
+            <form onSubmit={handleBroadcastPush} className="space-y-4 opacity-75">
               <div>
                 <label className="text-xs font-semibold text-[#3D3830] block mb-1">
-                  Judul Push Notification *
+                  Judul Push Notification
                 </label>
                 <input
                   type="text"
-                  required
+                  disabled
                   value={pushTitle}
                   onChange={(e) => setPushTitle(e.target.value)}
                   placeholder="Contoh: ✨ Flash Sale Abaya Series Malam Ini!"
-                  className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
+                  className="w-full px-3 py-2 text-xs bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed focus:outline-none"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-[#3D3830] block mb-1">
-                  Isi Pesan Promosi *
+                  Isi Pesan Promosi
                 </label>
                 <textarea
-                  required
+                  disabled
                   rows={3}
                   value={pushBody}
                   onChange={(e) => setPushBody(e.target.value)}
                   placeholder="Tulis detail promosi, kode voucher, dan batasan waktu..."
-                  className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
+                  className="w-full px-3 py-2 text-xs bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed focus:outline-none"
                 />
               </div>
 
-              {/* Push Simulation Card */}
+              {/* Push Preview Card */}
               <div className="p-4 bg-[#FAF7F2] rounded-xl border border-[#E5DDD2] space-y-2">
                 <span className="text-[10px] uppercase font-bold text-[#7A7266]">
-                  Pratinjau Tampilan di Layar Pelanggan:
+                  Pratinjau Format Pesan (Arsip):
                 </span>
                 <div className="p-3 bg-white rounded-xl shadow-xs border border-[#EAE2D5] flex items-start gap-3">
                   <div className="w-9 h-9 rounded-lg bg-[#1C3B2B] text-white flex items-center justify-center font-serif text-sm font-bold shrink-0">
@@ -1231,18 +1273,17 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                {broadcastSent && (
-                  <span className="text-xs text-[#2E7D32] font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Notifikasi Berhasil Dikirim ke Seluruh Pelanggan!</span>
-                  </span>
-                )}
+                <span className="text-[11px] text-amber-800 font-medium">
+                  🔒 Pengiriman broadcast sedang dinonaktifkan
+                </span>
                 <button
-                  type="submit"
-                  className="ml-auto px-5 py-2.5 bg-[#1C3B2B] text-white text-xs font-semibold rounded-xl hover:bg-[#28523C] shadow-md flex items-center gap-2 transition-all cursor-pointer"
+                  type="button"
+                  disabled
+                  className="ml-auto px-5 py-2.5 bg-gray-200 text-gray-400 text-xs font-semibold rounded-xl border border-gray-300 shadow-none flex items-center gap-2 cursor-not-allowed"
+                  title="Fungsi broadcast dinonaktifkan sementara"
                 >
-                  <Send className="w-4 h-4 text-[#C5A880]" />
-                  <span>Kirim Broadcast Sekarang</span>
+                  <Send className="w-4 h-4 text-gray-400" />
+                  <span>Kirim Broadcast Dinonaktifkan</span>
                 </button>
               </div>
             </form>
@@ -1488,7 +1529,7 @@ export const AdminDashboard: React.FC = () => {
                         ? 'bg-emerald-900/80 border-emerald-500 text-emerald-300' 
                         : 'bg-amber-900/80 border-amber-500 text-amber-300'
                     }`}>
-                      Mode: {mengantarConfig.environment === 'production' ? 'Live Production API' : 'Sandbox (Simulasi)'}
+                      Mode: {mengantarConfig.environment === 'production' ? 'Live Production API' : 'Sandbox Testing'}
                     </span>
                   </div>
                   <h3 className="font-display text-2xl font-bold tracking-tight text-[#F3E8CE]">
@@ -1553,7 +1594,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2.5 h-2.5 rounded-full ${mengantarConfig.apiKey ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                   <span className="text-sm font-bold text-[#1C3B2B]">
-                    {mengantarConfig.apiKey ? 'Terpasang & Siap' : 'Sandbox Demo Mode'}
+                    {mengantarConfig.apiKey ? 'Terpasang & Siap' : 'Sandbox Pengujian'}
                   </span>
                 </div>
                 <p className="text-[10px] text-[#8C8377]">
@@ -1589,6 +1630,81 @@ export const AdminDashboard: React.FC = () => {
                 <p className="text-[10px] text-[#8C8377]">
                   Jadwal Pickup: {mengantarConfig.pickupTimeSlot}
                 </p>
+              </div>
+            </div>
+
+            {/* Explanatory & Action Guide: Where to see pickup schedule & why it might not appear on mengantar.com yet */}
+            <div className="bg-[#FAF8F5] p-5 rounded-2xl border border-[#D5C9B8] space-y-4 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-md bg-[#1C3B2B] text-[#F3E8CE]">
+                      <Truck className="w-4 h-4" />
+                    </span>
+                    <h4 className="text-sm font-bold text-[#1C3B2B]">
+                      Panduan Penjemputan Kurir & Sinkronisasi Dashboard Mengantar.com
+                    </h4>
+                  </div>
+                  <p className="text-xs text-[#524B41] leading-relaxed">
+                    Pesanan yang masuk di toko otomatis dijadwalkan untuk penjemputan oleh kurir (JNE, J&T, SiCepat) di <strong>Warehouse Tamansari Tasikmalaya</strong>.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <a
+                    href="https://app.mengantar.com/orders"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs"
+                  >
+                    <span>Buka Dashboard Mengantar.com</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-[#C5A880]" />
+                  </a>
+                  <button
+                    onClick={() => setIsMengantarConfigModalOpen(true)}
+                    className="px-3 py-1.5 bg-[#C5A880] hover:bg-[#B59870] text-[#1C3B2B] text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
+                  >
+                    <span>⚙️ Atur API Key Resmi</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2-Column Answer Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                {/* Answer 1: Where to see schedule */}
+                <div className="p-3.5 bg-white rounded-xl border border-[#E5DDD2] space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#1C3B2B]">
+                    <Clock className="w-4 h-4 text-[#C5A880]" />
+                    <span>1. Di Mana Admin Melihat Jadwal Penjemputan?</span>
+                  </div>
+                  <ul className="text-xs text-[#524B41] space-y-1.5 list-disc list-inside">
+                    <li>
+                      <strong>Tabel di bawah:</strong> Kolom <em>Status Mengantar</em> menampilkan status <span className="text-emerald-800 font-semibold bg-emerald-50 px-1 rounded">MENUNGGU_PICKUP</span> dan jam penjemputan (<strong>{mengantarConfig.pickupTimeSlot}</strong>).
+                    </li>
+                    <li>
+                      <strong>Titik Penjemputan:</strong> Butik saena.id, Jl. Tamansari, Kec. Tamansari, Kota Tasikmalaya (46196).
+                    </li>
+                    <li>
+                      <strong>Tombol &quot;Cetak Label&quot;:</strong> Untuk mencetak label thermal 100×150 mm yang memuat barcode resi kurir resmi untuk ditempel di kardus paket.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Answer 2: Why not in mengantar.com dashboard yet */}
+                <div className="p-3.5 bg-white rounded-xl border border-[#E5DDD2] space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#1C3B2B]">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span>2. Mengapa di Dashboard Mengantar.com Belum Muncul?</span>
+                  </div>
+                  <div className="text-xs text-[#524B41] space-y-1.5 leading-relaxed">
+                    <p>
+                      Pesanan masuk ke dashboard luar <a href="https://mengantar.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-[#1C3B2B]">mengantar.com</a> hanya jika <strong>Public API Key Resmi</strong> dari akun Mengantar Anda telah diisi.
+                    </p>
+                    <p className="text-[11px] text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                      <strong>Status saat ini:</strong> {mengantarConfig.apiKey ? 'API Key telah diisi. Pastikan klik tombol "Kirim ke Mengantar" pada pesanan.' : 'Mode Sandbox pengujian. Masukkan API Key resmi di menu konfigurasi agar data terkirim langsung ke dashboard mengantar.com.'}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1639,6 +1755,15 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <button
+                  onClick={() => setIsClearOrdersModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors border border-red-200 shadow-2xs self-start sm:self-auto"
+                  title="Hapus semua daftar pesanan & status pengiriman Mengantar"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                  <span>Hapus Semua Pesanan</span>
+                </button>
+
+                <button
                   onClick={async () => {
                     const pendingPaid = orders.filter(o => !o.mengantar);
                     if (pendingPaid.length === 0) {
@@ -1687,7 +1812,20 @@ export const AdminDashboard: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F2ECE4]">
-                    {orders.map(order => (
+                    {orders.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-[#7A7266]">
+                          <div className="flex flex-col items-center justify-center space-y-2">
+                            <Package className="w-10 h-10 text-[#C5A880]/60 stroke-1" />
+                            <p className="font-bold text-sm text-[#1C3B2B]">Belum Ada Pengiriman Mengantar.com</p>
+                            <p className="text-xs text-[#8C8377] max-w-sm">
+                              Semua daftar pesanan & status pengiriman Mengantar telah dibersihkan. Pesanan baru akan muncul di sini.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      orders.map(order => (
                       <tr key={order.id} className="hover:bg-[#FAF8F5]">
                         <td className="py-3 font-bold text-[#1C3B2B]">
                           {order.id}
@@ -1710,10 +1848,13 @@ export const AdminDashboard: React.FC = () => {
                           {order.mengantar ? (
                             <div>
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                <CheckCircle2 className="w-2.5 h-2.5" /> Terbit Resi
+                                <CheckCircle2 className="w-2.5 h-2.5" /> {order.mengantar.status || 'MENUNGGU_PICKUP'}
                               </span>
                               <span className="block text-[10px] text-gray-500 font-mono mt-0.5">
                                 {order.mengantar.mengantarOrderId}
+                              </span>
+                              <span className="block text-[10px] text-emerald-800 font-semibold mt-0.5">
+                                🕒 {order.mengantar.pickupTime || mengantarConfig.pickupTimeSlot}
                               </span>
                             </div>
                           ) : (
@@ -1766,7 +1907,7 @@ export const AdminDashboard: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )))}
                   </tbody>
                 </table>
               </div>
@@ -1964,7 +2105,7 @@ export const AdminDashboard: React.FC = () => {
                     Log Transaksi Gerbang Pembayaran DOKU
                   </h4>
                   <p className="text-xs text-[#7A7266]">
-                    Daftar invoice, status verifikasi perbankan, dan pengujian webhook callback
+                    Daftar invoice, status verifikasi perbankan, dan konfirmasi pembayaran
                   </p>
                 </div>
               </div>
@@ -1979,7 +2120,7 @@ export const AdminDashboard: React.FC = () => {
                       <th className="pb-2.5">Metode Bayar</th>
                       <th className="pb-2.5">Nominal</th>
                       <th className="pb-2.5">Status Pembayaran</th>
-                      <th className="pb-2.5 text-right">Aksi Simulasi Webhook</th>
+                      <th className="pb-2.5 text-right">Aksi Verifikasi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F2ECE4]">
@@ -2019,35 +2160,35 @@ export const AdminDashboard: React.FC = () => {
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                  <Clock className="w-2.5 h-2.5 animate-spin" /> Menunggu Bayar
+                                  <Clock className="w-2.5 h-2.5" /> Menunggu Bayar
                                 </span>
                               )}
                             </td>
                             <td className="py-3 text-right">
                               {isPaid ? (
                                 <span className="text-[11px] text-[#2E7D32] font-semibold flex items-center justify-end gap-1">
-                                  <Check className="w-3.5 h-3.5" /> Webhook Verified
+                                  <Check className="w-3.5 h-3.5" /> Terverifikasi Lunas
                                 </span>
                               ) : (
                                 <button
                                   onClick={async () => {
-                                    setSimulatingDokuOrderId(order.id);
+                                    setConfirmingPaymentOrderId(order.id);
                                     try {
-                                      await simulatePaymentSuccess(order.id);
+                                      confirmOrderPayment(order.id);
                                     } finally {
-                                      setSimulatingDokuOrderId(null);
+                                      setConfirmingPaymentOrderId(null);
                                     }
                                   }}
-                                  disabled={simulatingDokuOrderId === order.id}
-                                  className="px-2.5 py-1 bg-[#2E7D32] hover:bg-[#256829] text-white text-[11px] font-semibold rounded-lg inline-flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-                                  title="Simulasi respon Webhook DOKU callback pembayaran sukses"
+                                  disabled={confirmingPaymentOrderId === order.id}
+                                  className="px-2.5 py-1 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-[11px] font-semibold rounded-lg inline-flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                                  title="Konfirmasi pembayaran lunas secara manual"
                                 >
-                                  {simulatingDokuOrderId === order.id ? (
+                                  {confirmingPaymentOrderId === order.id ? (
                                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                                   ) : (
-                                    <Sparkles className="w-3.5 h-3.5 text-[#C5A880]" />
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-[#C5A880]" />
                                   )}
-                                  <span>Simulasi Webhook Lunas</span>
+                                  <span>Konfirmasi Lunas Manual</span>
                                 </button>
                               )}
                             </td>
@@ -2250,6 +2391,71 @@ export const AdminDashboard: React.FC = () => {
                   <>
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Ya, Hapus Semua Produk</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus SEMUA Pesanan & Status Mengantar */}
+      {isClearOrdersModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#EAE2D5] space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-display text-base font-bold text-[#1C3B2B]">
+                  Hapus Semua Pesanan & Status Mengantar?
+                </h3>
+                <p className="text-xs text-[#7A7266]">
+                  Tindakan ini akan menghapus <strong>seluruh daftar pesanan ({orders.length} pesanan)</strong> beserta status pengiriman Mengantar.com secara bersih dari penyimpanan lokal dan database.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 text-[11px] text-rose-800">
+              ⚠️ <strong>Peringatan:</strong> Seluruh riwayat pesanan masuk dan status pengiriman Mengantar akan dikosongkan.
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#EAE2D5]">
+              <button
+                type="button"
+                onClick={() => setIsClearOrdersModalOpen(false)}
+                disabled={isClearingOrders}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#524B40] hover:bg-[#F3EFEA] transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                id="confirm-clear-all-orders-btn"
+                disabled={isClearingOrders}
+                onClick={async () => {
+                  setIsClearingOrders(true);
+                  try {
+                    await clearAllOrders();
+                    setIsClearOrdersModalOpen(false);
+                  } catch (err) {
+                    console.error('Error clearing all orders:', err);
+                  } finally {
+                    setIsClearingOrders(false);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+              >
+                {isClearingOrders ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Ya, Hapus Semua Pesanan</span>
                   </>
                 )}
               </button>

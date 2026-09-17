@@ -732,7 +732,7 @@ export const LandingPageStudio: React.FC<LandingPageStudioProps> = ({
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-[#1C3B2B]" />
               <span className="text-xs font-bold text-[#1C3B2B]">
-                Live Preview Simulasi
+                Live Preview Halaman Produk
               </span>
             </div>
 

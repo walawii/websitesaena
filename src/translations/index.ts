@@ -103,7 +103,7 @@ export const translations = {
       title: 'Notifikasi WhatsApp Otomatis',
       desc: 'Rincian invoice resmi, nomor resi pengiriman, dan tautan pelacakan real-time telah disiapkan.',
       openWhatsApp: 'Buka Obrolan WhatsApp Resmi',
-      simulatedNotice: 'Pesan otomatis telah dipersiapkan untuk nomor',
+      automatedNotice: 'Pesan otomatis telah dipersiapkan untuk nomor',
     },
     tracking: {
       title: 'Pelacakan Pengiriman Real-Time',
@@ -240,7 +240,7 @@ export const translations = {
       title: 'Automated WhatsApp Dispatch',
       desc: 'Your official invoice details and tracking updates have been formatted for instant notification.',
       openWhatsApp: 'Launch Official WhatsApp',
-      simulatedNotice: 'Automated message ready for',
+      automatedNotice: 'Automated message ready for',
     },
     tracking: {
       title: 'Live Order Tracking',
@@ -377,7 +377,7 @@ export const translations = {
       title: 'إشعار واتساب التلقائي',
       desc: 'تم تجهيز تفاصيل الفاتورة الرسمية ورقم التتبع لإرسالها مباشرة لعميلنا العزيز.',
       openWhatsApp: 'فتح محادثة واتساب الرسمية',
-      simulatedNotice: 'الرسالة التلقائية جاهزة للرقم',
+      automatedNotice: 'الرسالة التلقائية جاهزة للرقم',
     },
     tracking: {
       title: 'تتبع مسار الشحنة الفوري',

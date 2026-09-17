@@ -82,7 +82,7 @@ export const MengantarLabelModal: React.FC<MengantarLabelModalProps> = ({
 
             {/* Barcode & Resi Display */}
             <div className="text-center py-2 border-b-2 border-black space-y-1">
-              {/* Simulated Code 128 barcode bars */}
+              {/* Code 128 barcode bars representation */}
               <div className="h-10 flex items-center justify-center gap-[2px] overflow-hidden px-4">
                 {[3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 1, 4, 2, 1, 3, 2, 4, 1, 2, 3, 1, 2, 4, 1, 3, 1, 2, 4, 2, 1, 3, 1, 4, 2].map((w, i) => (
                   <div 

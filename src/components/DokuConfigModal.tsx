@@ -157,7 +157,7 @@ export const DokuConfigModal: React.FC<DokuConfigModalProps> = ({
               <p className="text-[#665E51] mt-0.5 leading-relaxed">
                 {environment === 'production'
                   ? 'Setiap transaksi akan memproses uang riil melalui rekening merchant DOKU saena.id.'
-                  : 'Mode simulasi aktif. Anda dapat menguji alur checkout, QRIS, Virtual Account, dan notifikasi lunas tanpa memotong saldo nyata.'}
+                  : 'Mode sandbox pengujian aktif. Anda dapat memverifikasi koneksi API, alur checkout QRIS, dan Virtual Account untuk memastikan integrasi berjalan lancar.'}
               </p>
             </div>
           </div>

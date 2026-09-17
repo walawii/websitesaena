@@ -26,8 +26,13 @@ import {
   Sparkles,
   MapPin,
   Store,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle,
+  Home,
+  RefreshCw,
+  MessageCircle
 } from 'lucide-react';
+import { validateIndonesianAddress, AddressValidationResult } from '../utils/addressValidation';
 
 export const CheckoutModal: React.FC = () => {
   const {
@@ -38,7 +43,7 @@ export const CheckoutModal: React.FC = () => {
     couponDiscount,
     appliedCoupon,
     placeOrder,
-    simulatePaymentSuccess,
+    orders,
     setIsWhatsAppModalOpen,
     setIsOrderTrackingOpen,
     setActiveOrder,
@@ -50,6 +55,8 @@ export const CheckoutModal: React.FC = () => {
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedVA, setCopiedVA] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
 
   // Customer Shipping Address Form (Defaults to blank/clean for public users, caches to localStorage)
   const [customer, setCustomer] = useState<CustomerDetails>(() => {
@@ -74,6 +81,21 @@ export const CheckoutModal: React.FC = () => {
   // Courier selection (default to JNE Reguler as primary courier)
   const [selectedShipping, setSelectedShipping] = useState<ShippingMethod>(SHIPPING_SERVICES[0]);
   const [selectedPayment, setSelectedPayment] = useState<PaymentChannel>('qris');
+
+  // Address completeness validation states
+  const [addressValidationAttempted, setAddressValidationAttempted] = useState(false);
+  const [allowNoHouseNumber, setAllowNoHouseNumber] = useState(false);
+  const [showIncompleteAddressModal, setShowIncompleteAddressModal] = useState(false);
+
+  // Real-time Indonesian address completeness validation
+  const addressValidation: AddressValidationResult = React.useMemo(() => {
+    return validateIndonesianAddress(
+      customer.address,
+      customer.subdistrict,
+      customer.city,
+      customer.postalCode
+    );
+  }, [customer.address, customer.subdistrict, customer.city, customer.postalCode]);
 
   if (!isCheckoutOpen) return null;
 
@@ -260,6 +282,17 @@ export const CheckoutModal: React.FC = () => {
     e.preventDefault();
     if (cart.length === 0) return;
 
+    // Validasi Kelengkapan Alamat Pembeli (Nomor Rumah/Patokan & Kecamatan)
+    const isMissingHouseNumber = !addressValidation.hasHouseNumber && !allowNoHouseNumber;
+    const isMissingSubdistrict = !addressValidation.hasSubdistrict;
+    const isMissingStreet = !addressValidation.hasStreetDetail;
+
+    if (isMissingHouseNumber || isMissingSubdistrict || isMissingStreet) {
+      setAddressValidationAttempted(true);
+      setShowIncompleteAddressModal(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       try {
@@ -299,10 +332,19 @@ export const CheckoutModal: React.FC = () => {
     }
   };
 
-  const handleSimulatePayment = () => {
+  const handleCheckPaymentStatus = () => {
     if (!createdOrder) return;
-    simulatePaymentSuccess(createdOrder.id);
-    setStep('success');
+    setIsVerifyingPayment(true);
+    setVerifyNotice(null);
+    setTimeout(() => {
+      setIsVerifyingPayment(false);
+      const found = orders.find(o => o.id === createdOrder.id);
+      if (found && found.status === 'dibayar') {
+        setStep('success');
+      } else {
+        setVerifyNotice('Pembayaran masih dalam antrean verifikasi sistem perbankan. Silakan periksa kembali beberapa saat lagi setelah transfer selesai.');
+      }
+    }, 1200);
   };
 
   const handleCopyVA = (text: string) => {
@@ -431,16 +473,29 @@ export const CheckoutModal: React.FC = () => {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold text-[#3D3830] block mb-1">
-                      {t.checkout.address} *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-[#3D3830]">
+                        {t.checkout.address} *
+                      </label>
+                      {(!addressValidation.hasHouseNumber && !allowNoHouseNumber && customer.address.length > 2) && (
+                        <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                          Nomor rumah / patokan belum ada
+                        </span>
+                      )}
+                    </div>
                     <textarea
                       required
+                      id="checkout-address-input"
                       rows={2}
                       value={customer.address}
                       onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
-                      placeholder="Nama jalan, nomor rumah, RT/RW, kelurahan"
-                      className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
+                      placeholder="Nama jalan, nomor rumah (contoh: No. 12 / Blok B3), RT/RW, kelurahan"
+                      className={`w-full px-3 py-2 text-xs bg-[#FAF8F5] border rounded-lg focus:outline-none transition-all ${
+                        addressValidationAttempted && (!addressValidation.hasHouseNumber && !allowNoHouseNumber)
+                          ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500'
+                          : 'border-[#D5C9B8] focus:border-[#1C3B2B]'
+                      }`}
                     />
                   </div>
 
@@ -473,16 +528,28 @@ export const CheckoutModal: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-[#3D3830] block mb-1">
-                      {t.checkout.subdistrict} *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-[#3D3830]">
+                        {t.checkout.subdistrict} *
+                      </label>
+                      {(!addressValidation.hasSubdistrict && customer.subdistrict.length > 0) && (
+                        <span className="text-[10px] text-amber-700 font-semibold">
+                          Belum lengkap
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       required
+                      id="checkout-subdistrict-input"
                       value={customer.subdistrict}
                       onChange={(e) => setCustomer({ ...customer, subdistrict: e.target.value })}
                       placeholder="Contoh: Kecamatan Tamansari"
-                      className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
+                      className={`w-full px-3 py-2 text-xs bg-[#FAF8F5] border rounded-lg focus:outline-none transition-all ${
+                        addressValidationAttempted && !addressValidation.hasSubdistrict
+                          ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500'
+                          : 'border-[#D5C9B8] focus:border-[#1C3B2B]'
+                      }`}
                     />
                   </div>
 
@@ -498,6 +565,80 @@ export const CheckoutModal: React.FC = () => {
                       placeholder="Contoh: 46196"
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
                     />
+                  </div>
+
+                  {/* Real-time Address Completeness Notification for Buyers */}
+                  <div className="sm:col-span-2 pt-1">
+                    {(customer.address.length > 2 || customer.subdistrict.length > 0 || addressValidationAttempted) ? (
+                      <div>
+                        {(!addressValidation.hasHouseNumber && !allowNoHouseNumber) || !addressValidation.hasSubdistrict || !addressValidation.hasStreetDetail ? (
+                          <div className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                            addressValidationAttempted
+                              ? 'bg-rose-50 border-rose-300 text-rose-900 shadow-xs'
+                              : 'bg-amber-50/90 border-amber-300/80 text-amber-900'
+                          }`}>
+                            <div className="flex items-center gap-2 font-bold">
+                              <AlertTriangle className={`w-4 h-4 shrink-0 ${addressValidationAttempted ? 'text-rose-600' : 'text-amber-600'}`} />
+                              <span>Notifikasi: Alamat Belum Benar-Benar Lengkap</span>
+                            </div>
+                            <p className="text-[11px] leading-relaxed opacity-90">
+                              Kurir ekspedisi (Mengantar, JNE, J&amp;T) membutuhkan kelengkapan nomor rumah dan kecamatan agar paket dapat dikirim tanpa kendala:
+                            </p>
+
+                            <div className="space-y-1.5 pt-0.5 text-[11px]">
+                              {(!addressValidation.hasHouseNumber && !allowNoHouseNumber) && (
+                                <div className="flex items-start gap-1.5 p-2 rounded-lg bg-white/70 border border-amber-200">
+                                  <span className="text-amber-700 font-bold shrink-0">⚠️ Nomor Rumah / Patokan:</span>
+                                  <span>Nomor rumah belum ada. Harap tuliskan nomor rumah (contoh: <em>No. 12, Blok B3</em>) atau patokan (contoh: <em>Depan Masjid / Samping Pos Ronda</em>).</span>
+                                </div>
+                              )}
+                              {!addressValidation.hasSubdistrict && (
+                                <div className="flex items-start gap-1.5 p-2 rounded-lg bg-white/70 border border-amber-200">
+                                  <span className="text-amber-700 font-bold shrink-0">⚠️ Kecamatan:</span>
+                                  <span>Nama kecamatan belum diisi. Harap lengkapi kolom <strong>Kecamatan</strong> (contoh: <em>Kecamatan Tamansari</em>) demi akurasi ongkir dan rute antar.</span>
+                                </div>
+                              )}
+                              {!addressValidation.hasStreetDetail && (
+                                <div className="flex items-start gap-1.5 p-2 rounded-lg bg-white/70 border border-amber-200">
+                                  <span className="text-amber-700 font-bold shrink-0">⚠️ Detail Jalan:</span>
+                                  <span>Alamat masih terlalu singkat. Cantumkan nama jalan, RT/RW, dan kelurahan/desa.</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Pilihan untuk rumah di kampung tanpa nomor */}
+                            {(!addressValidation.hasHouseNumber && !allowNoHouseNumber) && (
+                              <label className="flex items-center gap-2 pt-1 border-t border-amber-200 text-[11px] text-[#524B40] cursor-pointer hover:text-black">
+                                <input
+                                  type="checkbox"
+                                  checked={allowNoHouseNumber}
+                                  onChange={(e) => setAllowNoHouseNumber(e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded text-[#1C3B2B] focus:ring-[#1C3B2B]"
+                                />
+                                <span>Rumah di perkampungan tanpa nomor (sudah ada patokan RT/RW yang jelas)</span>
+                              </label>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs flex items-center justify-between gap-2 text-emerald-800">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span className="font-semibold text-[11px]">
+                                Alamat Lengkap Terverifikasi! (Nomor rumah/patokan &amp; Kecamatan terisi)
+                              </span>
+                            </div>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                              Siap Antar
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-[#FAF7F2] border border-[#EAE2D5] rounded-xl text-[11px] text-[#7A7266] flex items-center gap-2">
+                        <Home className="w-3.5 h-3.5 text-[#B38F5B] shrink-0" />
+                        <span>💡 <strong>Tips Pembeli:</strong> Pastikan menyertakan Nomor Rumah / Patokan dan Kecamatan agar kurir tiba tepat waktu tanpa tersesat.</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -802,6 +943,19 @@ export const CheckoutModal: React.FC = () => {
                 </div>
               </div>
 
+              {/* Warning if buyer attempts submit with incomplete address */}
+              {addressValidationAttempted && ((!addressValidation.hasHouseNumber && !allowNoHouseNumber) || !addressValidation.hasSubdistrict || !addressValidation.hasStreetDetail) && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-800 flex items-start gap-2.5 animate-shake">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-rose-900">Alamat Pengiriman Belum Benar-Benar Lengkap</p>
+                    <p className="text-[11px] text-rose-700 leading-relaxed">
+                      Mohon lengkapi <strong>nomor rumah/patokan</strong> dan <strong>kecamatan</strong> pada formulir di atas agar paket kurir Mengantar tidak tersesat atau tertunda.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Submit CTA */}
               <button
                 type="submit"
@@ -819,7 +973,7 @@ export const CheckoutModal: React.FC = () => {
             </form>
           )}
 
-          {/* STEP 2: PAYMENT PENDING (DOKU QRIS / VA / SIMULATION) */}
+          {/* STEP 2: PAYMENT PENDING (DOKU QRIS / VA) */}
           {step === 'payment_pending' && createdOrder && (
             <div className="space-y-5 text-center py-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-xs font-semibold">
@@ -990,18 +1144,40 @@ export const CheckoutModal: React.FC = () => {
                   </div>
                 )}
 
-                {/* SIMULATE PAYMENT BUTTON (Crucial for Instant Verification Demo!) */}
-                <div className="pt-2 border-t border-[#EAE2D5] text-center">
+                {/* PAYMENT STATUS CHECK ACTION */}
+                <div className="pt-2 border-t border-[#EAE2D5] space-y-2">
                   <button
-                    onClick={handleSimulatePayment}
-                    className="w-full py-3 px-4 bg-[#2E7D32] hover:bg-[#256829] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    onClick={handleCheckPaymentStatus}
+                    disabled={isVerifyingPayment}
+                    className="w-full py-3 px-4 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60"
                   >
-                    <Sparkles className="w-4 h-4 text-[#C5A880]" />
-                    <span>⚡ Simulasi Pembayaran Lunas (Webhook DOKU Realtime)</span>
+                    {isVerifyingPayment ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-[#C5A880]" />
+                        <span>Memeriksa Status Pembayaran...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4 text-[#C5A880]" />
+                        <span>Cek Status Pembayaran</span>
+                      </>
+                    )}
                   </button>
-                  <span className="text-[10px] text-[#7A7266] block mt-1.5">
-                    Menguji respon callback webhook DOKU secara langsung tanpa memotong saldo nyata
-                  </span>
+
+                  {verifyNotice && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left space-y-1.5">
+                      <p className="text-xs text-amber-900 leading-relaxed">{verifyNotice}</p>
+                      <a
+                        href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Halo Admin saena.id, saya ingin konfirmasi pembayaran untuk pesanan ${createdOrder?.id || ''} sebesar ${formatPrice(createdOrder?.total || 0)}.`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C3B2B] hover:underline"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-[#2E7D32]" />
+                        <span>Konfirmasi Bukti Transfer ke Admin via WhatsApp &rarr;</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1086,6 +1262,98 @@ export const CheckoutModal: React.FC = () => {
 
         </div>
       </div>
+
+      {/* Modal Dialog Peringatan Alamat Belum Benar-Benar Lengkap */}
+      {showIncompleteAddressModal && (
+        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-amber-300 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-display text-base font-bold text-[#1C3B2B]">
+                  Alamat Pengiriman Belum Lengkap 📦
+                </h3>
+                <p className="text-xs text-[#7A7266] leading-relaxed">
+                  Agar kurir ekspedisi <strong>Mengantar.com / JNE / J&amp;T</strong> tidak kesulitan mencari lokasi Anda atau salah antar, mohon lengkapi data berikut:
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/80 rounded-xl p-3.5 border border-amber-200 text-xs space-y-2 text-amber-950">
+              {(!addressValidation.hasHouseNumber && !allowNoHouseNumber) && (
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <div>
+                    <strong className="text-amber-900 block">Nomor Rumah / Patokan Belum Ada</strong>
+                    <span className="text-[11px] text-amber-800">
+                      Cantumkan nomor rumah (contoh: <em>No. 12</em>, <em>Blok B3</em>) atau patokan (contoh: <em>Depan Masjid / Samping Pos Ronda</em>).
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {!addressValidation.hasSubdistrict && (
+                <div className="flex items-start gap-2 pt-1.5 border-t border-amber-200/70">
+                  <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <div>
+                    <strong className="text-amber-900 block">Kecamatan Belum Diisi</strong>
+                    <span className="text-[11px] text-amber-800">
+                      Cantumkan nama kecamatan tujuan (contoh: <em>Kecamatan Tamansari</em>) untuk kepastian rute kurir dan tarif ongkir resmi.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {!addressValidation.hasStreetDetail && (
+                <div className="flex items-start gap-2 pt-1.5 border-t border-amber-200/70">
+                  <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <div>
+                    <strong className="text-amber-900 block">Alamat Terlalu Singkat</strong>
+                    <span className="text-[11px] text-amber-800">
+                      Cantumkan nama jalan, RT/RW, dan kelurahan/desa secara lebih lengkap.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Checkbox jika memang rumah di desa/kampung tanpa nomor */}
+            {(!addressValidation.hasHouseNumber && !allowNoHouseNumber) && (
+              <label className="flex items-start gap-2 text-[11px] text-[#524B40] cursor-pointer hover:text-black bg-[#FAF7F2] p-2.5 rounded-lg border border-[#EAE2D5]">
+                <input
+                  type="checkbox"
+                  checked={allowNoHouseNumber}
+                  onChange={(e) => setAllowNoHouseNumber(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded text-[#1C3B2B] focus:ring-[#1C3B2B] mt-0.5 shrink-0"
+                />
+                <span>Rumah saya di perkampungan/desa tanpa nomor (sudah menyertakan patokan/RT RW yang jelas pada kolom alamat)</span>
+              </label>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2 border-t border-[#EAE2D5]">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowIncompleteAddressModal(false);
+                  setTimeout(() => {
+                    if (!addressValidation.hasHouseNumber && !allowNoHouseNumber) {
+                      document.getElementById('checkout-address-input')?.focus();
+                    } else if (!addressValidation.hasSubdistrict) {
+                      document.getElementById('checkout-subdistrict-input')?.focus();
+                    }
+                  }, 100);
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+              >
+                ✏️ Lengkapi Alamat Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

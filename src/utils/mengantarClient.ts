@@ -3,7 +3,7 @@ import { Order, MengantarOrderData, MengantarStoreConfig } from '../types';
 export const DEFAULT_MENGANTAR_CONFIG: MengantarStoreConfig = {
   apiKey: '',
   environment: 'production',
-  autoCreateOnPaid: true,
+  autoCreateOnPaid: false, // Manual by default: Admin triggers Mengantar dispatch from dashboard
   defaultCourier: 'JNE',
   pickupTimeSlot: '14:00 - 17:00 WIB'
 };

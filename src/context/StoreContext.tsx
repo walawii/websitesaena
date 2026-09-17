@@ -33,6 +33,7 @@ import {
   updateProductStockInFirestore, 
   deleteProductFromFirestore,
   deleteAllProductsFromFirestore,
+  deleteAllOrdersFromFirestore,
   syncOrderStatusInFirestore,
   handleFirestoreError,
   OperationType
@@ -170,8 +171,9 @@ interface StoreContextType {
   
   // Checkout & Orders
   placeOrder: (customer: CustomerDetails, shipping: ShippingMethod, paymentChannel: PaymentChannel) => Promise<Order>;
-  simulatePaymentSuccess: (orderId: string) => void;
+  confirmOrderPayment: (orderId: string) => void;
   updateOrderStatus: (orderId: string, newStatus: OrderStatus, trackingNumber?: string) => void;
+  clearAllOrders: () => Promise<void>;
   
   // Inventory
   updateStock: (productId: string, sizeOrColor: string, newStock: number) => void;
@@ -229,8 +231,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('saena_orders_v1');
-    return saved ? JSON.parse(saved) : INITIAL_ORDERS;
+    try {
+      const saved = localStorage.getItem('saena_orders_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const hasOldMocks = parsed.length > 0 && parsed.every((o: Order) => o.id === 'SAENA-98214' || o.id === 'SAENA-98204' || o.id === 'SAENA-98205');
+          if (hasOldMocks) {
+            localStorage.setItem('saena_orders_v1', '[]');
+            return [];
+          }
+          return parsed;
+        }
+      }
+    } catch {}
+    return INITIAL_ORDERS;
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -248,14 +263,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('syncing');
 
   const [notifications, setNotifications] = useState<PushNotification[]>(() => [
-    {
-      id: 'notif-1',
-      title: 'Selamat Datang di saena.id! 🌙',
-      message: 'Gunakan kode voucher promo SAENARAMADHAN untuk menikmati potongan 15% untuk koleksi Hari Raya.',
-      timestamp: 'Baru saja',
-      read: false,
-      type: 'promo'
-    },
     {
       id: 'notif-2',
       title: 'Update Pengiriman Pesanan SAENA-98214 📦',
@@ -318,7 +325,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [mengantarConfig, setMengantarConfig] = useState<MengantarStoreConfig>(() => {
     try {
       const saved = localStorage.getItem('saena_mengantar_config_v1');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_MENGANTAR_CONFIG, ...parsed, autoCreateOnPaid: false };
+      }
     } catch {
       // fallback
     }
@@ -523,9 +533,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, productsPath);
+        try {
+          handleFirestoreError(error, OperationType.GET, productsPath);
+        } catch (e) {
+          console.warn('Firestore products listener fallback to local:', e);
+        }
         if (isMounted) {
           setProducts(prev => prev.length > 0 ? prev : INITIAL_PRODUCTS);
+          setFirebaseSyncStatus('offline');
         }
       }
     );
@@ -553,7 +568,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, ordersPath);
+        try {
+          handleFirestoreError(error, OperationType.GET, ordersPath);
+        } catch (e) {
+          console.warn('Firestore orders listener fallback to local:', e);
+        }
+        if (isMounted) {
+          setFirebaseSyncStatus('offline');
+        }
       }
     );
 
@@ -1307,8 +1329,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newOrder;
   };
 
-  // Simulate instant payment callback / webhook
-  const simulatePaymentSuccess = (orderId: string) => {
+  // Confirm order payment (marks as paid, records payment timestamp, and syncs)
+  const confirmOrderPayment = (orderId: string) => {
     setOrders(prev => prev.map(ord => {
       if (ord.id === orderId) {
         const paidOrder: Order = {
@@ -1328,7 +1350,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             {
               time: 'Baru saja',
               location: 'DOKU Payment Gateway (doku.com)',
-              description: `Pembayaran ${formatPrice(ord.total)} berhasil diverifikasi LUNAS otomatis melalui DOKU. Tim warehouse Tamansari Tasikmalaya bersiap mengemas paket.`
+              description: `Pembayaran ${formatPrice(ord.total)} diverifikasi LUNAS. Tim warehouse Tamansari Tasikmalaya bersiap mengemas paket.`
             }
           ]
         };
@@ -1345,18 +1367,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return ord;
     }));
 
-    // Trigger celebratory confetti
-    try {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#1C3B2B', '#C5A880', '#F3EFEA', '#D4AF37']
-      });
-    } catch {
-      // Confetti fallback
-    }
-
     sendPushNotification(
       `Pembayaran Pesanan ${orderId} LUNAS! ✅`,
       `Terima kasih atas kepercayaan Anda di saena.id. Pesanan Anda segera disiapkan.`,
@@ -1366,15 +1376,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Automatically trigger WhatsApp notification modal
     setIsWhatsAppModalOpen(true);
-
-    // Automatically dispatch paid order to Mengantar.com to generate resi
-    if (mengantarConfig.autoCreateOnPaid) {
-      setTimeout(() => {
-        dispatchOrderToMengantar(orderId).catch(err => {
-          console.warn('Auto dispatch paid order to Mengantar error:', err);
-        });
-      }, 700);
-    }
   };
 
   // Admin or system update order status
@@ -1448,6 +1449,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return ord;
     }));
+  };
+
+  const clearAllOrders = async (): Promise<void> => {
+    setOrders([]);
+    setActiveOrder(null);
+    setActiveMengantarLabelOrder(null);
+    try {
+      localStorage.removeItem('saena_orders_v1');
+      localStorage.setItem('saena_orders_v1', JSON.stringify([]));
+    } catch {}
+
+    try {
+      await deleteAllOrdersFromFirestore();
+    } catch (err) {
+      console.warn('Clear orders from Firestore notice:', err);
+    }
+
+    sendPushNotification(
+      'Daftar Pesanan & Status Mengantar Dibersihkan 🗑️',
+      'Semua daftar pesanan dan status pengiriman Mengantar berhasil dibersihkan.',
+      'system'
+    );
   };
 
   const updateMengantarConfig = (newCfg: Partial<MengantarStoreConfig>) => {
@@ -1549,7 +1572,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       sendPushNotification(
         'Akses Pengelola Terbuka 👑',
-        'Selamat datang di Panel Kontrol Butik & Gudang saena.id Tamansari Tasikmalaya.',
+        'Panel Kontrol Butik & Gudang saena.id Tamansari Tasikmalaya aktif.',
         'system'
       );
       return { success: true, message: 'Autentikasi berhasil! Mengalihkan ke Dashboard Pengelola...' };
@@ -1644,8 +1667,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         removeCoupon,
         toggleWishlist,
         placeOrder,
-        simulatePaymentSuccess,
+        confirmOrderPayment,
         updateOrderStatus,
+        clearAllOrders,
         updateStock,
         updateColorStock,
         updateProduct,

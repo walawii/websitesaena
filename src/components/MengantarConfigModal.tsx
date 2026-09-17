@@ -108,16 +108,29 @@ export const MengantarConfigModal: React.FC<MengantarConfigModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
           
-          {/* Status Banner */}
-          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
-            <div className="text-xs text-emerald-800 space-y-1">
-              <p className="font-semibold text-emerald-900">
-                Sistem Mengantar.com Siap Memproses Pesanan
-              </p>
-              <p>
-                Setiap pesanan di <strong>saena.id</strong> dapat langsung diterbitkan nomor resi kurir (JNE, J&T, SiCepat, Anteraja, dll.), cetak label pengiriman thermal, dan jadwalkan penjemputan paket kurir otomatis.
-              </p>
+          {/* Status Banner & Explanation */}
+          <div className="p-4 bg-[#FAF8F5] rounded-xl border border-[#D5C9B8] space-y-2.5">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+              <div className="text-xs text-[#524B41] space-y-1">
+                <p className="font-bold text-[#1C3B2B]">
+                  Bagaimana Sinkronisasi dengan Akun Mengantar.com Bekerja?
+                </p>
+                <p className="leading-relaxed">
+                  Agar pesanan muncul di dashboard <a href="https://mengantar.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-[#1C3B2B]">mengantar.com</a> dan kurir otomatis menjemput ke butik Tamansari Tasikmalaya, Anda perlu menghubungkan <strong>Public API Key</strong> resmi dari akun Mengantar.com Anda di bawah.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Steps Box */}
+            <div className="bg-white p-3 rounded-lg border border-[#E5DDD2] text-[11px] text-[#524B41] space-y-1">
+              <span className="font-bold text-[#1C3B2B] block">Cara Mendapatkan API Key Mengantar.com:</span>
+              <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                <li>Buka dan login ke akun Anda di <strong>mengantar.com</strong>.</li>
+                <li>Pilih menu <strong>Pengaturan &gt; Pengaturan Akun &gt; API Key</strong>.</li>
+                <li>Klik tombol <strong>Generate API Key</strong> (masukkan kode OTP dari email Anda).</li>
+                <li>Salin API Key tersebut, lalu tempelkan pada kolom di bawah dan simpan.</li>
+              </ol>
             </div>
           </div>
 
@@ -173,7 +186,7 @@ export const MengantarConfigModal: React.FC<MengantarConfigModalProps> = ({
               </div>
             )}
             <p className="text-[11px] text-neutral-500">
-              Dapatkan API Key di <em>Pengaturan Akun &gt; API Key</em> pada dashboard akun Mengantar.com Anda. Jika kosong, sistem otomatis menggunakan engine simulasi sandbox resmi.
+              Dapatkan API Key di <em>Pengaturan Akun &gt; API Key</em> pada dashboard akun Mengantar.com Anda. Jika belum diisi, sistem beroperasi dalam mode sandbox pengujian resmi.
             </p>
           </div>
 

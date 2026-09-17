@@ -22,7 +22,7 @@ export const WhatsAppModal: React.FC = () => {
   } = useStore();
 
   const [copied, setCopied] = useState(false);
-  const [isSimulatedSent, setIsSimulatedSent] = useState(false);
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
 
   if (!isWhatsAppModalOpen || !activeWhatsAppOrder) return null;
 
@@ -76,12 +76,13 @@ _Wassalamu'alaikum wr. wb._
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleSendSimulated = () => {
-    setIsSimulatedSent(true);
+  const handleOpenWhatsApp = () => {
+    setIsOpeningChat(true);
     setTimeout(() => {
       // open wa window safely
       window.open(waUrl, '_blank');
-    }, 500);
+      setIsOpeningChat(false);
+    }, 400);
   };
 
   return (
@@ -160,11 +161,11 @@ _Wassalamu'alaikum wr. wb._
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
             <button
-              onClick={handleSendSimulated}
+              onClick={handleOpenWhatsApp}
               className="flex-1 py-3 px-4 bg-[#25D366] hover:bg-[#20BA5A] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Send className="w-4 h-4" />
-              <span>{isSimulatedSent ? 'Membuka WhatsApp...' : 'Buka Obrolan WhatsApp Resmi'}</span>
+              <span>{isOpeningChat ? 'Membuka WhatsApp...' : 'Buka Obrolan WhatsApp Resmi'}</span>
             </button>
 
             <a

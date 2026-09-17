@@ -109,24 +109,6 @@ export const OrderTrackingModal: React.FC = () => {
 
   const currentStepIdx = currentOrder ? statusOrderIndex[currentOrder.status] : 0;
 
-  // Simulator for advance tracking milestone
-  const handleAdvanceMilestone = () => {
-    if (!currentOrder) return;
-    const nextStatuses: OrderStatus[] = [
-      'menunggu_pembayaran', 
-      'dibayar', 
-      'sedang_dikemas', 
-      'dikirim', 
-      'tiba_di_tujuan', 
-      'selesai'
-    ];
-    const currentIndex = nextStatuses.indexOf(currentOrder.status);
-    if (currentIndex < nextStatuses.length - 1) {
-      const nextStatus = nextStatuses[currentIndex + 1];
-      updateOrderStatus(currentOrder.id, nextStatus);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
       <div 
@@ -225,15 +207,9 @@ export const OrderTrackingModal: React.FC = () => {
                   <h4 className="text-xs font-bold uppercase tracking-wider text-[#1C3B2B]">
                     Status Perjalanan Paket
                   </h4>
-                  {/* Advance Simulator Button */}
-                  <button
-                    onClick={handleAdvanceMilestone}
-                    className="text-xs text-[#B38F5B] hover:text-[#8C6B3D] font-semibold flex items-center gap-1"
-                    title="Simulasi kurir bergerak ke pos berikutnya"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Simulasi Update Status Kurir</span>
-                  </button>
+                  <span className="text-[11px] text-[#7A7266] font-medium">
+                    Tracking Ekspedisi Real-Time
+                  </span>
                 </div>
 
                 <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#E5DDD2]">

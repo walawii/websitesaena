@@ -116,7 +116,8 @@ export async function initializeDatabaseIfNeeded(): Promise<void> {
     // 2. Check and seed products
     const productsCollection = collection(db, 'products');
     const productSnapshot = await getDocs(productsCollection).catch(err => {
-      handleFirestoreError(err, OperationType.LIST, 'products');
+      console.warn('Products fetch notice during initialization:', err);
+      return null;
     });
 
     if (productSnapshot && productSnapshot.empty && INITIAL_PRODUCTS.length > 0) {
@@ -127,18 +128,19 @@ export async function initializeDatabaseIfNeeded(): Promise<void> {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         })).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, `products/${prod.id}`);
+          console.warn(`Seed product notice:`, err);
         });
       }
     }
 
-    // 3. Check and seed initial orders
+    // 3. Check and seed initial orders (INITIAL_ORDERS is empty to preserve quota)
     const ordersCollection = collection(db, 'orders');
     const orderSnapshot = await getDocs(ordersCollection).catch(err => {
-      handleFirestoreError(err, OperationType.LIST, 'orders');
+      console.warn('Orders fetch notice during initialization:', err);
+      return null;
     });
 
-    if (orderSnapshot && orderSnapshot.empty) {
+    if (orderSnapshot && orderSnapshot.empty && INITIAL_ORDERS.length > 0) {
       console.log('Seeding initial orders to Firestore...');
       for (const ord of INITIAL_ORDERS) {
         await setDoc(doc(db, 'orders', ord.id), sanitizeForFirestore({
@@ -146,7 +148,7 @@ export async function initializeDatabaseIfNeeded(): Promise<void> {
           createdAt: ord.createdAt || new Date().toISOString(),
           updatedAt: ord.updatedAt || new Date().toISOString()
         })).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, `orders/${ord.id}`);
+          console.warn(`Seed order notice:`, err);
         });
       }
     }
@@ -154,7 +156,8 @@ export async function initializeDatabaseIfNeeded(): Promise<void> {
     // 4. Check and seed coupons
     const couponsCollection = collection(db, 'coupons');
     const couponSnapshot = await getDocs(couponsCollection).catch(err => {
-      handleFirestoreError(err, OperationType.LIST, 'coupons');
+      console.warn('Coupons fetch notice during initialization:', err);
+      return null;
     });
 
     if (couponSnapshot && couponSnapshot.empty) {
@@ -315,6 +318,27 @@ export async function deleteAllProductsFromFirestore(): Promise<number> {
     return totalDeleted;
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, path);
+    return totalDeleted;
+  }
+}
+
+export async function deleteAllOrdersFromFirestore(): Promise<number> {
+  let totalDeleted = 0;
+  const path = 'orders';
+  try {
+    const ordersRef = collection(db, 'orders');
+    const snapshot = await getDocs(ordersRef);
+    if (!snapshot.empty) {
+      const batch = writeBatch(db);
+      for (const docSnap of snapshot.docs) {
+        batch.delete(doc(db, 'orders', docSnap.id));
+      }
+      await batch.commit();
+      totalDeleted = snapshot.docs.length;
+    }
+    return totalDeleted;
+  } catch (err) {
+    console.warn('Delete orders from Firestore notice:', err);
     return totalDeleted;
   }
 }
