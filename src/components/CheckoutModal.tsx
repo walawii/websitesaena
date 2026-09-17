@@ -7,6 +7,7 @@ import {
   PaymentChannel, 
   Order 
 } from '../types';
+import { trackMetaInitiateCheckout, trackMetaPurchase } from '../utils/metaPixel';
 import { 
   X, 
   CheckCircle2, 
@@ -272,6 +273,15 @@ export const CheckoutModal: React.FC = () => {
 
       const order = await placeOrder(customer, shippingWithDynamicCost, selectedPayment);
       setCreatedOrder(order);
+
+      // Track Meta Ads Purchase Event
+      trackMetaPurchase({
+        orderId: order.id,
+        contentName: order.items.map(i => i.product.name).join(', '),
+        value: order.total,
+        currency: 'IDR',
+        numItems: order.items.reduce((acc, i) => acc + i.quantity, 0)
+      });
 
       if (selectedPayment === 'cod') {
         setStep('success');

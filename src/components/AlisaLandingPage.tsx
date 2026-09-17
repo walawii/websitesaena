@@ -45,6 +45,12 @@ import { useStore } from '../context/StoreContext';
 import { Order, PaymentChannel, MengantarOrderData, DokuPaymentData } from '../types';
 import { createMengantarOrderApi } from '../utils/mengantarClient';
 import { createDokuPaymentApi } from '../utils/dokuClient';
+import { 
+  trackMetaPageView, 
+  trackMetaViewContent, 
+  trackMetaInitiateCheckout, 
+  trackMetaPurchase 
+} from '../utils/metaPixel';
 
 // Visual Assets downloaded locally
 const IMAGES = {
@@ -272,6 +278,15 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
   // Countdown timer state (hours, minutes, seconds)
   const [timeLeft, setTimeLeft] = useState({ hours: 2, minutes: 47, seconds: 18 });
   useEffect(() => {
+    // Fire Meta Ads Pixel PageView & ViewContent
+    trackMetaPageView();
+    trackMetaViewContent({
+      contentName: 'Mukena Traveling 2in1 Laser Cut Alisa Premium',
+      contentCategory: 'Mukena Traveling',
+      value: 79500,
+      currency: 'IDR'
+    });
+
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
@@ -289,6 +304,12 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
   // Form ref for smooth scroll
   const formRef = useRef<HTMLDivElement>(null);
   const scrollToForm = () => {
+    trackMetaInitiateCheckout({
+      contentName: currentPackage.title,
+      value: currentPackage.promoPrice,
+      currency: 'IDR',
+      numItems: currentPackage.qty
+    });
     formRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -454,6 +475,15 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
         'order',
         fullOrder.id
       );
+
+      // Track Meta Ads Purchase Event
+      trackMetaPurchase({
+        orderId,
+        contentName: currentPackage.title,
+        value: currentPackage.promoPrice,
+        currency: 'IDR',
+        numItems: currentPackage.qty
+      });
 
       setOrderSuccessData({
         order: fullOrder,
