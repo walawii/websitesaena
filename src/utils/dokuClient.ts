@@ -50,17 +50,30 @@ export async function createDokuPaymentApi(
       })
     });
 
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson.error || `HTTP ${res.status}: Gagal memproses pembayaran DOKU`);
+    const text = await res.text();
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return {
+        success: false,
+        message: 'Server DOKU mengembalikan respon non-JSON'
+      };
     }
 
-    return await res.json();
+    if (!res.ok || !json.success) {
+      return {
+        success: false,
+        message: json?.error || json?.message || `HTTP ${res.status}: Gagal memproses pembayaran DOKU`
+      };
+    }
+
+    return json;
   } catch (err: any) {
     console.error('DOKU Client Error:', err);
     return {
       success: false,
-      message: err.message || 'Gagal menghubungi server DOKU Payment Gateway'
+      message: err?.message || 'Gagal menghubungi server DOKU Payment Gateway'
     };
   }
 }

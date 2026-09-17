@@ -44,9 +44,18 @@ export async function createMengantarOrderApi(
       body: JSON.stringify(payload)
     });
 
-    const result = await res.json();
+    const text = await res.text();
+    let result: any = null;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return {
+        success: false,
+        message: 'Respon Mengantar.com bukan JSON'
+      };
+    }
 
-    if (result.success && result.data) {
+    if (result?.success && result?.data) {
       return {
         success: true,
         data: {
