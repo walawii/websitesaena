@@ -284,6 +284,71 @@ export const INITIAL_PRODUCTS: Product[] = [
     reviews: []
   },
   {
+    id: 'alisa-01',
+    name: 'Mukena Traveling Terbaru Mini Pouch 2in1 Laser Cut Motif Katun Micro Alisa Premium',
+    slug: 'mukena-traveling-mini-pouch-2in1-laser-cut-alisa-premium',
+    category: 'mukena-silk',
+    price: 79500,
+    originalPrice: 159000,
+    rating: 4.9,
+    reviewCount: 148,
+    description: 'Mukena traveling 2in1 laser cut motif Alisa Premium berbahan katun mikro grade A yang adem, lembut, tidak menerawang, dan nyaman dipakai di semua musim. Dilengkapi resleting jepang di bawah dagu sehingga bisa dipakai reguler atau model ponco tanpa merusak tatanan hijab. Pinggiran dipotong teknologi laser cut presisi bergelombang mewah tanpa benang rontok, lengkap dengan mini pouch traveling ringkas.',
+    shortDescription: 'Mukena traveling 2in1 katun micro premium adem, laser cut presisi + mini pouch cantik.',
+    sku: 'SAENA-ALS-01',
+    weight: 400,
+    dimensions: { length: 18, width: 15, height: 4 },
+    material: 'Katun Mikro Grade A Premium',
+    careInstructions: [
+      'Cuci dengan tangan atau mesin putaran lembut',
+      'Hindari penggunaan pemutih pakaian berlebih',
+      'Setrika dengan suhu sedang'
+    ],
+    features: [
+      'Bahan katun mikro premium: adem, lembut saat dikenakan, dan nyaman di semua musim',
+      'Desain 2in1 dengan resleting: praktis untuk digunakan dan disimpan tanpa merusak hijab',
+      'Motif print shabby chic yang elegan dan berkelas',
+      'Finishing laser cut bergelombang mewah presisi anti-berudul',
+      'Dilengkapi tas pouch praktis (18 x 15 cm) untuk dibawa bepergian',
+      'Ukuran standar dewasa: Panjang depan 117 cm, belakang 120 cm, rok 110 x 73 cm'
+    ],
+    colors: [
+      { name: 'Dusty Pink', hex: '#E8A5A5', stock: 28, image: '/assets/alisa/alisa-pink-model.webp' },
+      { name: 'Sky Blue', hex: '#99BBE0', stock: 24, image: '/assets/alisa/alisa-blue-model.webp' }
+    ],
+    sizes: ['All Size Dewasa Jumbo'],
+    stock: { 'Dusty Pink': 28, 'Sky Blue': 24 },
+    totalStock: 52,
+    images: [
+      '/assets/alisa/alisa-pink-model.webp',
+      '/assets/alisa/alisa-pink-close.webp',
+      '/assets/alisa/alisa-blue-model.webp',
+      '/assets/alisa/alisa-blue-detail.webp',
+      '/assets/alisa/alisa-blue-full.webp'
+    ],
+    isNewArrival: true,
+    isBestSeller: true,
+    reviews: [
+      {
+        id: 'rev-als-1',
+        userName: 'dr. Annisa Larasati',
+        rating: 5,
+        date: '15 September 2026',
+        comment: 'Bagus banget Masya Allah! Katun mikronya beneran adem semriwing, resleting 2in1 nya penyelamat pas lagi buru-buru sholat tanpa lepas jilbab.',
+        variantInfo: 'Dusty Pink / All Size',
+        verifiedBuyer: true
+      },
+      {
+        id: 'rev-als-2',
+        userName: 'Riana Nurul Hidayah',
+        rating: 5,
+        date: '14 September 2026',
+        comment: 'Laser cut-nya rapi banget gak ada benang rontok. Pouch-nya imut muat di sling bag kerja. Warna Sky Blue sangat sejuk!',
+        variantInfo: 'Sky Blue / All Size',
+        verifiedBuyer: true
+      }
+    ]
+  },
+  {
     id: 'saena-08',
     name: 'Humaira Travelling Mini Silk Mukena',
     slug: 'humaira-travelling-mini-silk-mukena',

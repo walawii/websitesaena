@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StoreProvider, useStore } from './context/StoreContext';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
@@ -17,6 +17,7 @@ import { DokuConfigModal } from './components/DokuConfigModal';
 import { Footer } from './components/Footer';
 import { MarketplaceOrderOptions } from './components/MarketplaceOrderLinks';
 import { ProductLandingPage } from './components/ProductLandingPage';
+import { AlisaPage } from './components/AlisaPage';
 import { 
   Filter, 
   SlidersHorizontal, 
@@ -100,6 +101,62 @@ const MainContent: React.FC = () => {
     if (sortBy === 'latest') return (b.isNewArrival ? 1 : 0) - (a.isNewArrival ? 1 : 0);
     return 0; // featured default
   });
+
+  // Current path detection for routing (e.g. /alisa)
+  const [currentPath, setCurrentPath] = useState(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('path') === 'home' || sp.get('page') === 'home') return '/';
+      if (sp.get('path') === 'alisa' || sp.get('page') === 'alisa') return '/alisa';
+      
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/alisa' || path.startsWith('/alisa')) return '/alisa';
+
+      const saved = localStorage.getItem('saena_active_route');
+      if (saved) return saved;
+
+      // Default to /alisa as requested by user ("tampilan preview di https://www.saena.my.id/alisa")
+      return '/alisa';
+    } catch {
+      return '/alisa';
+    }
+  });
+
+  const navigateTo = (path: string) => {
+    setCurrentPath(path);
+    try {
+      localStorage.setItem('saena_active_route', path);
+      window.history.pushState({}, '', path);
+    } catch {
+      // fallback
+    }
+  };
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      try {
+        setCurrentPath(window.location.pathname.toLowerCase());
+      } catch {
+        // fallback
+      }
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
+
+  const isAlisaPage = 
+    currentPath === '/alisa' || 
+    currentPath === '/alisa/' || 
+    currentPath.startsWith('/alisa/') ||
+    (typeof window !== 'undefined' && (
+      new URLSearchParams(window.location.search).get('path') === 'alisa' ||
+      new URLSearchParams(window.location.search).get('page') === 'alisa'
+    ));
+
+  // If path is /alisa, display completely clean, blank page
+  if (isAlisaPage) {
+    return <AlisaPage onNavigateHome={() => navigateTo('/')} />;
+  }
 
   const activeLandingProduct = activeLandingProductId 
     ? products.find(p => p.id === activeLandingProductId || p.slug === activeLandingProductId)
@@ -450,6 +507,18 @@ const MainContent: React.FC = () => {
         isOpen={isDokuConfigModalOpen}
         onClose={() => setIsDokuConfigModalOpen(false)}
       />
+
+      {/* Floating preview shortcut to /alisa */}
+      <div className="fixed bottom-4 right-4 z-40">
+        <button
+          onClick={() => navigateTo('/alisa')}
+          className="bg-[#1C3B2B] hover:bg-[#2A523D] text-[#E6CBA6] text-xs font-semibold px-3 py-2 rounded-full shadow-lg border border-[#C5A880]/40 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
+          title="Buka Halaman Baru /alisa"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Lihat Preview /alisa</span>
+        </button>
+      </div>
     </div>
   );
 };
