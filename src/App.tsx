@@ -180,8 +180,7 @@ const MainContent: React.FC = () => {
 
   const isAlisaPage = 
     currentPath === '/alisa' || 
-    currentPath === '/alisa/' || 
-    currentPath.startsWith('/alisa/') ||
+    currentPath.startsWith('/alisa') ||
     (typeof window !== 'undefined' && (
       window.location.pathname.toLowerCase().startsWith('/alisa') ||
       new URLSearchParams(window.location.search).get('path') === 'alisa' ||
@@ -190,8 +189,7 @@ const MainContent: React.FC = () => {
 
   const isOrderPage = 
     currentPath === '/order' || 
-    currentPath === '/order/' || 
-    currentPath.startsWith('/order/') ||
+    currentPath.startsWith('/order') ||
     (typeof window !== 'undefined' && (
       window.location.pathname.toLowerCase().startsWith('/order') ||
       new URLSearchParams(window.location.search).get('path') === 'order' ||
@@ -200,8 +198,7 @@ const MainContent: React.FC = () => {
 
   const isPaymentPage = 
     currentPath === '/payment' || 
-    currentPath === '/payment/' || 
-    currentPath.startsWith('/payment/') ||
+    currentPath.startsWith('/payment') ||
     (typeof window !== 'undefined' && (
       window.location.pathname.toLowerCase().startsWith('/payment') ||
       new URLSearchParams(window.location.search).get('path') === 'payment' ||
@@ -233,11 +230,20 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /alisa, display completely clean, blank page
+  // If path is /alisa, display Alisa Landing Page with all order buttons directed to /order
   if (isAlisaPage) {
     return (
       <>
-        <AlisaPage onNavigateHome={() => navigateTo('/')} />
+        <AlisaPage 
+          onNavigateHome={() => navigateTo('/')} 
+          onNavigateOrder={(packageId, color) => {
+            const params = new URLSearchParams();
+            if (packageId) params.set('package', packageId);
+            if (color) params.set('color', color);
+            const qs = params.toString();
+            navigateTo(qs ? `/order?${qs}` : '/order');
+          }}
+        />
         <DokuConfigModal
           isOpen={isDokuConfigModalOpen}
           onClose={() => setIsDokuConfigModalOpen(false)}
@@ -653,35 +659,7 @@ const MainContent: React.FC = () => {
         onClose={() => setIsDokuConfigModalOpen(false)}
       />
 
-      {/* Floating preview navigation shortcuts */}
-      <div className="fixed bottom-4 right-4 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-2">
-        <button
-          onClick={() => navigateTo('/order')}
-          className="bg-[#88222A] hover:bg-[#701a21] text-white text-xs font-semibold px-3.5 py-2 rounded-full shadow-lg border border-red-300/40 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
-          title="Buka Halaman Form Pemesanan (/order)"
-        >
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          <span>Halaman /order</span>
-        </button>
 
-        <button
-          onClick={() => navigateTo('/payment')}
-          className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold px-3.5 py-2 rounded-full shadow-lg border border-emerald-300/40 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
-          title="Buka Halaman Instruksi Pembayaran (/payment)"
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span>Halaman /payment</span>
-        </button>
-
-        <button
-          onClick={() => navigateTo('/alisa')}
-          className="bg-[#1C3B2B] hover:bg-[#2A523D] text-[#E6CBA6] text-xs font-semibold px-3 py-2 rounded-full shadow-lg border border-[#C5A880]/40 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
-          title="Buka Landing Page /alisa"
-        >
-          <span className="w-2 h-2 rounded-full bg-[#E6CBA6]" />
-          <span>/alisa</span>
-        </button>
-      </div>
     </div>
   );
 };

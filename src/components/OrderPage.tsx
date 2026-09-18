@@ -68,10 +68,31 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
     }
   ];
 
-  const [selectedPackageId, setSelectedPackageId] = useState<string>('pkg-2');
+  const [selectedPackageId, setSelectedPackageId] = useState<string>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const p = sp.get('package') || sp.get('pkg');
+      if (p === 'pkg-1' || p === '1') return 'pkg-1';
+      if (p === 'pkg-2' || p === '2') return 'pkg-2';
+      if (p === 'pkg-3' || p === '3') return 'pkg-3';
+    } catch {
+      // fallback
+    }
+    return 'pkg-2';
+  });
   const currentPackage = packages.find(p => p.id === selectedPackageId) || packages[1];
 
-  const [selectedColor, setSelectedColor] = useState<'Dusty Pink' | 'Sky Blue'>('Dusty Pink');
+  const [selectedColor, setSelectedColor] = useState<'Dusty Pink' | 'Sky Blue'>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const c = sp.get('color');
+      if (c && c.toLowerCase().includes('blue')) return 'Sky Blue';
+      if (c && c.toLowerCase().includes('pink')) return 'Dusty Pink';
+    } catch {
+      // fallback
+    }
+    return 'Dusty Pink';
+  });
   const [secondaryColor, setSecondaryColor] = useState<'Dusty Pink' | 'Sky Blue'>('Sky Blue');
 
   // Customer Data
