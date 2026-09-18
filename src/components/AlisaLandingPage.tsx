@@ -134,7 +134,9 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
     products,
     syncOrderToFirestore,
     setActiveMengantarLabelOrder,
-    setIsMengantarLabelModalOpen
+    setIsMengantarLabelModalOpen,
+    isAdminMode,
+    isAuthenticatedAdmin
   } = useStore();
 
   // Variant & Image State
@@ -1647,90 +1649,92 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   Alhamdulillah! Pesanan Berhasil Diterima
                 </h3>
                 <p className="text-xs sm:text-sm text-[#615446] max-w-md mx-auto">
-                  Terima kasih Kak <strong>{orderSuccessData.name}</strong>. Pesanan Anda telah tersambung langsung ke sistem <strong>Mengantar.com</strong> dan <strong>DOKU Payment Gateway</strong>.
+                  Terima kasih Kak <strong>{orderSuccessData.name}</strong>. Pesanan Anda telah berhasil diterima dan sedang dipersiapkan oleh tim butik kami untuk segera dikirimkan.
                 </p>
               </div>
 
-              {/* SECTION 1: Mengantar.com Official Logistics Panel */}
-              <div className="bg-gradient-to-br from-[#FAF8F5] to-emerald-50/50 rounded-2xl border-2 border-emerald-600/30 p-5 text-left shadow-sm space-y-3.5">
-                <div className="flex items-center justify-between border-b border-emerald-200/60 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-                      <Truck className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-emerald-950 uppercase tracking-wide">
-                          Mengantar.com Logistics
-                        </span>
-                        <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
-                          AUTO DISPATCH
-                        </span>
+              {/* Internal Mengantar.com Logistics Panel & Cetak Label Thermal (HANYA UNTUK ADMIN) */}
+              {isAdminMode && isAuthenticatedAdmin && (
+                <div className="bg-gradient-to-br from-[#FAF8F5] to-emerald-50/50 rounded-2xl border-2 border-emerald-600/30 p-5 text-left shadow-sm space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-emerald-200/60 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                        <Truck className="w-4 h-4" />
                       </div>
-                      <p className="text-[11px] text-gray-600">
-                        Ekspedisi Resmi: <strong className="text-emerald-900">{orderSuccessData.mengantar?.courier || orderSuccessData.selectedCourier} (Layanan REG)</strong>
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-emerald-950 uppercase tracking-wide">
+                            Mengantar.com Logistics
+                          </span>
+                          <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
+                            PANEL ADMIN
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-600">
+                          Ekspedisi Resmi: <strong className="text-emerald-900">{orderSuccessData.mengantar?.courier || orderSuccessData.selectedCourier} (Layanan REG)</strong>
+                        </p>
+                      </div>
                     </div>
+                    <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-full border border-emerald-200 shadow-xs">
+                      Hanya Terlihat Oleh Admin
+                    </span>
                   </div>
-                  <span className="hidden sm:inline-block text-[11px] font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded-full border border-emerald-200 shadow-xs">
-                    Hub Tasikmalaya
-                  </span>
-                </div>
 
-                {/* Resi AWB Box */}
-                <div className="bg-white rounded-xl border border-emerald-200 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  <div>
-                    <span className="text-[11px] text-gray-500 font-medium block">Nomor Resi / AWB Mengantar.com:</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-mono text-sm sm:text-base font-bold text-gray-900 tracking-wider">
-                        {orderSuccessData.order?.trackingNumber || orderSuccessData.mengantar?.trackingNumber || `MGT-${orderSuccessData.id}`}
-                      </span>
+                  {/* Resi AWB Box */}
+                  <div className="bg-white rounded-xl border border-emerald-200 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div>
+                      <span className="text-[11px] text-gray-500 font-medium block">Nomor Resi / AWB Mengantar.com:</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-mono text-sm sm:text-base font-bold text-gray-900 tracking-wider">
+                          {orderSuccessData.order?.trackingNumber || orderSuccessData.mengantar?.trackingNumber || `MGT-${orderSuccessData.id}`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(orderSuccessData.order?.trackingNumber || orderSuccessData.mengantar?.trackingNumber || `MGT-${orderSuccessData.id}`, 'resi')}
+                          className="text-[11px] flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold px-2 py-1 rounded-md transition-colors cursor-pointer"
+                          title="Salin Nomor Resi"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>{copiedKey === 'resi' ? 'Tersalin!' : 'Salin Resi'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(orderSuccessData.order?.trackingNumber || orderSuccessData.mengantar?.trackingNumber || `MGT-${orderSuccessData.id}`, 'resi')}
-                        className="text-[11px] flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold px-2 py-1 rounded-md transition-colors cursor-pointer"
-                        title="Salin Nomor Resi"
+                        onClick={() => {
+                          if (orderSuccessData.order) {
+                            setActiveMengantarLabelOrder(orderSuccessData.order);
+                            setIsMengantarLabelModalOpen(true);
+                          }
+                        }}
+                        className="w-full sm:w-auto text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3.5 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
                       >
-                        <Copy className="w-3 h-3" />
-                        <span>{copiedKey === 'resi' ? 'Tersalin!' : 'Salin Resi'}</span>
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Cetak Label Thermal</span>
                       </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (orderSuccessData.order) {
-                          setActiveMengantarLabelOrder(orderSuccessData.order);
-                          setIsMengantarLabelModalOpen(true);
-                        }
-                      }}
-                      className="w-full sm:w-auto text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3.5 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Cetak Label Thermal</span>
-                    </button>
+                  {/* Logistics status breakdown */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
+                      <span className="text-gray-500 block text-[10px]">Status Pengiriman:</span>
+                      <span className="font-semibold text-emerald-900 flex items-center gap-1 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        <span>Terjadwal Pickup Mengantar.com</span>
+                      </span>
+                    </div>
+                    <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
+                      <span className="text-gray-500 block text-[10px]">Jadwal Penjemputan Kurir:</span>
+                      <span className="font-semibold text-gray-800 mt-0.5 block">
+                        {orderSuccessData.mengantar?.pickupTime || 'Hari ini, 14:00 - 17:00 WIB'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-
-                {/* Logistics status breakdown */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                    <span className="text-gray-500 block text-[10px]">Status Pengiriman:</span>
-                    <span className="font-semibold text-emerald-900 flex items-center gap-1 mt-0.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      <span>Terjadwal Pickup Mengantar.com</span>
-                    </span>
-                  </div>
-                  <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                    <span className="text-gray-500 block text-[10px]">Jadwal Penjemputan Kurir:</span>
-                    <span className="font-semibold text-gray-800 mt-0.5 block">
-                      {orderSuccessData.mengantar?.pickupTime || 'Hari ini, 14:00 - 17:00 WIB'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* SECTION 2: DOKU Payment Gateway Panel (Jika Transfer/QRIS) ATAU COD Panel */}
               {orderSuccessData.paymentMethod === 'TRANSFER' ? (
@@ -1911,17 +1915,32 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   <span className="font-semibold">{orderSuccessData.color}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ekspedisi Logistik:</span>
+                  <span className="text-gray-600">Ekspedisi Pengiriman:</span>
                   <span className="font-semibold text-emerald-800">
-                    Mengantar.com ({orderSuccessData.selectedCourier})
+                    {orderSuccessData.selectedCourier || 'JNE'} (Layanan Reguler)
                   </span>
                 </div>
+                {orderSuccessData.order?.trackingNumber && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Nomor Resi:</span>
+                    <div className="flex items-center gap-1.5 font-mono font-bold text-gray-900">
+                      <span>{orderSuccessData.order.trackingNumber}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(orderSuccessData.order.trackingNumber, 'resi-summary')}
+                        className="text-[10px] text-emerald-700 hover:underline cursor-pointer"
+                      >
+                        {copiedKey === 'resi-summary' ? 'Tersalin' : 'Salin'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Metode Pembayaran:</span>
                   <span className="font-semibold text-emerald-700">
                     {orderSuccessData.paymentMethod === 'COD' 
-                      ? 'COD (Bayar di Tempat - Mengantar.com)' 
-                      : `Transfer / QRIS (DOKU Gateway)`}
+                      ? 'COD (Bayar di Tempat)' 
+                      : 'Transfer Bank / QRIS'}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1935,6 +1954,15 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                <a
+                  href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Halo Admin saena.id, saya ingin konfirmasi pesanan dengan No. Pesanan ${orderSuccessData.id} a.n. ${orderSuccessData.name}.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Hubungi CS WhatsApp</span>
+                </a>
                 <button
                   type="button"
                   onClick={() => setOrderSuccessData(null)}
