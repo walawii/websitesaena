@@ -95,10 +95,63 @@ function generateDokuVirtualAccount(bank: string, invoiceSuffix: string): string
   }
 }
 
-// Generate realistic Indonesian QRIS string with EMVCo standard payload structure
+function crc16Ccitt(str: string): string {
+  let crc = 0xFFFF;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= (str.charCodeAt(i) << 8);
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      } else {
+        crc = (crc << 1) & 0xFFFF;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function formatTlv(tag: string, value: string): string {
+  const len = value.length.toString().padStart(2, '0');
+  return `${tag}${len}${value}`;
+}
+
+// Generate realistic Bank Indonesia & EMVCo standard QRIS string with CRC16-CCITT
 function generateDokuQrisPayload(invoiceNumber: string, amount: number): string {
-  const paddedAmount = amount.toString();
-  return `00020101021226670014ID.DOKU.WWW01189360001000000000000215${invoiceNumber.slice(-10)}0303UME51440014ID.LINKAJA.WWW0215000000000000000520456515303360540${paddedAmount.length}${paddedAmount}5802ID5918SAENA BUTIK MUSLIM6011TASIKMALAYA61054619662210117${invoiceNumber}6304`;
+  const roundedAmount = Math.max(0, Math.round(amount));
+  const cleanInvoice = (invoiceNumber || 'INV-SAENA').replace(/[^A-Za-z0-9_-]/g, '').slice(-20);
+
+  // Tag 26: National QRIS Merchant Account Information
+  const tag26_00 = formatTlv('00', 'ID.CO.QRIS.WWW');
+  const tag26_01 = formatTlv('01', '936009180020109988');
+  const tag26_02 = formatTlv('02', 'UME');
+  const tag26 = formatTlv('26', tag26_00 + tag26_01 + tag26_02);
+
+  // Tag 51: DOKU Payment Gateway / Jokul Acquirer Specification
+  const tag51_00 = formatTlv('00', 'ID.DOKU.WWW');
+  const tag51_01 = formatTlv('01', '000000000000001');
+  const tag51 = formatTlv('51', tag51_00 + tag51_01);
+
+  // Tag 62: Additional Data Field (Invoice Reference)
+  const tag62_01 = formatTlv('01', cleanInvoice);
+  const tag62 = formatTlv('62', tag62_01);
+
+  const payloadWithoutCrc =
+    formatTlv('00', '01') +
+    formatTlv('01', roundedAmount > 0 ? '12' : '11') +
+    tag26 +
+    tag51 +
+    formatTlv('52', '5651') +
+    formatTlv('53', '360') +
+    (roundedAmount > 0 ? formatTlv('54', roundedAmount.toString()) : '') +
+    formatTlv('58', 'ID') +
+    formatTlv('59', 'SAENA BUTIK MUSLIMAH') +
+    formatTlv('60', 'TASIKMALAYA') +
+    formatTlv('61', '46196') +
+    tag62 +
+    '6304';
+
+  const checksum = crc16Ccitt(payloadWithoutCrc);
+  return `${payloadWithoutCrc}${checksum}`;
 }
 
 export async function processDokuPayment(

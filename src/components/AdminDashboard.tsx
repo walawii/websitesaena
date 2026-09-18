@@ -725,9 +725,18 @@ export const AdminDashboard: React.FC = () => {
 
                       <td className="py-3 font-bold text-[#1C3B2B]">
                         {formatPrice(order.total)}
-                        <span className="block text-[10px] text-[#7A7266] font-normal">
-                          via {order.payment.channel.toUpperCase()}
+                        <span className="block text-[10px] text-[#7A7266] font-normal truncate max-w-[140px]" title={order.payment.channelName || order.payment.channel}>
+                          via {(order.payment.channel || 'DOKU').toUpperCase()}
                         </span>
+                        {order.status === 'menunggu_pembayaran' ? (
+                          <span className="inline-block mt-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                            Belum Dibayar
+                          </span>
+                        ) : order.status === 'dibayar' ? (
+                          <span className="inline-block mt-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                            Lunas (Terverifikasi)
+                          </span>
+                        ) : null}
                       </td>
 
                       <td className="py-3">

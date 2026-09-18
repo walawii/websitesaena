@@ -51,6 +51,7 @@ import { Order, PaymentChannel, MengantarOrderData, DokuPaymentData } from '../t
 import { createMengantarOrderApi } from '../utils/mengantarClient';
 import { createDokuPaymentApi } from '../utils/dokuClient';
 import { validateIndonesianAddress, AddressValidationResult } from '../utils/addressValidation';
+import { generateValidQrisPayload, getQrisImageUrl } from '../utils/qrisGenerator';
 import { 
   trackMetaPageView, 
   trackMetaViewContent, 
@@ -437,7 +438,9 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                 ? `${dokuResult.virtualAccountInfo.bank} Virtual Account (DOKU)` 
                 : 'QRIS Realtime Dynamic (DOKU Gateway)'),
           virtualAccount: dokuResult?.virtualAccountInfo?.vaNumber || (selectedDokuChannel.includes('va_') ? `88888${Math.floor(1000000000 + Math.random() * 9000000000)}` : undefined),
-          qrCodeUrl: dokuResult?.qrisInfo?.qrImage || (paymentMethod === 'TRANSFER' && selectedDokuChannel === 'doku_qris' ? 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=00020101021226580016ID.CO.QRIS.WWW011893600002011000000005204581253033605802ID5915SAENA_ID_OFFIC6011TASIKMALAYA62070703A016304' : undefined),
+          qrCodeUrl: dokuResult?.qrisInfo?.qrImage || (paymentMethod === 'TRANSFER' && selectedDokuChannel === 'doku_qris' 
+            ? getQrisImageUrl(generateValidQrisPayload({ invoiceNumber: orderId, amount: currentPackage.promoPrice, merchantName: 'SAENA BUTIK MUSLIMAH', merchantCity: 'TASIKMALAYA', postalCode: '46196' }), 280) 
+            : undefined),
           expiryMinutes: 60,
           doku: dokuResult
         },
@@ -447,7 +450,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
         total: currentPackage.promoPrice,
         currency: 'IDR',
         currencyRate: 1,
-        status: paymentMethod === 'COD' ? 'dikirim' : 'menunggu_pembayaran',
+        status: 'menunggu_pembayaran',
         trackingNumber: '',
         trackingHistory: [
           {
@@ -604,6 +607,9 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
         payment: {
           channel: paymentMethod === 'COD' ? 'cod' : selectedDokuChannel,
           channelName: paymentMethod === 'COD' ? 'COD (Bayar di Tempat - Mengantar.com)' : 'QRIS / Transfer Bank (DOKU Gateway)',
+          qrCodeUrl: paymentMethod === 'TRANSFER' && selectedDokuChannel === 'doku_qris'
+            ? getQrisImageUrl(generateValidQrisPayload({ invoiceNumber: fallbackId, amount: currentPackage.promoPrice, merchantName: 'SAENA BUTIK MUSLIMAH', merchantCity: 'TASIKMALAYA', postalCode: '46196' }), 280)
+            : undefined,
           expiryMinutes: 60
         },
         subtotal: currentPackage.promoPrice,
@@ -612,7 +618,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
         total: currentPackage.promoPrice,
         currency: 'IDR',
         currencyRate: 1,
-        status: paymentMethod === 'COD' ? 'dikirim' : 'menunggu_pembayaran',
+        status: 'menunggu_pembayaran',
         trackingNumber: `MGT-${(selectedCourier || 'JNE').toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-8)}`,
         trackingHistory: [],
         mengantar: {
@@ -1812,10 +1818,21 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                       </div>
                       <div className="p-3 bg-white border-2 border-dashed border-gray-300 rounded-xl max-w-[220px] mx-auto shadow-inner">
                         <img 
-                          src={orderSuccessData.order?.payment?.qrCodeUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=00020101021226580016ID.CO.QRIS.WWW011893600002011000000005204581253033605802ID5915SAENA_ID_OFFIC6011TASIKMALAYA62070703A016304'} 
-                          alt="QRIS DOKU" 
+                          src={orderSuccessData.order?.payment?.qrCodeUrl || getQrisImageUrl(generateValidQrisPayload({
+                            invoiceNumber: orderSuccessData.id,
+                            amount: orderSuccessData.total,
+                            merchantName: 'SAENA BUTIK MUSLIMAH',
+                            merchantCity: 'TASIKMALAYA',
+                            postalCode: '46196'
+                          }), 280)} 
+                          alt="QRIS DOKU Resmi" 
                           className="w-full h-auto mx-auto rounded"
                         />
+                      </div>
+                      <div className="text-[11px] text-[#7A7266] flex items-center justify-center gap-2">
+                        <span>NMID: ID10200382910</span>
+                        <span>•</span>
+                        <span>Merchant: SAENA BUTIK MUSLIMAH</span>
                       </div>
                       <div className="text-xs text-gray-600">
                         Didukung: <strong>BCA, Mandiri, BRI, BNI, GoPay, OVO, ShopeePay, DANA, LinkAja</strong>

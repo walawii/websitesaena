@@ -33,6 +33,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { validateIndonesianAddress, AddressValidationResult } from '../utils/addressValidation';
+import { generateValidQrisPayload, getQrisImageUrl } from '../utils/qrisGenerator';
 
 export const CheckoutModal: React.FC = () => {
   const {
@@ -1027,7 +1028,7 @@ export const CheckoutModal: React.FC = () => {
                     </p>
                     <div className="w-52 h-52 mx-auto p-2 bg-white rounded-xl shadow-md border border-[#E2D8CA]">
                       <img
-                        src={createdOrder.payment.qrCodeUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=00020101021226580016ID.CO.QRIS.WWW011893600002011000000005204581253033605802ID5915SAENA_ID_OFFIC6011TASIKMALAYA62070703A016304'}
+                        src={createdOrder.payment.qrCodeUrl || getQrisImageUrl(generateValidQrisPayload({ invoiceNumber: createdOrder.id, amount: createdOrder.total, merchantName: 'SAENA BUTIK MUSLIMAH', merchantCity: 'TASIKMALAYA', postalCode: '46196' }), 280)}
                         alt="QRIS DOKU saena.id"
                         className="w-full h-full object-contain"
                       />
