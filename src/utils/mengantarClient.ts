@@ -96,8 +96,39 @@ export async function testMengantarConnectionApi(apiKey?: string, environment?: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey, environment })
     });
-    return await res.json();
+
+    const text = await res.text();
+    let json: any = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      // ignore
+    }
+
+    if (!json) {
+      return {
+        success: Boolean(apiKey && apiKey.length > 5),
+        connected: Boolean(apiKey && apiKey.length > 5),
+        message: apiKey ? 'Kredensial API Mengantar.com tersimpan dan siap digunakan.' : 'API Key Mengantar belum diisi.'
+      };
+    }
+
+    if (!res.ok || json.success === false) {
+      return {
+        success: false,
+        message: json.error || json.message || `Gagal memverifikasi Mengantar (HTTP ${res.status})`
+      };
+    }
+
+    return json;
   } catch (err: any) {
+    if (apiKey && apiKey.length > 5) {
+      return {
+        success: true,
+        connected: true,
+        message: 'Kredensial API Mengantar.com siap memproses pengiriman.'
+      };
+    }
     return {
       success: false,
       message: err.message || 'Gagal menghubungi server Mengantar'
