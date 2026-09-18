@@ -18,6 +18,8 @@ import { Footer } from './components/Footer';
 import { MarketplaceOrderOptions } from './components/MarketplaceOrderLinks';
 import { ProductLandingPage } from './components/ProductLandingPage';
 import { AlisaPage } from './components/AlisaPage';
+import { OrderPage } from './components/OrderPage';
+import { PaymentPage } from './components/PaymentPage';
 import { 
   Filter, 
   SlidersHorizontal, 
@@ -153,6 +155,24 @@ const MainContent: React.FC = () => {
       new URLSearchParams(window.location.search).get('page') === 'alisa'
     ));
 
+  const isOrderPage = 
+    currentPath === '/order' || 
+    currentPath === '/order/' || 
+    currentPath.startsWith('/order/') ||
+    (typeof window !== 'undefined' && (
+      new URLSearchParams(window.location.search).get('path') === 'order' ||
+      new URLSearchParams(window.location.search).get('page') === 'order'
+    ));
+
+  const isPaymentPage = 
+    currentPath === '/payment' || 
+    currentPath === '/payment/' || 
+    currentPath.startsWith('/payment/') ||
+    (typeof window !== 'undefined' && (
+      new URLSearchParams(window.location.search).get('path') === 'payment' ||
+      new URLSearchParams(window.location.search).get('page') === 'payment'
+    ));
+
   // If in Admin Mode and authenticated, show Admin Dashboard regardless of route
   if (isAdminMode && isAuthenticatedAdmin) {
     return (
@@ -183,6 +203,53 @@ const MainContent: React.FC = () => {
     return (
       <>
         <AlisaPage onNavigateHome={() => navigateTo('/')} />
+        <DokuConfigModal
+          isOpen={isDokuConfigModalOpen}
+          onClose={() => setIsDokuConfigModalOpen(false)}
+        />
+        <MengantarConfigModal
+          isOpen={isMengantarConfigModalOpen}
+          onClose={() => setIsMengantarConfigModalOpen(false)}
+        />
+        <MengantarLabelModal
+          order={activeMengantarLabelOrder}
+          isOpen={isMengantarLabelModalOpen}
+          onClose={() => setIsMengantarLabelModalOpen(false)}
+        />
+        <NotificationToast />
+      </>
+    );
+  }
+
+  // If path is /order, display standalone Order Form
+  if (isOrderPage) {
+    return (
+      <>
+        <OrderPage 
+          onNavigateToPayment={(orderId) => navigateTo(`/payment?orderId=${orderId}`)}
+          onNavigateHome={() => navigateTo('/')}
+        />
+        <DokuConfigModal
+          isOpen={isDokuConfigModalOpen}
+          onClose={() => setIsDokuConfigModalOpen(false)}
+        />
+        <MengantarConfigModal
+          isOpen={isMengantarConfigModalOpen}
+          onClose={() => setIsMengantarConfigModalOpen(false)}
+        />
+        <NotificationToast />
+      </>
+    );
+  }
+
+  // If path is /payment, display standalone Payment / Confirmation Screen
+  if (isPaymentPage) {
+    return (
+      <>
+        <PaymentPage 
+          onNavigateHome={() => navigateTo('/')}
+          onNavigateNewOrder={() => navigateTo('/order')}
+        />
         <DokuConfigModal
           isOpen={isDokuConfigModalOpen}
           onClose={() => setIsDokuConfigModalOpen(false)}

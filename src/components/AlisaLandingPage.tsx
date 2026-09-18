@@ -1831,143 +1831,65 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
 
                     return (
                       <div className="bg-white rounded-xl border border-[#D5C9B8] overflow-hidden shadow-sm">
-                        {/* Sub-tab selection: QRIS vs Manual Bank */}
-                        <div className="bg-[#FAF8F5] border-b border-[#EAE4D9] p-1.5 flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setDokuPaymentSubTab('qris')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                              dokuPaymentSubTab === 'qris'
-                                ? 'bg-[#1C3B2B] text-white shadow-2xs'
-                                : 'text-[#7A7266] hover:text-[#242320] hover:bg-[#EAE4D9]'
-                            }`}
-                          >
-                            <QrCode className="w-3.5 h-3.5" />
-                            <span>Scan QRIS Instan</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setDokuPaymentSubTab('manual_bank')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                              dokuPaymentSubTab === 'manual_bank'
-                                ? 'bg-[#1C3B2B] text-white shadow-2xs'
-                                : 'text-[#7A7266] hover:text-[#242320] hover:bg-[#EAE4D9]'
-                            }`}
-                          >
-                            <Building2 className="w-3.5 h-3.5" />
-                            <span>Transfer Bank Manual</span>
-                          </button>
-                        </div>
-
-                        {dokuPaymentSubTab === 'qris' ? (
-                          <div className="p-4 text-center space-y-3">
-                            <div className="inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full border border-emerald-200">
-                              Scan QRIS dengan Aplikasi Mobile Banking / E-Wallet Anda
-                            </div>
-
-                            {/* QRIS Image Frame */}
-                            <div className="p-2.5 bg-white border-2 border-dashed border-[#1C3B2B]/20 rounded-xl max-w-[210px] mx-auto shadow-inner">
-                              <img 
-                                src={smartQris.qrImageUrl} 
-                                alt="QRIS Resmi Toko saena.id" 
-                                className="w-full h-auto mx-auto rounded"
-                              />
-                            </div>
-
-                            <div className="text-[11px] text-[#7A7266] flex flex-wrap items-center justify-center gap-2">
-                              <span>NMID: <strong className="text-[#242320]">{smartQris.merchantNmid}</strong></span>
-                              <span>•</span>
-                              <span>Merchant: <strong className="text-[#242320]">{smartQris.merchantName}</strong></span>
-                            </div>
-
-                            {/* Scanning Instructions */}
-                            <div className="bg-[#FAF8F5] p-2.5 rounded-lg border border-[#EAE4D9] text-[11px] text-[#524B40] text-left space-y-1">
-                              <p className="font-semibold text-[#1C3B2B] flex items-center gap-1">
-                                <span>💡 Panduan Scan QRIS:</span>
-                              </p>
-                              <p>
-                                1. Buka m-Banking (BCA, Mandiri, BRI, BNI) atau E-Wallet (GoPay, Shopee, DANA, OVO).
-                              </p>
-                              <p>
-                                2. Buka menu <strong>"Scan / Bayar"</strong> di dalam aplikasi (bukan kamera biasa).
-                              </p>
-                              <p>
-                                3. Atau unduh gambar QRIS di bawah ini, lalu pilih <i>"Ambil dari Galeri"</i> di m-banking.
-                              </p>
-                            </div>
-
-                            {/* Download & Actions */}
-                            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                              <a
-                                href={smartQris.qrImageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download={`QRIS-SAENA-${orderSuccessData.id}.png`}
-                                className="text-xs bg-[#EAE4D9] hover:bg-[#D5C9B8] text-[#1C3B2B] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                              >
-                                <QrCode className="w-3.5 h-3.5" />
-                                <span>Unduh / Buka Barcode QRIS</span>
-                              </a>
-
-                              <button
-                                type="button"
-                                onClick={() => setIsDokuConfigModalOpen(true)}
-                                className="text-xs bg-white hover:bg-[#FAF8F5] border border-[#D5C9B8] text-[#7A7266] hover:text-[#1C3B2B] font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
-                                title="Pengaturan Toko: Ganti / Upload QRIS Toko Asli"
-                              >
-                                <span>⚙️ Pasang QRIS Toko Asli</span>
-                              </button>
-                            </div>
+                        <div className="p-4 text-center space-y-3">
+                          <div className="inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full border border-emerald-200">
+                            Scan QRIS dengan Aplikasi Mobile Banking / E-Wallet Anda
                           </div>
-                        ) : (
-                          /* Manual Bank Transfer Tab */
-                          <div className="p-4 space-y-3">
-                            <p className="text-xs text-[#524B40]">
-                              Silakan transfer tepat sebesar <strong className="text-[#1C3B2B]">Rp {orderSuccessData.total.toLocaleString('id-ID')}</strong> ke salah satu rekening resmi kami:
+
+                          {/* QRIS Image Frame */}
+                          <div className="p-2.5 bg-white border-2 border-dashed border-[#1C3B2B]/20 rounded-xl max-w-[210px] mx-auto shadow-inner">
+                            <img 
+                              src={smartQris.qrImageUrl} 
+                              alt="QRIS Resmi Toko saena.id" 
+                              className="w-full h-auto mx-auto rounded"
+                            />
+                          </div>
+
+                          <div className="text-[11px] text-[#7A7266] flex flex-wrap items-center justify-center gap-2">
+                            <span>NMID: <strong className="text-[#242320]">{smartQris.merchantNmid}</strong></span>
+                            <span>•</span>
+                            <span>Merchant: <strong className="text-[#242320]">{smartQris.merchantName}</strong></span>
+                          </div>
+
+                          {/* Scanning Instructions */}
+                          <div className="bg-[#FAF8F5] p-2.5 rounded-lg border border-[#EAE4D9] text-[11px] text-[#524B40] text-left space-y-1">
+                            <p className="font-semibold text-[#1C3B2B] flex items-center gap-1">
+                              <span>💡 Panduan Scan QRIS:</span>
                             </p>
-
-                            <div className="space-y-2">
-                              {bankAccounts.map((acc, idx) => (
-                                <div key={idx} className="p-2.5 bg-[#FAF8F5] rounded-xl border border-[#EAE4D9] flex items-center justify-between gap-2">
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-bold text-xs text-[#1C3B2B]">{acc.bank}</span>
-                                      <span className="text-[10px] text-[#7A7266]">({acc.holderName})</span>
-                                    </div>
-                                    <span className="font-mono text-sm font-bold text-[#1C3B2B] tracking-wider block mt-0.5">
-                                      {acc.accountNumber}
-                                    </span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => copyToClipboard(acc.accountNumber, `bank_${idx}`)}
-                                    className="text-xs flex items-center gap-1 bg-white hover:bg-[#EAE4D9] border border-[#D5C9B8] text-[#1C3B2B] font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                    <span>{copiedKey === `bank_${idx}` ? 'Tersalin!' : 'Salin No. Rek'}</span>
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="flex items-center justify-between p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs">
-                              <span className="text-blue-950 font-medium">Nominal Transfer:</span>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-blue-900 font-mono text-sm">
-                                  Rp {orderSuccessData.total.toLocaleString('id-ID')}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(orderSuccessData.total.toString(), 'amount')}
-                                  className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold px-2 py-1 rounded transition-colors cursor-pointer"
-                                >
-                                  {copiedKey === 'amount' ? 'Tersalin' : 'Salin Nominal'}
-                                </button>
-                              </div>
-                            </div>
+                            <p>
+                              1. Buka m-Banking (BCA, Mandiri, BRI, BNI) atau E-Wallet (GoPay, Shopee, DANA, OVO).
+                            </p>
+                            <p>
+                              2. Buka menu <strong>"Scan / Bayar"</strong> di dalam aplikasi (bukan kamera biasa).
+                            </p>
+                            <p>
+                              3. Atau unduh gambar QRIS di bawah ini, lalu pilih <i>"Ambil dari Galeri"</i> di m-banking.
+                            </p>
                           </div>
-                        )}
+
+                          {/* Download & Actions */}
+                          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                            <a
+                              href={smartQris.qrImageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={`QRIS-SAENA-${orderSuccessData.id}.png`}
+                              className="text-xs bg-[#EAE4D9] hover:bg-[#D5C9B8] text-[#1C3B2B] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <QrCode className="w-3.5 h-3.5" />
+                              <span>Unduh / Buka Barcode QRIS</span>
+                            </a>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsDokuConfigModalOpen(true)}
+                              className="text-xs bg-white hover:bg-[#FAF8F5] border border-[#D5C9B8] text-[#7A7266] hover:text-[#1C3B2B] font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Pengaturan Toko: Ganti / Upload QRIS Toko Asli"
+                            >
+                              <span>⚙️ Pasang QRIS Toko Asli</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     );
                   })() : (
