@@ -104,23 +104,37 @@ const MainContent: React.FC = () => {
     return 0; // featured default
   });
 
-  // Current path detection for routing (e.g. /alisa)
+  // Current path detection for routing (e.g. /alisa, /order, /payment, /)
   const [currentPath, setCurrentPath] = useState(() => {
     try {
+      // 1. Check query parameters first (e.g. ?path=order, ?page=payment)
       const sp = new URLSearchParams(window.location.search);
-      if (sp.get('path') === 'home' || sp.get('page') === 'home') return '/';
-      if (sp.get('path') === 'alisa' || sp.get('page') === 'alisa') return '/alisa';
+      const queryRoute = sp.get('path') || sp.get('page');
+      if (queryRoute) {
+        const clean = queryRoute.toLowerCase().replace(/^\//, '');
+        if (clean === 'home' || clean === '') return '/';
+        return `/${clean}`;
+      }
       
-      const path = window.location.pathname.toLowerCase();
-      if (path === '/alisa' || path.startsWith('/alisa')) return '/alisa';
+      // 2. Check window.location.pathname directly
+      const path = (window.location.pathname || '').toLowerCase();
+      if (path === '/order' || path.startsWith('/order/') || path === '/order.html') return '/order';
+      if (path === '/payment' || path.startsWith('/payment/') || path === '/payment.html') return '/payment';
+      if (path === '/alisa' || path.startsWith('/alisa/') || path === '/alisa.html') return '/alisa';
+      if (path === '/' || path === '') {
+        // If explicitly root path, return '/'
+        return '/';
+      }
 
+      // 3. Check if stored route exists
       const saved = localStorage.getItem('saena_active_route');
-      if (saved) return saved;
+      if (saved && (saved === '/order' || saved === '/payment' || saved === '/alisa' || saved === '/')) {
+        return saved;
+      }
 
-      // Default to /alisa as requested by user ("tampilan preview di https://www.saena.my.id/alisa")
-      return '/alisa';
+      return path || '/';
     } catch {
-      return '/alisa';
+      return '/';
     }
   });
 
@@ -129,6 +143,7 @@ const MainContent: React.FC = () => {
     try {
       localStorage.setItem('saena_active_route', path);
       window.history.pushState({}, '', path);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       // fallback
     }
@@ -137,7 +152,24 @@ const MainContent: React.FC = () => {
   useEffect(() => {
     const handleLocationChange = () => {
       try {
-        setCurrentPath(window.location.pathname.toLowerCase());
+        const sp = new URLSearchParams(window.location.search);
+        const queryRoute = sp.get('path') || sp.get('page');
+        if (queryRoute) {
+          const clean = queryRoute.toLowerCase().replace(/^\//, '');
+          setCurrentPath(clean === 'home' || clean === '' ? '/' : `/${clean}`);
+          return;
+        }
+
+        const path = (window.location.pathname || '').toLowerCase();
+        if (path === '/order' || path.startsWith('/order/')) {
+          setCurrentPath('/order');
+        } else if (path === '/payment' || path.startsWith('/payment/')) {
+          setCurrentPath('/payment');
+        } else if (path === '/alisa' || path.startsWith('/alisa/')) {
+          setCurrentPath('/alisa');
+        } else {
+          setCurrentPath(path || '/');
+        }
       } catch {
         // fallback
       }
@@ -151,6 +183,7 @@ const MainContent: React.FC = () => {
     currentPath === '/alisa/' || 
     currentPath.startsWith('/alisa/') ||
     (typeof window !== 'undefined' && (
+      window.location.pathname.toLowerCase().startsWith('/alisa') ||
       new URLSearchParams(window.location.search).get('path') === 'alisa' ||
       new URLSearchParams(window.location.search).get('page') === 'alisa'
     ));
@@ -160,6 +193,7 @@ const MainContent: React.FC = () => {
     currentPath === '/order/' || 
     currentPath.startsWith('/order/') ||
     (typeof window !== 'undefined' && (
+      window.location.pathname.toLowerCase().startsWith('/order') ||
       new URLSearchParams(window.location.search).get('path') === 'order' ||
       new URLSearchParams(window.location.search).get('page') === 'order'
     ));
@@ -169,6 +203,7 @@ const MainContent: React.FC = () => {
     currentPath === '/payment/' || 
     currentPath.startsWith('/payment/') ||
     (typeof window !== 'undefined' && (
+      window.location.pathname.toLowerCase().startsWith('/payment') ||
       new URLSearchParams(window.location.search).get('path') === 'payment' ||
       new URLSearchParams(window.location.search).get('page') === 'payment'
     ));
@@ -618,15 +653,33 @@ const MainContent: React.FC = () => {
         onClose={() => setIsDokuConfigModalOpen(false)}
       />
 
-      {/* Floating preview shortcut to /alisa */}
-      <div className="fixed bottom-4 right-4 z-40">
+      {/* Floating preview navigation shortcuts */}
+      <div className="fixed bottom-4 right-4 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-2">
+        <button
+          onClick={() => navigateTo('/order')}
+          className="bg-[#88222A] hover:bg-[#701a21] text-white text-xs font-semibold px-3.5 py-2 rounded-full shadow-lg border border-red-300/40 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
+          title="Buka Halaman Form Pemesanan (/order)"
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>Halaman /order</span>
+        </button>
+
+        <button
+          onClick={() => navigateTo('/payment')}
+          className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold px-3.5 py-2 rounded-full shadow-lg border border-emerald-300/40 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
+          title="Buka Halaman Instruksi Pembayaran (/payment)"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span>Halaman /payment</span>
+        </button>
+
         <button
           onClick={() => navigateTo('/alisa')}
           className="bg-[#1C3B2B] hover:bg-[#2A523D] text-[#E6CBA6] text-xs font-semibold px-3 py-2 rounded-full shadow-lg border border-[#C5A880]/40 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
-          title="Buka Halaman Baru /alisa"
+          title="Buka Landing Page /alisa"
         >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Lihat Preview /alisa</span>
+          <span className="w-2 h-2 rounded-full bg-[#E6CBA6]" />
+          <span>/alisa</span>
         </button>
       </div>
     </div>

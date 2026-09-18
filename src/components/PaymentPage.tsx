@@ -9,7 +9,8 @@ import {
   MessageCircle, 
   ShoppingBag,
   RefreshCw,
-  Printer
+  Printer,
+  Home
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useStore } from '../context/StoreContext';
@@ -205,15 +206,30 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
         {/* Main Card */}
         <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl border border-[#D5C9B8] overflow-hidden">
           {/* Header Banner */}
-          <div className="bg-[#1C3B2B] text-white p-5 sm:p-7 text-center">
+          <div className="bg-[#1C3B2B] text-white p-5 sm:p-7 text-center relative">
+            {onNavigateHome && (
+              <button
+                type="button"
+                onClick={onNavigateHome}
+                className="absolute left-4 top-4 text-[#D5CAB9] hover:text-white text-xs flex items-center gap-1 bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                title="Kembali ke Beranda Utama"
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Beranda</span>
+              </button>
+            )}
             <span className="inline-block bg-[#88222A] text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-2">
-              FORMULIR PEMESANAN RESMI &amp; CEPAT
+              INSTRUKSI &amp; KONFIRMASI PEMBAYARAN RESMI
             </span>
             <h1 className="font-display text-xl sm:text-2xl font-bold text-[#EFE8DC]">
-              Klaim Promo Mukena Traveling Alisa Hari Ini
+              {orderData.paymentMethod === 'COD' 
+                ? 'Pesanan COD Siap Dikirim ke Alamat Anda' 
+                : 'Selesaikan Pembayaran Pesanan Anda'}
             </h1>
             <p className="text-xs sm:text-sm text-[#D5CAB9] mt-1">
-              Silakan isi formulir di bawah ini. Bayar via Transfer Bank / QRIS atau Bayar di Tempat (Bisa COD).
+              {orderData.paymentMethod === 'COD'
+                ? 'Siapkan uang tunai sesuai tagihan saat kurir ekspedisi Mengantar.com tiba.'
+                : 'Silakan lakukan pembayaran via QRIS Realtime atau Transfer Virtual Account DOKU.'}
             </p>
           </div>
 

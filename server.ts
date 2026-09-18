@@ -631,9 +631,18 @@ app.post('/api/doku/test-connection', async (req, res) => {
   }
 });
 
-// API Route: DOKU Payment Gateway - Webhook Notification
-app.post('/api/doku/notification', async (req, res) => {
+// API Route: DOKU Payment Gateway - Webhook Notification (POST from DOKU, GET for browser check)
+app.all('/api/doku/notification', (req, res) => {
   try {
+    if (req.method === 'GET') {
+      return res.status(200).json({
+        status: 'OK',
+        endpoint: '/api/doku/notification',
+        message: 'Endpoint Webhook Notifikasi DOKU.com aktif dan siap menerima HTTP POST payload transaksi dari DOKU Jokul Payment Gateway.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const notificationData = req.body;
     console.log('DOKU Webhook Notification received:', notificationData);
     

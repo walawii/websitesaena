@@ -13,7 +13,9 @@ import {
   Clock,
   Instagram,
   Facebook,
-  Lock
+  Lock,
+  ClipboardList,
+  CreditCard
 } from 'lucide-react';
 import { ShopeeLogo, TikTokLogo, SHOPEE_STORE_URL, TIKTOK_STORE_URL } from './MarketplaceOrderLinks';
 
@@ -157,6 +159,34 @@ export const Footer: React.FC = () => {
                   <Truck className="w-3.5 h-3.5 text-[#C5A880]" />
                   <span>Lacak Pengiriman Real-Time</span>
                 </button>
+              </li>
+              <li>
+                <a 
+                  href="/order" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.history.pushState({}, '', '/order');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }}
+                  className="hover:text-white transition-colors flex items-center gap-1.5 text-left"
+                >
+                  <ClipboardList className="w-3.5 h-3.5 text-[#C5A880]" />
+                  <span>Formulir Pemesanan Resmi (/order)</span>
+                </a>
+              </li>
+              <li>
+                <a 
+                  href="/payment" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.history.pushState({}, '', '/payment');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }}
+                  className="hover:text-white transition-colors flex items-center gap-1.5 text-left"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-[#C5A880]" />
+                  <span>Cek Tagihan / Bayar (/payment)</span>
+                </a>
               </li>
               <li>
                 <a 
