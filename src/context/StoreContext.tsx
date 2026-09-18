@@ -170,6 +170,9 @@ interface StoreContextType {
   toggleWishlist: (productId: string) => void;
   
   // Checkout & Orders
+  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+  syncOrderToFirestore: (order: Order) => Promise<void>;
+  recordDirectOrder: (order: Order) => Promise<void>;
   placeOrder: (customer: CustomerDetails, shipping: ShippingMethod, paymentChannel: PaymentChannel) => Promise<Order>;
   confirmOrderPayment: (orderId: string) => void;
   updateOrderStatus: (orderId: string, newStatus: OrderStatus, trackingNumber?: string) => void;
@@ -1329,6 +1332,90 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newOrder;
   };
 
+  // Record direct checkout orders (from landing pages, bypassing regular cart)
+  const recordDirectOrder = async (order: Order): Promise<void> => {
+    // 1. Immediately update orders state & localStorage
+    setOrders(prev => {
+      const filtered = Array.isArray(prev) ? prev.filter(o => o.id !== order.id) : [];
+      const updated = [order, ...filtered];
+      try {
+        localStorage.setItem('saena_orders_v1', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Local storage write error for orders:', err);
+      }
+      return updated;
+    });
+
+    setActiveOrder(order);
+    setActiveWhatsAppOrder(order);
+
+    // 2. Decrement inventory stock automatically per color variant
+    setProducts(prev => prev.map(p => {
+      const orderItems = order.items.filter(ci => ci.productId === p.id);
+      if (orderItems.length === 0) return p;
+
+      const updatedStock = { ...p.stock };
+      const updatedColors = p.colors.map(c => ({ ...c }));
+
+      orderItems.forEach(ci => {
+        const colorName = ci.selectedColor?.name;
+        if (colorName && updatedStock[colorName] !== undefined) {
+          updatedStock[colorName] = Math.max(0, updatedStock[colorName] - ci.quantity);
+        } else if (ci.selectedSize && updatedStock[ci.selectedSize] !== undefined) {
+          updatedStock[ci.selectedSize] = Math.max(0, updatedStock[ci.selectedSize] - ci.quantity);
+        }
+
+        const colorIdx = updatedColors.findIndex(c => c.name === colorName);
+        if (colorIdx >= 0) {
+          updatedColors[colorIdx].stock = Math.max(0, (updatedColors[colorIdx].stock || 0) - ci.quantity);
+        }
+      });
+
+      const updatedTotal = (Object.values(updatedStock) as number[]).reduce((a, b) => a + b, 0);
+      const updatedProduct: Product = {
+        ...p,
+        colors: updatedColors,
+        stock: updatedStock,
+        totalStock: updatedTotal
+      };
+
+      // Sync updated stock to Firestore
+      syncProductToFirestore(updatedProduct).catch(err => {
+        console.warn('Update stock post-order in Firestore error:', err);
+      });
+
+      return updatedProduct;
+    }));
+
+    // 3. Persist order to Cloud Firestore
+    try {
+      await syncOrderToFirestore(order);
+    } catch (err) {
+      console.warn('Sync order to Firestore error in recordDirectOrder:', err);
+    }
+
+    // 4. Send push notification about order creation
+    try {
+      sendPushNotification(
+        `Pesanan ${order.id} Diterima! 🎉`,
+        `${order.customer.fullName} memesan via ${order.payment.channelName}. Resi: ${order.trackingNumber || '-'}`,
+        'order',
+        order.id
+      );
+    } catch (err) {
+      console.warn('Notification notice:', err);
+    }
+
+    // 5. Auto-dispatch COD orders to Mengantar.com if enabled
+    if (order.payment.channel === 'cod' && mengantarConfig.autoCreateOnPaid) {
+      setTimeout(() => {
+        dispatchOrderToMengantar(order.id).catch(err => {
+          console.warn('Auto dispatch COD to Mengantar error:', err);
+        });
+      }, 700);
+    }
+  };
+
   // Confirm order payment (marks as paid, records payment timestamp, and syncs)
   const confirmOrderPayment = (orderId: string) => {
     setOrders(prev => prev.map(ord => {
@@ -1666,6 +1753,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         applyCoupon,
         removeCoupon,
         toggleWishlist,
+        setOrders,
+        syncOrderToFirestore,
+        recordDirectOrder,
         placeOrder,
         confirmOrderPayment,
         updateOrderStatus,

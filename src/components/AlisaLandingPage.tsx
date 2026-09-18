@@ -42,7 +42,8 @@ import {
   AlertTriangle,
   Home,
   RefreshCw,
-  MessageCircle
+  MessageCircle,
+  LayoutDashboard
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useStore } from '../context/StoreContext';
@@ -133,10 +134,12 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
     mengantarConfig,
     products,
     syncOrderToFirestore,
+    recordDirectOrder,
     setActiveMengantarLabelOrder,
     setIsMengantarLabelModalOpen,
     isAdminMode,
-    isAuthenticatedAdmin
+    isAuthenticatedAdmin,
+    setIsAdminMode
   } = useStore();
 
   // Variant & Image State
@@ -505,21 +508,20 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
       // Set order success UI state immediately
       setOrderSuccessData(successData);
 
-      // Safe secondary side-effects (will never block user checkout even if local storage / network / browser restrictions occur)
+      // Record order into centralized store & Cloud Firestore real-time database
       try {
-        if (typeof setOrders === 'function') {
-          setOrders(prev => Array.isArray(prev) ? [fullOrder, ...prev] : [fullOrder]);
+        if (typeof recordDirectOrder === 'function') {
+          await recordDirectOrder(fullOrder);
+        } else {
+          if (typeof setOrders === 'function') {
+            setOrders(prev => Array.isArray(prev) ? [fullOrder, ...prev.filter(o => o.id !== fullOrder.id)] : [fullOrder]);
+          }
+          if (typeof syncOrderToFirestore === 'function') {
+            await syncOrderToFirestore(fullOrder);
+          }
         }
-      } catch (err) {
-        console.warn('Orders state update notice:', err);
-      }
-
-      try {
-        if (typeof syncOrderToFirestore === 'function') {
-          await syncOrderToFirestore(fullOrder);
-        }
-      } catch (e) {
-        console.warn('Firestore sync notice:', e);
+      } catch (saveErr) {
+        console.warn('Orders state & Firestore direct recording notice:', saveErr);
       }
 
       try {
@@ -627,6 +629,22 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
         }
       };
 
+      // Ensure fallback order is also recorded into centralized store & Firestore
+      try {
+        if (typeof recordDirectOrder === 'function') {
+          await recordDirectOrder(safeFallbackOrder);
+        } else {
+          if (typeof setOrders === 'function') {
+            setOrders(prev => Array.isArray(prev) ? [safeFallbackOrder, ...prev.filter(o => o.id !== safeFallbackOrder.id)] : [safeFallbackOrder]);
+          }
+          if (typeof syncOrderToFirestore === 'function') {
+            await syncOrderToFirestore(safeFallbackOrder);
+          }
+        }
+      } catch (saveErr) {
+        console.warn('Fallback order recording notice:', saveErr);
+      }
+
       setOrderSuccessData({
         order: safeFallbackOrder,
         id: fallbackId,
@@ -699,13 +717,29 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
             <span className="font-medium text-[#E6CBA6]">saena.my.id / alisa</span>
             <span className="hidden sm:inline text-white/60">| Official Landing Page Mukena Traveling 2in1</span>
           </div>
-          <button
-            onClick={onNavigateHome}
-            className="flex items-center gap-1.5 text-xs text-[#E6CBA6] hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition-all cursor-pointer"
-          >
-            <ArrowLeft className="w-3 h-3" />
-            <span>Ke Toko Utama</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {isAuthenticatedAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminMode(true);
+                  if (onNavigateHome) onNavigateHome();
+                }}
+                className="flex items-center gap-1.5 text-xs text-amber-200 hover:text-white bg-amber-900/60 hover:bg-amber-900/90 border border-amber-500/40 px-3 py-1 rounded-full transition-all cursor-pointer font-semibold shadow-sm"
+                title="Buka Manajemen Pesanan Real-Time di Dashboard Admin"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5 text-amber-300" />
+                <span>Pesanan ({orders.length})</span>
+              </button>
+            )}
+            <button
+              onClick={onNavigateHome}
+              className="flex items-center gap-1.5 text-xs text-[#E6CBA6] hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              <span>Ke Toko Utama</span>
+            </button>
+          </div>
         </div>
       )}
 

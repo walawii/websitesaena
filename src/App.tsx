@@ -153,6 +153,21 @@ const MainContent: React.FC = () => {
       new URLSearchParams(window.location.search).get('page') === 'alisa'
     ));
 
+  // If in Admin Mode and authenticated, show Admin Dashboard regardless of route
+  if (isAdminMode && isAuthenticatedAdmin) {
+    return (
+      <div className="min-h-screen flex flex-col justify-between bg-[#FAF8F5]">
+        <Navbar />
+        <AdminDashboard />
+        <Footer />
+        <MengantarLabelModal />
+        <MengantarConfigModal />
+        <DokuConfigModal />
+        <NotificationToast />
+      </div>
+    );
+  }
+
   // If path is /alisa, display completely clean, blank page
   if (isAlisaPage) {
     return <AlisaPage onNavigateHome={() => navigateTo('/')} />;
