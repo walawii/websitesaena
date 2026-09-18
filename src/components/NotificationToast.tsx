@@ -26,15 +26,9 @@ export const NotificationToast: React.FC = () => {
     }
   }, [notifications]);
 
-  // Show push notification permission banner after initial 3 seconds if not prompted yet
+  // Disable automatic push notification permission prompt banner
   useEffect(() => {
-    const dismissed = sessionStorage.getItem('saena_push_dismissed');
-    if (!dismissed && 'Notification' in window && Notification.permission === 'default') {
-      const timer = setTimeout(() => {
-        setShowPermissionBanner(true);
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
+    setShowPermissionBanner(false);
   }, []);
 
   const handleDismissBanner = () => {

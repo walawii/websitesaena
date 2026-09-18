@@ -134,7 +134,7 @@ export async function processMengantarOrder(
           name: item.name,
           qty: item.quantity,
           price: item.price,
-          weight: item.weight || 500
+          weight: item.weight || 600
         })),
         notes: reqPayload.notes || 'Busana Muslimah Premium - Handle With Care'
       };

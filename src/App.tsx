@@ -257,7 +257,6 @@ const MainContent: React.FC = () => {
           isOpen={isMengantarLabelModalOpen}
           onClose={() => setIsMengantarLabelModalOpen(false)}
         />
-        <NotificationToast />
       </>
     );
   }
@@ -278,7 +277,6 @@ const MainContent: React.FC = () => {
           isOpen={isMengantarConfigModalOpen}
           onClose={() => setIsMengantarConfigModalOpen(false)}
         />
-        <NotificationToast />
       </>
     );
   }
@@ -304,7 +302,6 @@ const MainContent: React.FC = () => {
           isOpen={isMengantarLabelModalOpen}
           onClose={() => setIsMengantarLabelModalOpen(false)}
         />
-        <NotificationToast />
       </>
     );
   }
@@ -325,7 +322,6 @@ const MainContent: React.FC = () => {
         <CheckoutModal />
         <WhatsAppModal />
         <OrderTrackingModal />
-        <NotificationToast />
       </div>
     );
   }
@@ -639,7 +635,7 @@ const MainContent: React.FC = () => {
       <WhatsAppModal />
       <OrderTrackingModal />
       <AdminLoginModal />
-      <NotificationToast />
+      {isAdminMode && isAuthenticatedAdmin && <NotificationToast />}
 
       {/* Mengantar.com Modals */}
       <MengantarLabelModal

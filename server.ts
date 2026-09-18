@@ -550,15 +550,16 @@ app.post('/api/mengantar/test-connection', async (req, res) => {
 
 // API Route: Mengantar.com - Courier Rates
 app.post('/api/mengantar/rates', async (req, res) => {
-  const { originCity = 'Kota Tasikmalaya', destinationCity, weight = 1000 } = req.body;
+  const { originCity = 'Kota Tasikmalaya', destinationCity, weight = 600 } = req.body;
+  const weightInKg = Math.max(1, Math.ceil(Number(weight) / 1000));
 
   const standardRates = [
-    { courier: 'JNE', service: 'REG', name: 'JNE Reguler', cost: 18000, etd: '1-2 Hari' },
-    { courier: 'J&T Express', service: 'EZ', name: 'J&T Reguler', cost: 17000, etd: '1-2 Hari' },
-    { courier: 'SiCepat', service: 'SIUNTUNG', name: 'SiCepat SiUntung', cost: 16000, etd: '1-2 Hari' },
-    { courier: 'Anteraja', service: 'REG', name: 'Anteraja Regular', cost: 16500, etd: '1-3 Hari' },
-    { courier: 'Ninja Xpress', service: 'STANDARD', name: 'Ninja Reguler', cost: 17500, etd: '2-3 Hari' },
-    { courier: 'JNE', service: 'YES', name: 'JNE YES (Yakin Esok Sampai)', cost: 32000, etd: '1 Hari (Besok Sampai)' }
+    { courier: 'JNE', service: 'REG', name: 'JNE Reguler', cost: 18000 * weightInKg, etd: '1-2 Hari' },
+    { courier: 'J&T Express', service: 'EZ', name: 'J&T Reguler', cost: 17000 * weightInKg, etd: '1-2 Hari' },
+    { courier: 'SiCepat', service: 'SIUNTUNG', name: 'SiCepat SiUntung', cost: 16000 * weightInKg, etd: '1-2 Hari' },
+    { courier: 'Anteraja', service: 'REG', name: 'Anteraja Regular', cost: 16500 * weightInKg, etd: '1-3 Hari' },
+    { courier: 'Ninja Xpress', service: 'STANDARD', name: 'Ninja Reguler', cost: 17500 * weightInKg, etd: '2-3 Hari' },
+    { courier: 'JNE', service: 'YES', name: 'JNE YES (Yakin Esok Sampai)', cost: 32000 * weightInKg, etd: '1 Hari (Besok Sampai)' }
   ];
 
   return res.json({
@@ -566,6 +567,7 @@ app.post('/api/mengantar/rates', async (req, res) => {
     origin: originCity,
     destination: destinationCity || 'Tujuan Pengiriman',
     weightGrams: weight,
+    weightInKg,
     rates: standardRates
   });
 });

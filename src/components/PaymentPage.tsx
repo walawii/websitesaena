@@ -9,7 +9,6 @@ import {
   MessageCircle, 
   ShoppingBag,
   RefreshCw,
-  Printer,
   Home
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -250,62 +249,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
               </p>
             </div>
 
-            {/* SECTION 1: Mengantar.com AWB Box */}
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 text-left space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/80 pb-3">
-                <div>
-                  <span className="text-[11px] text-gray-500 font-medium block">Nomor Resi / AWB Mengantar.com:</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="font-mono text-sm sm:text-base font-bold text-gray-900 tracking-wider">
-                      {orderData.order?.trackingNumber || orderData.mengantar?.trackingNumber || `MGT-${orderData.id}`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(orderData.order?.trackingNumber || orderData.mengantar?.trackingNumber || `MGT-${orderData.id}`, 'resi')}
-                      className="text-[11px] flex items-center gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold px-2 py-1 rounded-md transition-colors cursor-pointer"
-                      title="Salin Nomor Resi"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>{copiedKey === 'resi' ? 'Tersalin!' : 'Salin'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (orderData.order) {
-                        setActiveMengantarLabelOrder(orderData.order);
-                        setIsMengantarLabelModalOpen(true);
-                      }
-                    }}
-                    className="w-full sm:w-auto text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Cetak Label Thermal</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="bg-white/90 p-2.5 rounded-lg border border-emerald-100">
-                  <span className="text-gray-500 block text-[10px]">Status Pengiriman:</span>
-                  <span className="font-semibold text-emerald-900 flex items-center gap-1 mt-0.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span>Terjadwal Pickup Mengantar.com</span>
-                  </span>
-                </div>
-                <div className="bg-white/90 p-2.5 rounded-lg border border-emerald-100">
-                  <span className="text-gray-500 block text-[10px]">Jadwal Penjemputan Kurir:</span>
-                  <span className="font-semibold text-gray-800 mt-0.5 block">
-                    {orderData.mengantar?.pickupTime || 'Hari ini, 14:00 - 17:00 WIB'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 2: DOKU Payment Panel OR COD Panel */}
+            {/* DOKU Payment Panel OR COD Panel */}
             {orderData.paymentMethod === 'TRANSFER' ? (
               <div className="bg-gradient-to-br from-white to-blue-50/40 rounded-2xl border-2 border-blue-600/30 p-4 sm:p-5 text-left shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-blue-100 pb-3">
@@ -444,9 +388,9 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
               </div>
             ) : (
               /* COD Notice */
-              <div className="bg-[#F4F8F5] rounded-2xl border-2 border-[#1C3B2B]/30 p-5 text-left shadow-sm space-y-2.5">
+              <div className="bg-[#F4F8F5] rounded-2xl border-2 border-[#1C3B2B]/30 p-5 text-left shadow-sm space-y-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#1C3B2B] text-white flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-[#1C3B2B] text-white flex items-center justify-center shrink-0">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
@@ -454,15 +398,32 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                       Jaminan COD Mengantar.com (Bayar di Tempat)
                     </span>
                     <p className="text-[11px] text-gray-600">
-                      Tidak perlu transfer terlebih dahulu. Siapkan uang pas kepada kurir saat paket tiba.
+                      Pesanan segera dikirim. Siapkan uang tunai pas kepada kurir saat paket tiba.
                     </p>
                   </div>
                 </div>
-                <div className="bg-white p-3 rounded-xl border border-gray-200 flex justify-between items-center text-xs">
-                  <span className="text-gray-600">Uang Pas untuk Kurir:</span>
-                  <span className="font-black text-[#88222A] text-sm">
-                    Rp {orderData.total.toLocaleString('id-ID')}
-                  </span>
+
+                <div className="bg-white p-3.5 rounded-xl border border-gray-200 space-y-1.5 text-xs">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Harga Paket Produk:</span>
+                    <span className="font-semibold text-gray-800">
+                      Rp {(orderData.total - (orderData.shippingCost || 0)).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  {orderData.shippingCost ? (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Ongkir Kurir Mengantar.com:</span>
+                      <span className="font-semibold text-gray-800">
+                        +Rp {orderData.shippingCost.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100 font-bold">
+                    <span className="text-gray-800 text-xs">Total Uang Pas untuk Kurir:</span>
+                    <span className="font-black text-[#88222A] text-sm sm:text-base">
+                      Rp {orderData.total.toLocaleString('id-ID')}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -482,11 +443,34 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                 <span className="font-semibold">{orderData.color}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Ekspedisi Pengiriman:</span>
-                <span className="font-semibold text-emerald-800">
-                  {orderData.selectedCourier || 'JNE'} (Layanan Reguler)
+                <span className="text-gray-600">Berat Paket:</span>
+                <span className="font-semibold">
+                  {orderData.weightGrams 
+                    ? `${orderData.weightGrams} gram (${Math.max(1, Math.ceil(orderData.weightGrams / 1000))} kg ekspedisi)` 
+                    : '600 gram (1 kg ekspedisi)'}
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Ekspedisi Pengiriman:</span>
+                <span className="font-semibold text-emerald-800">
+                  {orderData.selectedCourier || 'JNE'} (Layanan Reguler Mengantar)
+                </span>
+              </div>
+              {orderData.shippingCost ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ongkir Ekspedisi Mengantar:</span>
+                  <span className="font-semibold text-gray-900">
+                    +Rp {orderData.shippingCost.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ongkos Kirim:</span>
+                  <span className="font-semibold text-emerald-700">
+                    GRATIS ONGKIR (Bayar di Muka via DOKU)
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Nomor Resi:</span>
                 <div className="flex items-center gap-1.5 font-mono font-bold text-gray-900">
@@ -504,8 +488,8 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                 <span className="text-gray-600">Metode Pembayaran:</span>
                 <span className="font-semibold text-emerald-700">
                   {orderData.paymentMethod === 'COD' 
-                    ? 'COD (Bayar di Tempat)' 
-                    : 'Transfer Bank / QRIS'}
+                    ? 'COD (Bayar di Tempat ke Kurir)' 
+                    : 'Transfer Bank / QRIS (Lunas)'}
                 </span>
               </div>
               <div className="flex justify-between">

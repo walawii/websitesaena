@@ -266,17 +266,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
   const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('syncing');
 
-  const [notifications, setNotifications] = useState<PushNotification[]>(() => [
-    {
-      id: 'notif-2',
-      title: 'Update Pengiriman Pesanan SAENA-98214 📦',
-      message: 'Paket Anda telah diserahkan ke kurir SiCepat dengan nomor resi SCP-88291048201.',
-      timestamp: '2 jam lalu',
-      read: false,
-      type: 'order',
-      linkTarget: 'SAENA-98214'
-    }
-  ]);
+  const [notifications, setNotifications] = useState<PushNotification[]>(() => []);
 
   const [language, setLanguage] = useState<LanguageCode>('id');
   const [currency, setCurrency] = useState<CurrencyCode>('IDR');

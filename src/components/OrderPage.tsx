@@ -38,33 +38,33 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
     {
       id: 'pkg-1',
       title: 'Paket Hemat (1 Pcs)',
-      badge: 'HARGA SATUAN',
+      badge: 'HARGA SATUAN (600gr)',
       qty: 1,
       normalPrice: 159000,
       promoPrice: 79500,
       savings: 79500,
-      description: '1x Mukena Traveling 2in1 + 1x Mini Pouch Cantik'
+      description: '1x Mukena Traveling 2in1 + 1x Mini Pouch Cantik (Berat: 600gr)'
     },
     {
       id: 'pkg-2',
       title: 'Paket Best Seller (2 Pcs)',
-      badge: '🔥 BELI 2 PCS GRATIS ONGKIR',
+      badge: '🔥 BELI 2 PCS BEBAS ONGKIR*',
       isPopular: true,
       qty: 2,
       normalPrice: 318000,
       promoPrice: 159000,
       savings: 159000,
-      description: '2x Mukena Traveling 2in1 (Bisa Beda Warna) + 2x Mini Pouch • GRATIS ONGKIR'
+      description: '2x Mukena Traveling 2in1 (Bisa Beda Warna) + 2x Mini Pouch • Bebas Ongkir Khusus Bayar Dimuka (Berat: 1.200gr)'
     },
     {
       id: 'pkg-3',
       title: 'Paket Seragam / Hadiah (3 Pcs)',
-      badge: 'GRATIS ONGKIR + HEMAT',
+      badge: 'BEBAS ONGKIR* + HEMAT',
       qty: 3,
       normalPrice: 477000,
       promoPrice: 238500,
       savings: 238500,
-      description: '3x Mukena Traveling 2in1 (Bisa Mix Warna) + 3x Mini Pouch • GRATIS ONGKIR'
+      description: '3x Mukena Traveling 2in1 (Bisa Mix Warna) + 3x Mini Pouch • Bebas Ongkir Khusus Bayar Dimuka (Berat: 1.800gr)'
     }
   ];
 
@@ -116,16 +116,73 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
   const [selectedDokuChannel, setSelectedDokuChannel] = useState<PaymentChannel>('doku_qris');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Weight Calculation: 1 product is exactly 600 grams
+  const PRODUCT_WEIGHT_GRAMS = 600;
+  const totalWeightInGrams = currentPackage.qty * PRODUCT_WEIGHT_GRAMS;
+  const weightInKg = Math.max(1, Math.ceil(totalWeightInGrams / 1000));
+
+  // Courier base rates from Central Warehouse Tasikmalaya
+  const [courierRates, setCourierRates] = useState<Record<string, number>>({
+    'JNE': 18000,
+    'J&T Express': 17000,
+    'SiCepat': 16000
+  });
+
+  // Dynamic rates from Mengantar endpoint
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchRates = async () => {
+      try {
+        const res = await fetch('/api/mengantar/rates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originCity: 'Kota Tasikmalaya',
+            destinationCity: customerCity || 'Kota Tasikmalaya',
+            weight: totalWeightInGrams
+          })
+        });
+        const data = await res.json();
+        if (!isCancelled && data.success && Array.isArray(data.rates)) {
+          const newRates: Record<string, number> = {};
+          data.rates.forEach((r: any) => {
+            if (r.courier && r.cost) {
+              newRates[r.courier] = r.cost;
+            }
+          });
+          setCourierRates(prev => ({ ...prev, ...newRates }));
+        }
+      } catch {
+        // fallback to standard rates per kg
+      }
+    };
+
+    fetchRates();
+    return () => { isCancelled = true; };
+  }, [customerCity, totalWeightInGrams]);
+
+  // Current shipping cost for selected courier
+  const baseShippingCost = courierRates[selectedCourier] || (
+    selectedCourier === 'JNE' ? 18000 * weightInKg :
+    selectedCourier === 'J&T Express' ? 17000 * weightInKg :
+    16000 * weightInKg
+  );
+
+  // Business Rule: COD has NO free shipping (shipping fee added from Mengantar).
+  // Free shipping ONLY applies if customer pays upfront (TRANSFER via DOKU QRIS/VA).
+  const shippingCost = paymentMethod === 'COD' ? baseShippingCost : 0;
+  const finalTotal = currentPackage.promoPrice + shippingCost;
+
   useEffect(() => {
     document.title = 'Formulir Pemesanan Resmi Mukena Alisa - saena.my.id';
     trackMetaPageView();
     trackMetaInitiateCheckout({
       contentName: 'Formulir Pemesanan Resmi Mukena Alisa',
-      value: currentPackage.promoPrice,
+      value: finalTotal,
       currency: 'IDR',
       numItems: currentPackage.qty
     });
-  }, []);
+  }, [finalTotal, currentPackage.qty]);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +240,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
         id: 'alisa-01',
         name: 'Mukena Traveling 2in1 Laser Cut Alisa Premium',
         price: 79500,
-        weight: 400 * currentPackage.qty,
+        weight: 600 * currentPackage.qty,
         images: ['/assets/alisa/alisa-pink-model.webp']
       };
 
@@ -205,7 +262,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
         items: [{
           id: `ci-${Date.now()}`,
           productId: 'alisa-01',
-          product: targetProduct as any,
+          product: { ...(targetProduct as any), weight: 600 * currentPackage.qty },
           selectedColor: { name: colorSelection, hex: '#C48B9F' },
           selectedSize: 'Standar Jumbo Dewasa',
           quantity: currentPackage.qty,
@@ -216,7 +273,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
           name: `Mengantar.com - ${selectedCourier}`,
           courier: selectedCourier,
           service: 'REG',
-          cost: 0,
+          cost: shippingCost,
           estimatedDays: '1-3 Hari Kerja',
           logo: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=100&q=80'
         },
@@ -236,8 +293,8 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
         },
         subtotal: currentPackage.promoPrice,
         discount: 0,
-        shippingCost: 0,
-        total: currentPackage.promoPrice,
+        shippingCost: shippingCost,
+        total: finalTotal,
         currency: 'IDR',
         currencyRate: 1,
         status: 'menunggu_pembayaran',
@@ -246,7 +303,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
           {
             time: 'Baru saja',
             location: 'Central Warehouse saena.my.id Tasikmalaya (Mengantar.com Hub)',
-            description: `Pesanan dibuat dan dialokasikan ke ekspedisi ${selectedCourier} via Mengantar.com.`
+            description: `Pesanan dibuat dan dialokasikan ke ekspedisi ${selectedCourier} via Mengantar.com (Berat: ${totalWeightInGrams}gr, Ongkir: Rp ${shippingCost.toLocaleString('id-ID')}).`
           }
         ],
         notes
@@ -272,9 +329,9 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
           serviceType: 'REG',
           status: 'MENUNGGU_PICKUP',
           pickupTime: 'Hari ini, 14:00 - 17:00 WIB',
-          shippingFee: 0,
+          shippingFee: shippingCost,
           isCod: paymentMethod === 'COD',
-          codAmount: paymentMethod === 'COD' ? currentPackage.promoPrice : 0,
+          codAmount: paymentMethod === 'COD' ? finalTotal : 0,
           syncedAt: new Date().toISOString()
         };
       }
@@ -285,7 +342,9 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
         id: orderId,
         packageName: currentPackage.title,
         color: colorSelection,
-        total: currentPackage.promoPrice,
+        total: finalTotal,
+        shippingCost,
+        weightGrams: totalWeightInGrams,
         paymentMethod,
         name: customerName,
         phone: customerPhone,
@@ -676,42 +735,71 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
 
             {/* 4. PILIHAN EKSPEDISI PENGIRIMAN */}
             <div>
-              <label className="block text-xs font-bold text-[#1C3B2B] uppercase tracking-wider mb-2.5 flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-[#1C3B2B] text-white text-[11px] flex items-center justify-center font-bold">4</span>
-                <span>PILIHAN EKSPEDISI PENGIRIMAN (DIDUKUNG MENGANTAR.COM):</span>
-              </label>
+              <div className="flex items-center justify-between mb-2.5">
+                <label className="block text-xs font-bold text-[#1C3B2B] uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#1C3B2B] text-white text-[11px] flex items-center justify-center font-bold">4</span>
+                  <span>PILIHAN EKSPEDISI PENGIRIMAN (DIDUKUNG MENGANTAR.COM):</span>
+                </label>
+                <span className="text-[11px] text-gray-500 font-medium">
+                  Berat: <strong className="text-gray-800">{totalWeightInGrams}gr</strong> ({weightInKg} kg @ 600gr/pcs)
+                </span>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {[
                   { id: 'JNE', name: 'JNE Express', desc: 'Layanan Reguler (1-3 hari)', badge: 'REKOMENDASI' },
                   { id: 'J&T Express', name: 'J&T Express', desc: 'Layanan EZ Cepat (1-3 hari)', badge: 'PRIORITAS' },
                   { id: 'SiCepat', name: 'SiCepat', desc: 'Layanan REG (1-3 hari)', badge: 'AMAN' }
-                ].map((courier) => (
-                  <button
-                    key={courier.id}
-                    type="button"
-                    onClick={() => setSelectedCourier(courier.id as any)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                      selectedCourier === courier.id
-                        ? 'border-emerald-600 bg-emerald-50/80 shadow-sm ring-1 ring-emerald-600'
-                        : 'border-gray-200 hover:border-gray-300 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-gray-900">{courier.name}</span>
-                      <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">
-                        {courier.badge}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-500">{courier.desc}</p>
-                  </button>
-                ))}
+                ].map((courier) => {
+                  const rate = courierRates[courier.id] || (
+                    courier.id === 'JNE' ? 18000 * weightInKg :
+                    courier.id === 'J&T Express' ? 17000 * weightInKg :
+                    16000 * weightInKg
+                  );
+                  return (
+                    <button
+                      key={courier.id}
+                      type="button"
+                      onClick={() => setSelectedCourier(courier.id as any)}
+                      className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                        selectedCourier === courier.id
+                          ? 'border-emerald-600 bg-emerald-50/80 shadow-sm ring-1 ring-emerald-600'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-gray-900">{courier.name}</span>
+                        <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">
+                          {courier.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500">{courier.desc}</p>
+                      <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                        <span className="text-gray-500">Tarif ({totalWeightInGrams}gr):</span>
+                        {paymentMethod === 'TRANSFER' ? (
+                          <span className="font-bold text-emerald-700">
+                            GRATIS <del className="text-gray-400 font-normal">Rp {rate.toLocaleString('id-ID')}</del>
+                          </span>
+                        ) : (
+                          <span className="font-bold text-[#88222A]">
+                            Rp {rate.toLocaleString('id-ID')}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="mt-2.5 p-2.5 rounded-lg bg-[#FAF8F5] border border-[#E8DFC8] flex items-center gap-2 text-[11px] text-[#615446]">
-                <Truck className="w-4 h-4 text-emerald-700 shrink-0" />
-                <span>
-                  🚚 <strong>Terintegrasi Otomatis Mengantar.com:</strong> Resi resmi terbit otomatis &amp; paket langsung dijadwalkan pickup di Central Warehouse Tasikmalaya.
+              <div className="mt-2.5 p-2.5 rounded-lg bg-[#FAF8F5] border border-[#E8DFC8] flex items-center justify-between gap-2 text-[11px] text-[#615446]">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>
+                    🚚 <strong>Logistik Resmi Mengantar.com:</strong> Resi resmi terbit otomatis &amp; pickup dari Central Warehouse Tasikmalaya (Berat per pcs: 600gr).
+                  </span>
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded shrink-0">
+                  Tarif Resmi
                 </span>
               </div>
             </div>
@@ -746,12 +834,16 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-emerald-900">Transfer Bank &amp; QRIS (DOKU)</span>
                         <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">
-                          POPULER
+                          GRATIS ONGKIR
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-600 leading-snug">
                         QRIS Instan &amp; Virtual Account (BCA, Mandiri, BRI, BNI). Verifikasi otomatis 24/7.
                       </p>
+                      <div className="mt-1.5 text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        <span>Bebas ongkir kurir Mengantar (Hemat Rp {baseShippingCost.toLocaleString('id-ID')})</span>
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -762,7 +854,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                   onClick={() => setPaymentMethod('COD')}
                   className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
                     paymentMethod === 'COD'
-                      ? 'border-[#1C3B2B] bg-[#F4F8F5] shadow-md ring-1 ring-[#1C3B2B]'
+                      ? 'border-[#88222A] bg-amber-50/70 shadow-md ring-1 ring-[#88222A]'
                       : 'border-gray-200 hover:border-gray-300 bg-white'
                   }`}
                 >
@@ -772,15 +864,21 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       name="paymentMethodOption"
                       checked={paymentMethod === 'COD'}
                       onChange={() => setPaymentMethod('COD')}
-                      className="mt-0.5 accent-[#1C3B2B] cursor-pointer"
+                      className="mt-0.5 accent-[#88222A] cursor-pointer"
                     />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-[#1C3B2B]">COD (Bayar di Tempat)</span>
+                        <span className="text-xs font-bold text-[#88222A]">COD (Bayar di Tempat)</span>
+                        <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded">
+                          +ONGKIR MENGANTAR
+                        </span>
                       </div>
                       <p className="text-[11px] text-gray-600 leading-snug">
-                        Logistik Mengantar.com. Bayar tunai ke kurir saat barang sudah Anda terima di rumah.
+                        Bayar tunai ke kurir saat barang tiba. <strong>Tidak ada promo gratis ongkir kecuali bayar dimuka</strong>.
                       </p>
+                      <div className="mt-1.5 text-[10px] text-amber-900 font-semibold">
+                        Ongkir kurir: +Rp {baseShippingCost.toLocaleString('id-ID')}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -827,9 +925,9 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
             </div>
 
             {/* Total Ringkasan Tagihan */}
-            <div className="bg-[#FAF8F5] p-4 rounded-xl border border-[#E8DFC8] space-y-1.5 text-xs">
+            <div className="bg-[#FAF8F5] p-4 rounded-xl border border-[#E8DFC8] space-y-2 text-xs">
               <div className="flex justify-between text-gray-600">
-                <span>Paket:</span>
+                <span>Paket Produk:</span>
                 <span className="font-semibold text-gray-800">{currentPackage.title}</span>
               </div>
               <div className="flex justify-between text-gray-600">
@@ -839,18 +937,58 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                 </span>
               </div>
               <div className="flex justify-between text-gray-600">
+                <span>Berat Pengiriman:</span>
+                <span className="font-semibold text-gray-800">
+                  {totalWeightInGrams} gram ({weightInKg} kg @ 600gr/pcs)
+                </span>
+              </div>
+              <div className="flex justify-between text-gray-600">
                 <span>Ekspedisi Logistik:</span>
                 <span className="font-semibold text-emerald-800">Mengantar.com ({selectedCourier})</span>
               </div>
-              <div className="flex justify-between text-gray-600">
-                <span>Ongkos Kirim:</span>
-                <span className={`font-semibold ${currentPackage.qty >= 2 ? 'text-emerald-700 font-bold' : 'text-gray-700'}`}>
-                  {currentPackage.qty >= 2 ? 'GRATIS ONGKIR (Promo Beli 2 Pcs)' : 'Ongkir Reguler'}
-                </span>
+              <div className="flex justify-between items-center text-gray-600">
+                <span>Ongkos Kirim Mengantar:</span>
+                {paymentMethod === 'TRANSFER' ? (
+                  <span className="text-emerald-700 font-bold flex items-center gap-1.5">
+                    <span>Rp 0 (GRATIS ONGKIR - Bayar Dimuka)</span>
+                    <del className="text-gray-400 font-normal">Rp {baseShippingCost.toLocaleString('id-ID')}</del>
+                  </span>
+                ) : (
+                  <span className="text-gray-900 font-bold">
+                    +Rp {baseShippingCost.toLocaleString('id-ID')} (Tarif Kurir Mengantar)
+                  </span>
+                )}
               </div>
+
+              {paymentMethod === 'COD' && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-900 space-y-1">
+                  <div className="flex items-start gap-1.5 font-bold">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <span>Metode COD: Jumlah Pesanan Disesuaikan + Ongkir Mengantar</span>
+                  </div>
+                  <p className="text-[10px] text-amber-800 leading-relaxed">
+                    Promo Bebas Ongkir hanya berlaku untuk pembayaran di muka (Transfer/QRIS). Untuk COD, ongkos kirim ekspedisi Mengantar sebesar <strong>Rp {baseShippingCost.toLocaleString('id-ID')}</strong> ditambahkan ke total pesanan Anda dan dibayar tunai saat kurir tiba.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('TRANSFER')}
+                    className="text-[10px] text-emerald-800 font-bold hover:underline cursor-pointer flex items-center gap-1 mt-1"
+                  >
+                    <span>👉 Mau Bebas Ongkir? Klik di sini untuk beralih ke Bayar Dimuka (Transfer/QRIS)</span>
+                  </button>
+                </div>
+              )}
+
               <div className="flex justify-between text-sm font-black text-[#88222A] pt-2 border-t border-[#E8DFC8]">
-                <span>Total yang Harus Dibayar:</span>
-                <span className="text-base">Rp {currentPackage.promoPrice.toLocaleString('id-ID')}</span>
+                <div>
+                  <span>Total yang Harus Dibayar:</span>
+                  <div className="text-[10px] text-gray-500 font-normal">
+                    {paymentMethod === 'COD' 
+                      ? 'Total uang pas yang diserahkan ke kurir saat barang sampai'
+                      : 'Total pembayaran lunas via DOKU Payment Gateway'}
+                  </div>
+                </div>
+                <span className="text-base sm:text-lg">Rp {finalTotal.toLocaleString('id-ID')}</span>
               </div>
             </div>
 
@@ -878,8 +1016,8 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                 {isSubmitting 
                   ? 'Menghubungkan ke Mengantar & DOKU...' 
                   : paymentMethod === 'TRANSFER' 
-                    ? 'KONFIRMASI PESAN (BAYAR VIA DOKU GATEWAY) →' 
-                    : 'KONFIRMASI PESAN (BISA COD MENGANTAR) →'}
+                    ? `KONFIRMASI PESAN (BAYAR VIA DOKU RP ${finalTotal.toLocaleString('id-ID')}) →` 
+                    : `KONFIRMASI PESAN COD (TOTAL RP ${finalTotal.toLocaleString('id-ID')}) →`}
               </span>
             </button>
 

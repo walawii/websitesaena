@@ -295,7 +295,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     description: 'Mukena traveling 2in1 laser cut motif Alisa Premium berbahan katun mikro grade A yang adem, lembut, tidak menerawang, dan nyaman dipakai di semua musim. Dilengkapi resleting jepang di bawah dagu sehingga bisa dipakai reguler atau model ponco tanpa merusak tatanan hijab. Pinggiran dipotong teknologi laser cut presisi bergelombang mewah tanpa benang rontok, lengkap dengan mini pouch traveling ringkas.',
     shortDescription: 'Mukena traveling 2in1 katun micro premium adem, laser cut presisi + mini pouch cantik.',
     sku: 'SAENA-ALS-01',
-    weight: 400,
+    weight: 600,
     dimensions: { length: 18, width: 15, height: 4 },
     material: 'Katun Mikro Grade A Premium',
     careInstructions: [

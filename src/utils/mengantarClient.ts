@@ -22,7 +22,7 @@ export async function createMengantarOrderApi(
         name: `${item.product.name} (${item.selectedColor.name}, ${item.selectedSize})`,
         quantity: item.quantity,
         price: item.price,
-        weight: item.product.weight || 500
+        weight: item.product.weight || 600
       })),
       totalAmount: order.total,
       shippingCost: order.shippingCost,
