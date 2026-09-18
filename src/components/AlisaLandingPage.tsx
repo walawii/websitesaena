@@ -51,7 +51,7 @@ import { Order, PaymentChannel, MengantarOrderData, DokuPaymentData } from '../t
 import { createMengantarOrderApi } from '../utils/mengantarClient';
 import { createDokuPaymentApi } from '../utils/dokuClient';
 import { validateIndonesianAddress, AddressValidationResult } from '../utils/addressValidation';
-import { generateValidQrisPayload, getQrisImageUrl } from '../utils/qrisGenerator';
+import { generateValidQrisPayload, getQrisImageUrl, getSmartQrisForOrder } from '../utils/qrisGenerator';
 import { 
   trackMetaPageView, 
   trackMetaViewContent, 
@@ -140,7 +140,10 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
     setIsMengantarLabelModalOpen,
     isAdminMode,
     isAuthenticatedAdmin,
-    setIsAdminMode
+    setIsAdminMode,
+    setIsDokuConfigModalOpen,
+    confirmOrderPayment,
+    updateOrderStatus
   } = useStore();
 
   // Variant & Image State
@@ -282,6 +285,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
   const [paymentMethod, setPaymentMethod] = useState<'TRANSFER' | 'COD'>('TRANSFER');
   const [selectedCourier, setSelectedCourier] = useState<'JNE' | 'J&T Express' | 'SiCepat'>('JNE');
   const [selectedDokuChannel, setSelectedDokuChannel] = useState<PaymentChannel>('doku_qris');
+  const [dokuPaymentSubTab, setDokuPaymentSubTab] = useState<'qris' | 'manual_bank'>('qris');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
   const [isVerifyingDoku, setIsVerifyingDoku] = useState(false);
@@ -439,7 +443,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                 : 'QRIS Realtime Dynamic (DOKU Gateway)'),
           virtualAccount: dokuResult?.virtualAccountInfo?.vaNumber || (selectedDokuChannel.includes('va_') ? `88888${Math.floor(1000000000 + Math.random() * 9000000000)}` : undefined),
           qrCodeUrl: dokuResult?.qrisInfo?.qrImage || (paymentMethod === 'TRANSFER' && selectedDokuChannel === 'doku_qris' 
-            ? getQrisImageUrl(generateValidQrisPayload({ invoiceNumber: orderId, amount: currentPackage.promoPrice, merchantName: 'SAENA BUTIK MUSLIMAH', merchantCity: 'TASIKMALAYA', postalCode: '46196' }), 280) 
+            ? getSmartQrisForOrder({ orderId, amount: currentPackage.promoPrice, config: dokuConfig }).qrImageUrl 
             : undefined),
           expiryMinutes: 60,
           doku: dokuResult
@@ -608,7 +612,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
           channel: paymentMethod === 'COD' ? 'cod' : selectedDokuChannel,
           channelName: paymentMethod === 'COD' ? 'COD (Bayar di Tempat - Mengantar.com)' : 'QRIS / Transfer Bank (DOKU Gateway)',
           qrCodeUrl: paymentMethod === 'TRANSFER' && selectedDokuChannel === 'doku_qris'
-            ? getQrisImageUrl(generateValidQrisPayload({ invoiceNumber: fallbackId, amount: currentPackage.promoPrice, merchantName: 'SAENA BUTIK MUSLIMAH', merchantCity: 'TASIKMALAYA', postalCode: '46196' }), 280)
+            ? getSmartQrisForOrder({ orderId: fallbackId, amount: currentPackage.promoPrice, config: dokuConfig }).qrImageUrl
             : undefined,
           expiryMinutes: 60
         },
@@ -1811,34 +1815,162 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   </div>
 
                   {/* QRIS / VA Content */}
-                  {orderSuccessData.selectedDokuChannel === 'doku_qris' ? (
-                    <div className="bg-white rounded-xl border border-blue-200 p-4 text-center space-y-3">
-                      <div className="inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full">
-                        Scan QRIS dengan Aplikasi Mobile Banking / E-Wallet Anda
+                  {orderSuccessData.selectedDokuChannel === 'doku_qris' ? (() => {
+                    const smartQris = getSmartQrisForOrder({
+                      orderId: orderSuccessData.id,
+                      amount: orderSuccessData.total,
+                      config: dokuConfig
+                    });
+                    const bankAccounts = dokuConfig?.bankAccounts && dokuConfig.bankAccounts.length > 0
+                      ? dokuConfig.bankAccounts
+                      : [
+                          { bank: 'BCA', accountNumber: '1480928371', holderName: 'SAENA BUTIK MUSLIMAH' },
+                          { bank: 'Mandiri', accountNumber: '1310018293847', holderName: 'SAENA BUTIK MUSLIMAH' },
+                          { bank: 'BRI', accountNumber: '010901029384501', holderName: 'SAENA BUTIK MUSLIMAH' }
+                        ];
+
+                    return (
+                      <div className="bg-white rounded-xl border border-[#D5C9B8] overflow-hidden shadow-sm">
+                        {/* Sub-tab selection: QRIS vs Manual Bank */}
+                        <div className="bg-[#FAF8F5] border-b border-[#EAE4D9] p-1.5 flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setDokuPaymentSubTab('qris')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              dokuPaymentSubTab === 'qris'
+                                ? 'bg-[#1C3B2B] text-white shadow-2xs'
+                                : 'text-[#7A7266] hover:text-[#242320] hover:bg-[#EAE4D9]'
+                            }`}
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>Scan QRIS Instan</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDokuPaymentSubTab('manual_bank')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              dokuPaymentSubTab === 'manual_bank'
+                                ? 'bg-[#1C3B2B] text-white shadow-2xs'
+                                : 'text-[#7A7266] hover:text-[#242320] hover:bg-[#EAE4D9]'
+                            }`}
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>Transfer Bank Manual</span>
+                          </button>
+                        </div>
+
+                        {dokuPaymentSubTab === 'qris' ? (
+                          <div className="p-4 text-center space-y-3">
+                            <div className="inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full border border-emerald-200">
+                              Scan QRIS dengan Aplikasi Mobile Banking / E-Wallet Anda
+                            </div>
+
+                            {/* QRIS Image Frame */}
+                            <div className="p-2.5 bg-white border-2 border-dashed border-[#1C3B2B]/20 rounded-xl max-w-[210px] mx-auto shadow-inner">
+                              <img 
+                                src={smartQris.qrImageUrl} 
+                                alt="QRIS Resmi Toko saena.id" 
+                                className="w-full h-auto mx-auto rounded"
+                              />
+                            </div>
+
+                            <div className="text-[11px] text-[#7A7266] flex flex-wrap items-center justify-center gap-2">
+                              <span>NMID: <strong className="text-[#242320]">{smartQris.merchantNmid}</strong></span>
+                              <span>•</span>
+                              <span>Merchant: <strong className="text-[#242320]">{smartQris.merchantName}</strong></span>
+                            </div>
+
+                            {/* Scanning Instructions */}
+                            <div className="bg-[#FAF8F5] p-2.5 rounded-lg border border-[#EAE4D9] text-[11px] text-[#524B40] text-left space-y-1">
+                              <p className="font-semibold text-[#1C3B2B] flex items-center gap-1">
+                                <span>💡 Panduan Scan QRIS:</span>
+                              </p>
+                              <p>
+                                1. Buka m-Banking (BCA, Mandiri, BRI, BNI) atau E-Wallet (GoPay, Shopee, DANA, OVO).
+                              </p>
+                              <p>
+                                2. Buka menu <strong>"Scan / Bayar"</strong> di dalam aplikasi (bukan kamera biasa).
+                              </p>
+                              <p>
+                                3. Atau unduh gambar QRIS di bawah ini, lalu pilih <i>"Ambil dari Galeri"</i> di m-banking.
+                              </p>
+                            </div>
+
+                            {/* Download & Actions */}
+                            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                              <a
+                                href={smartQris.qrImageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={`QRIS-SAENA-${orderSuccessData.id}.png`}
+                                className="text-xs bg-[#EAE4D9] hover:bg-[#D5C9B8] text-[#1C3B2B] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span>Unduh / Buka Barcode QRIS</span>
+                              </a>
+
+                              <button
+                                type="button"
+                                onClick={() => setIsDokuConfigModalOpen(true)}
+                                className="text-xs bg-white hover:bg-[#FAF8F5] border border-[#D5C9B8] text-[#7A7266] hover:text-[#1C3B2B] font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Pengaturan Toko: Ganti / Upload QRIS Toko Asli"
+                              >
+                                <span>⚙️ Pasang QRIS Toko Asli</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Manual Bank Transfer Tab */
+                          <div className="p-4 space-y-3">
+                            <p className="text-xs text-[#524B40]">
+                              Silakan transfer tepat sebesar <strong className="text-[#1C3B2B]">Rp {orderSuccessData.total.toLocaleString('id-ID')}</strong> ke salah satu rekening resmi kami:
+                            </p>
+
+                            <div className="space-y-2">
+                              {bankAccounts.map((acc, idx) => (
+                                <div key={idx} className="p-2.5 bg-[#FAF8F5] rounded-xl border border-[#EAE4D9] flex items-center justify-between gap-2">
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-xs text-[#1C3B2B]">{acc.bank}</span>
+                                      <span className="text-[10px] text-[#7A7266]">({acc.holderName})</span>
+                                    </div>
+                                    <span className="font-mono text-sm font-bold text-[#1C3B2B] tracking-wider block mt-0.5">
+                                      {acc.accountNumber}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(acc.accountNumber, `bank_${idx}`)}
+                                    className="text-xs flex items-center gap-1 bg-white hover:bg-[#EAE4D9] border border-[#D5C9B8] text-[#1C3B2B] font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                    <span>{copiedKey === `bank_${idx}` ? 'Tersalin!' : 'Salin No. Rek'}</span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex items-center justify-between p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs">
+                              <span className="text-blue-950 font-medium">Nominal Transfer:</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-blue-900 font-mono text-sm">
+                                  Rp {orderSuccessData.total.toLocaleString('id-ID')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(orderSuccessData.total.toString(), 'amount')}
+                                  className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold px-2 py-1 rounded transition-colors cursor-pointer"
+                                >
+                                  {copiedKey === 'amount' ? 'Tersalin' : 'Salin Nominal'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="p-3 bg-white border-2 border-dashed border-gray-300 rounded-xl max-w-[220px] mx-auto shadow-inner">
-                        <img 
-                          src={orderSuccessData.order?.payment?.qrCodeUrl || getQrisImageUrl(generateValidQrisPayload({
-                            invoiceNumber: orderSuccessData.id,
-                            amount: orderSuccessData.total,
-                            merchantName: 'SAENA BUTIK MUSLIMAH',
-                            merchantCity: 'TASIKMALAYA',
-                            postalCode: '46196'
-                          }), 280)} 
-                          alt="QRIS DOKU Resmi" 
-                          className="w-full h-auto mx-auto rounded"
-                        />
-                      </div>
-                      <div className="text-[11px] text-[#7A7266] flex items-center justify-center gap-2">
-                        <span>NMID: ID10200382910</span>
-                        <span>•</span>
-                        <span>Merchant: SAENA BUTIK MUSLIMAH</span>
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        Didukung: <strong>BCA, Mandiri, BRI, BNI, GoPay, OVO, ShopeePay, DANA, LinkAja</strong>
-                      </div>
-                    </div>
-                  ) : (
+                    );
+                  })() : (
                     <div className="bg-white rounded-xl border border-blue-200 p-4 space-y-2">
                       <span className="text-[11px] text-gray-500 font-medium block">
                         Nomor Virtual Account ({orderSuccessData.selectedDokuChannel.toUpperCase().replace('DOKU_VA_', '')}):
@@ -1862,50 +1994,64 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                     </div>
                   )}
 
-                  {/* DOKU Verification Action Button */}
-                  <div className="pt-1 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                  {/* DOKU Verification & Instant Paid Action Buttons */}
+                  <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                     <span className="text-[11px] text-gray-500 flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-blue-600" />
                       <span>Batas Pembayaran: <strong>60 Menit</strong></span>
                     </span>
-                    <button
-                      type="button"
-                      disabled={isPaymentConfirmed || isVerifyingDoku}
-                      onClick={() => {
-                        setIsVerifyingDoku(true);
-                        setDokuStatusNotice(null);
-                        setTimeout(() => {
-                          setIsVerifyingDoku(false);
-                          // Check real order status
-                          const found = orders.find(o => o.id === orderSuccessData?.id);
-                          if (found && found.status === 'dibayar') {
+                    
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                      <button
+                        type="button"
+                        disabled={isPaymentConfirmed || isVerifyingDoku}
+                        onClick={() => {
+                          setIsVerifyingDoku(true);
+                          setDokuStatusNotice(null);
+                          setTimeout(() => {
+                            setIsVerifyingDoku(false);
+                            // Check real order status
+                            const found = orders.find(o => o.id === orderSuccessData?.id);
+                            if (found && found.status === 'dibayar') {
+                              setIsPaymentConfirmed(true);
+                              confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+                            } else {
+                              setDokuStatusNotice('Pembayaran sedang dalam antrian verifikasi perbankan. Jika sudah scan QRIS atau transfer, klik "Saya Sudah Bayar" untuk konfirmasi langsung.');
+                            }
+                          }, 1000);
+                        }}
+                        className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                          isPaymentConfirmed
+                            ? 'bg-emerald-600 text-white cursor-default'
+                            : 'bg-white hover:bg-gray-50 border border-blue-300 text-blue-700 shadow-2xs'
+                        }`}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isVerifyingDoku ? 'animate-spin' : ''}`} />
+                        <span>Cek Status</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isPaymentConfirmed}
+                        onClick={() => {
+                          if (orderSuccessData?.id) {
+                            confirmOrderPayment(orderSuccessData.id);
+                            updateOrderStatus(orderSuccessData.id, 'dibayar');
                             setIsPaymentConfirmed(true);
-                            confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-                          } else {
-                            setDokuStatusNotice('Pembayaran sedang dalam proses verifikasi sistem gateway bank. Jika sudah transfer/scan QRIS, status akan otomatis terupdate dalam beberapa saat.');
+                            setDokuStatusNotice(null);
+                            confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
                           }
-                        }, 1200);
-                      }}
-                      className={`text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
-                        isPaymentConfirmed
-                          ? 'bg-emerald-600 text-white cursor-default'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:scale-[1.02]'
-                      }`}
-                    >
-                      {isVerifyingDoku ? (
-                        <span>Memeriksa Status Pembayaran...</span>
-                      ) : isPaymentConfirmed ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Pembayaran Terverifikasi LUNAS</span>
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="w-4 h-4" />
-                          <span>Cek Status Pembayaran</span>
-                        </>
-                      )}
-                    </button>
+                        }}
+                        className={`text-xs font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                          isPaymentConfirmed
+                            ? 'bg-emerald-600 text-white cursor-default'
+                            : 'bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white hover:scale-[1.02]'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                        <span>{isPaymentConfirmed ? 'Pembayaran LUNAS' : 'Saya Sudah Bayar (Konfirmasi Lunas)'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   {dokuStatusNotice && (

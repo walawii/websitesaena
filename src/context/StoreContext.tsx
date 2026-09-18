@@ -23,7 +23,7 @@ import { translations } from '../translations';
 import confetti from 'canvas-confetti';
 import { DEFAULT_MENGANTAR_CONFIG, createMengantarOrderApi } from '../utils/mengantarClient';
 import { DEFAULT_DOKU_CONFIG, createDokuPaymentApi } from '../utils/dokuClient';
-import { generateValidQrisPayload, getQrisImageUrl } from '../utils/qrisGenerator';
+import { generateValidQrisPayload, getQrisImageUrl, getSmartQrisForOrder } from '../utils/qrisGenerator';
 import { 
   db, 
   testConnection, 
@@ -1233,7 +1233,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         channel: paymentChannel,
         channelName: channelNames[paymentChannel] || 'DOKU Payment Gateway',
         virtualAccount: dokuPaymentData?.virtualAccountInfo?.vaNumber || (paymentChannel.includes('va_') ? `88888${Math.floor(1000000000 + Math.random() * 9000000000)}` : undefined),
-        qrCodeUrl: dokuPaymentData?.qrisInfo?.qrImage || (paymentChannel.includes('qris') ? getQrisImageUrl(generateValidQrisPayload({ invoiceNumber: orderId, amount: finalTotal, merchantName: 'SAENA BUTIK MUSLIMAH', merchantCity: 'TASIKMALAYA', postalCode: '46196' }), 280) : undefined),
+        qrCodeUrl: dokuPaymentData?.qrisInfo?.qrImage || (paymentChannel.includes('qris') ? getSmartQrisForOrder({ orderId, amount: finalTotal, config: dokuConfig }).qrImageUrl : undefined),
         expiryMinutes: 60,
         paidAt: undefined,
         doku: dokuPaymentData

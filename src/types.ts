@@ -189,6 +189,16 @@ export interface DokuStoreConfig {
     creditCard: boolean;
     convenienceStore: boolean;
   };
+  customQrisImage?: string;
+  customQrisString?: string;
+  merchantName?: string;
+  merchantNmid?: string;
+  merchantCity?: string;
+  bankAccounts?: Array<{
+    bank: string;
+    accountNumber: string;
+    holderName: string;
+  }>;
 }
 
 export interface Order {

@@ -116,13 +116,20 @@ function formatTlv(tag: string, value: string): string {
 }
 
 // Generate realistic Bank Indonesia & EMVCo standard QRIS string with CRC16-CCITT
-function generateDokuQrisPayload(invoiceNumber: string, amount: number): string {
+export function generateDokuQrisPayload(
+  invoiceNumber: string,
+  amount: number,
+  merchantDetails?: { name?: string; city?: string; nmid?: string }
+): string {
   const roundedAmount = Math.max(0, Math.round(amount));
   const cleanInvoice = (invoiceNumber || 'INV-SAENA').replace(/[^A-Za-z0-9_-]/g, '').slice(-20);
+  const merchantName = (merchantDetails?.name || 'SAENA BUTIK MUSLIMAH').slice(0, 25).toUpperCase().replace(/[^A-Z0-9 ]/g, '');
+  const merchantCity = (merchantDetails?.city || 'TASIKMALAYA').slice(0, 15).toUpperCase().replace(/[^A-Z0-9 ]/g, '');
+  const merchantNmid = merchantDetails?.nmid || 'ID10200382910';
 
   // Tag 26: National QRIS Merchant Account Information
   const tag26_00 = formatTlv('00', 'ID.CO.QRIS.WWW');
-  const tag26_01 = formatTlv('01', '936009180020109988');
+  const tag26_01 = formatTlv('01', merchantNmid);
   const tag26_02 = formatTlv('02', 'UME');
   const tag26 = formatTlv('26', tag26_00 + tag26_01 + tag26_02);
 
@@ -144,8 +151,8 @@ function generateDokuQrisPayload(invoiceNumber: string, amount: number): string 
     formatTlv('53', '360') +
     (roundedAmount > 0 ? formatTlv('54', roundedAmount.toString()) : '') +
     formatTlv('58', 'ID') +
-    formatTlv('59', 'SAENA BUTIK MUSLIMAH') +
-    formatTlv('60', 'TASIKMALAYA') +
+    formatTlv('59', merchantName) +
+    formatTlv('60', merchantCity) +
     formatTlv('61', '46196') +
     tag62 +
     '6304';
@@ -156,7 +163,15 @@ function generateDokuQrisPayload(invoiceNumber: string, amount: number): string 
 
 export async function processDokuPayment(
   reqPayload: DokuOrderRequest,
-  config?: { clientId?: string; secretKey?: string; environment?: 'sandbox' | 'production' }
+  config?: { 
+    clientId?: string; 
+    secretKey?: string; 
+    environment?: 'sandbox' | 'production';
+    customQrisImage?: string;
+    customQrisString?: string;
+    merchantName?: string;
+    merchantNmid?: string;
+  }
 ): Promise<DokuPaymentResult> {
   const clientId = config?.clientId || process.env.DOKU_CLIENT_ID || '';
   const secretKey = config?.secretKey || process.env.DOKU_SECRET_KEY || '';
@@ -178,90 +193,103 @@ export async function processDokuPayment(
 
   // If live credentials are provided and valid, try contacting DOKU Jokul API
   if (clientId && secretKey && clientId.length > 5 && !clientId.startsWith('demo_')) {
-    try {
-      const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      const requestTimestamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      const requestTarget = '/checkout/v1/payment';
+    if (secretKey.includes('*')) {
+      console.warn('DOKU Secret Key contains asterisks (*) - user likely copied without clicking Reveal Key in DOKU dashboard.');
+    } else {
+      try {
+        const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const requestTimestamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+        const requestTarget = '/checkout/v1/payment';
 
-      const dokuBody = {
-        order: {
-          invoice_number: invoiceNumber,
-          amount: reqPayload.amount,
-          currency: 'IDR',
-          callback_url: reqPayload.callbackUrl || 'https://saena.my.id/order/status',
-          line_items: reqPayload.items.map(item => ({
-            name: item.name.slice(0, 50),
-            price: item.price,
-            quantity: item.quantity
-          }))
-        },
-        payment: {
-          payment_due_date: 60 // 60 minutes
-        },
-        customer: {
-          id: `CUST-${reqPayload.customer.whatsapp.replace(/\D/g, '')}`,
-          name: reqPayload.customer.fullName,
-          email: reqPayload.customer.email || 'customer@saena.my.id',
-          phone: reqPayload.customer.whatsapp,
-          address: reqPayload.customer.address
-        }
-      };
-
-      const bodyJson = JSON.stringify(dokuBody);
-      const signature = generateDokuSignature(clientId, requestId, requestTimestamp, requestTarget, bodyJson, secretKey);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-      const res = await fetch(`${baseUrl}${requestTarget}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Client-Id': clientId,
-          'Request-Id': requestId,
-          'Request-Timestamp': requestTimestamp,
-          'Signature': signature
-        },
-        body: bodyJson,
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const jsonResult = await res.json();
-        const paymentUrl = jsonResult.response?.payment?.url || `${checkoutHostUrl}/v1/payment/${invoiceNumber}`;
-
-        return {
-          success: true,
-          message: 'Berhasil membuat sesi transaksi DOKU Payment Gateway.',
-          data: {
-            invoiceNumber,
-            paymentUrl,
-            paymentMethodType: channel,
-            virtualAccountInfo: {
-              vaNumber: jsonResult.response?.payment?.virtual_account_info?.virtual_account_number || generateDokuVirtualAccount('BCA', invoiceNumber),
-              bank: 'BCA (DOKU Gateway)',
-              expiredDate,
-              howToPayUrl: jsonResult.response?.payment?.virtual_account_info?.how_to_pay_url
-            },
-            qrisInfo: {
-              qrString: generateDokuQrisPayload(invoiceNumber, reqPayload.amount),
-              qrImage: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(generateDokuQrisPayload(invoiceNumber, reqPayload.amount))}`,
-              expiredDate
-            },
-            creditCardInfo: {
-              url: paymentUrl
-            },
-            status: 'PENDING',
+        const dokuBody = {
+          order: {
+            invoice_number: invoiceNumber,
             amount: reqPayload.amount,
-            expiredAt: expiredDate,
-            rawResponse: jsonResult
+            currency: 'IDR',
+            callback_url: reqPayload.callbackUrl || 'https://saena.my.id/order/status',
+            line_items: reqPayload.items.map(item => ({
+              name: item.name.slice(0, 50),
+              price: item.price,
+              quantity: item.quantity
+            }))
+          },
+          payment: {
+            payment_due_date: 60 // 60 minutes
+          },
+          customer: {
+            id: `CUST-${reqPayload.customer.whatsapp.replace(/\D/g, '')}`,
+            name: reqPayload.customer.fullName,
+            email: reqPayload.customer.email || 'customer@saena.my.id',
+            phone: reqPayload.customer.whatsapp,
+            address: reqPayload.customer.address
           }
         };
+
+        const bodyJson = JSON.stringify(dokuBody);
+        const signature = generateDokuSignature(clientId, requestId, requestTimestamp, requestTarget, bodyJson, secretKey);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+        const res = await fetch(`${baseUrl}${requestTarget}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Client-Id': clientId,
+            'Request-Id': requestId,
+            'Request-Timestamp': requestTimestamp,
+            'Signature': signature
+          },
+          body: bodyJson,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const jsonResult = await res.json();
+          const paymentUrl = jsonResult.response?.payment?.url || `${checkoutHostUrl}/v1/payment/${invoiceNumber}`;
+
+          const qrisString = jsonResult.response?.payment?.qris_info?.qr_string || generateDokuQrisPayload(invoiceNumber, reqPayload.amount, {
+            name: config?.merchantName,
+            nmid: config?.merchantNmid
+          });
+          const qrImage = config?.customQrisImage || jsonResult.response?.payment?.qris_info?.qr_image || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrisString)}`;
+
+          return {
+            success: true,
+            message: 'Berhasil membuat sesi transaksi DOKU Payment Gateway.',
+            data: {
+              invoiceNumber,
+              paymentUrl,
+              paymentMethodType: channel,
+              virtualAccountInfo: {
+                vaNumber: jsonResult.response?.payment?.virtual_account_info?.virtual_account_number || generateDokuVirtualAccount('BCA', invoiceNumber),
+                bank: 'BCA (DOKU Gateway)',
+                expiredDate,
+                howToPayUrl: jsonResult.response?.payment?.virtual_account_info?.how_to_pay_url
+              },
+              qrisInfo: {
+                qrString: qrisString,
+                qrImage,
+                expiredDate
+              },
+              creditCardInfo: {
+                url: paymentUrl
+              },
+              status: 'PENDING',
+              amount: reqPayload.amount,
+              expiredAt: expiredDate,
+              rawResponse: jsonResult
+            }
+          };
+        } else {
+          const errText = await res.text();
+          console.error(`[DOKU API Error HTTP ${res.status}] at ${baseUrl}${requestTarget}:`, errText);
+        }
+      } catch (apiErr) {
+        console.warn('DOKU live API call failed or timed out, activating high-fidelity DOKU simulation:', apiErr);
       }
-    } catch (apiErr) {
-      console.warn('DOKU live API call failed or timed out, activating high-fidelity DOKU simulation:', apiErr);
     }
   }
 
@@ -274,8 +302,13 @@ export async function processDokuPayment(
   else if (channel.includes('bsi')) bankName = 'BSI';
 
   const vaNumber = generateDokuVirtualAccount(bankName, invoiceNumber);
-  const qrisString = generateDokuQrisPayload(invoiceNumber, reqPayload.amount);
-  const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrisString)}`;
+
+  // Determine QRIS image and payload
+  let qrisString = generateDokuQrisPayload(invoiceNumber, reqPayload.amount, {
+    name: config?.merchantName,
+    nmid: config?.merchantNmid
+  });
+  let qrImage = config?.customQrisImage || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrisString)}`;
 
   return {
     success: true,

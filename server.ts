@@ -609,6 +609,13 @@ app.post('/api/doku/test-connection', async (req, res) => {
       });
     }
 
+    if (activeSecretKey.includes('*')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Secret Key masih disensor (mengandung tanda bintang "*"). Harap buka dashboard DOKU, klik tombol "Reveal Key" di sebelah Active Secret Key terlebih dahulu, lalu salin kuncinya secara utuh.'
+      });
+    }
+
     return res.json({
       success: true,
       connected: true,

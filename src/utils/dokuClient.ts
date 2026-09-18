@@ -1,9 +1,9 @@
 import { DokuStoreConfig, DokuPaymentData, PaymentChannel } from '../types';
 
 export const DEFAULT_DOKU_CONFIG: DokuStoreConfig = {
-  clientId: '',
+  clientId: 'BRN-0286-1789185802157',
   secretKey: '',
-  environment: 'sandbox',
+  environment: 'production',
   enabled: true,
   autoRedirectToPaymentUrl: false,
   activeChannels: {
@@ -12,7 +12,15 @@ export const DEFAULT_DOKU_CONFIG: DokuStoreConfig = {
     eWallet: true,
     creditCard: true,
     convenienceStore: true
-  }
+  },
+  merchantName: 'SAENA BUTIK MUSLIMAH',
+  merchantCity: 'TASIKMALAYA',
+  merchantNmid: 'ID10200382910',
+  bankAccounts: [
+    { bank: 'BCA', accountNumber: '1480928371', holderName: 'SAENA BUTIK MUSLIMAH' },
+    { bank: 'Mandiri', accountNumber: '1310018293847', holderName: 'SAENA BUTIK MUSLIMAH' },
+    { bank: 'BRI', accountNumber: '010901029384501', holderName: 'SAENA BUTIK MUSLIMAH' }
+  ]
 };
 
 export async function createDokuPaymentApi(

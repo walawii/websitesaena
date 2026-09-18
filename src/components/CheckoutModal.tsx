@@ -33,7 +33,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { validateIndonesianAddress, AddressValidationResult } from '../utils/addressValidation';
-import { generateValidQrisPayload, getQrisImageUrl } from '../utils/qrisGenerator';
+import { generateValidQrisPayload, getQrisImageUrl, getSmartQrisForOrder } from '../utils/qrisGenerator';
 
 export const CheckoutModal: React.FC = () => {
   const {
@@ -1021,25 +1021,58 @@ export const CheckoutModal: React.FC = () => {
                 </div>
 
                 {/* QRIS Display */}
-                {(createdOrder.payment.channel === 'qris' || createdOrder.payment.channel === 'doku_qris') && (
-                  <div className="space-y-3 text-center">
-                    <p className="text-xs text-[#524B40]">
-                      Scan kode QRIS resmi di bawah ini menggunakan BCA Mobile, Livin' by Mandiri, GoPay, OVO, ShopeePay, DANA, atau M-Banking:
-                    </p>
-                    <div className="w-52 h-52 mx-auto p-2 bg-white rounded-xl shadow-md border border-[#E2D8CA]">
-                      <img
-                        src={createdOrder.payment.qrCodeUrl || getQrisImageUrl(generateValidQrisPayload({ invoiceNumber: createdOrder.id, amount: createdOrder.total, merchantName: 'SAENA BUTIK MUSLIMAH', merchantCity: 'TASIKMALAYA', postalCode: '46196' }), 280)}
-                        alt="QRIS DOKU saena.id"
-                        className="w-full h-full object-contain"
-                      />
+                {(createdOrder.payment.channel === 'qris' || createdOrder.payment.channel === 'doku_qris') && (() => {
+                  const smartQris = getSmartQrisForOrder({
+                    orderId: createdOrder.id,
+                    amount: createdOrder.total,
+                    config: dokuConfig
+                  });
+                  return (
+                    <div className="space-y-3 text-center bg-white p-3.5 rounded-xl border border-[#E2D8CA]">
+                      <div className="inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full border border-emerald-200">
+                        Scan QRIS dengan Aplikasi Mobile Banking / E-Wallet Anda
+                      </div>
+                      <div className="w-52 h-52 mx-auto p-2 bg-white rounded-xl shadow-md border-2 border-dashed border-[#1C3B2B]/20">
+                        <img
+                          src={smartQris.qrImageUrl}
+                          alt="QRIS Resmi Toko saena.id"
+                          className="w-full h-full object-contain rounded"
+                        />
+                      </div>
+                      <div className="text-[11px] text-[#7A7266] flex items-center justify-center gap-2">
+                        <span>NMID: {smartQris.merchantNmid}</span>
+                        <span>•</span>
+                        <span>Merchant: {smartQris.merchantName}</span>
+                      </div>
+                      <div className="bg-[#FAF8F5] p-2.5 rounded-lg border border-[#EAE4D9] text-[11px] text-[#524B40] text-left space-y-1">
+                        <p className="font-semibold text-[#1C3B2B]">
+                          💡 Panduan Pembayaran QRIS:
+                        </p>
+                        <p>
+                          1. Buka aplikasi m-Banking (BCA Mobile, Livin by Mandiri, BRImo, BNI) atau E-Wallet (GoPay, OVO, ShopeePay, DANA).
+                        </p>
+                        <p>
+                          2. Pilih menu <strong>Scan / Bayar</strong> (jangan gunakan kamera biasa HP).
+                        </p>
+                        <p>
+                          3. Periksa nominal <strong>{formatPrice(createdOrder.total)}</strong> dan selesaikan pembayaran.
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        <a
+                          href={smartQris.qrImageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          download={`QRIS-${createdOrder.id}.png`}
+                          className="text-xs bg-[#EAE4D9] hover:bg-[#D5C9B8] text-[#1C3B2B] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span>Unduh / Buka Gambar QRIS</span>
+                        </a>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-[#7A7266] flex items-center justify-center gap-2">
-                      <span>NMID: ID10200382910</span>
-                      <span>•</span>
-                      <span>Merchant: DOKU - SAENA ID</span>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Virtual Account Display */}
                 {createdOrder.payment.channel.includes('va_') && (

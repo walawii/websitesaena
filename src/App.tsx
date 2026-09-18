@@ -160,9 +160,19 @@ const MainContent: React.FC = () => {
         <Navbar />
         <AdminDashboard />
         <Footer />
-        <MengantarLabelModal />
-        <MengantarConfigModal />
-        <DokuConfigModal />
+        <MengantarLabelModal
+          order={activeMengantarLabelOrder}
+          isOpen={isMengantarLabelModalOpen}
+          onClose={() => setIsMengantarLabelModalOpen(false)}
+        />
+        <MengantarConfigModal
+          isOpen={isMengantarConfigModalOpen}
+          onClose={() => setIsMengantarConfigModalOpen(false)}
+        />
+        <DokuConfigModal
+          isOpen={isDokuConfigModalOpen}
+          onClose={() => setIsDokuConfigModalOpen(false)}
+        />
         <NotificationToast />
       </div>
     );
@@ -170,7 +180,25 @@ const MainContent: React.FC = () => {
 
   // If path is /alisa, display completely clean, blank page
   if (isAlisaPage) {
-    return <AlisaPage onNavigateHome={() => navigateTo('/')} />;
+    return (
+      <>
+        <AlisaPage onNavigateHome={() => navigateTo('/')} />
+        <DokuConfigModal
+          isOpen={isDokuConfigModalOpen}
+          onClose={() => setIsDokuConfigModalOpen(false)}
+        />
+        <MengantarConfigModal
+          isOpen={isMengantarConfigModalOpen}
+          onClose={() => setIsMengantarConfigModalOpen(false)}
+        />
+        <MengantarLabelModal
+          order={activeMengantarLabelOrder}
+          isOpen={isMengantarLabelModalOpen}
+          onClose={() => setIsMengantarLabelModalOpen(false)}
+        />
+        <NotificationToast />
+      </>
+    );
   }
 
   const activeLandingProduct = activeLandingProductId 
