@@ -472,7 +472,7 @@ export const SHIPPING_SERVICES: ShippingMethod[] = [
     courier: 'JNE Express',
     service: 'REG (Reguler)',
     name: 'JNE Reguler',
-    cost: 10000,
+    cost: 0,
     estimatedDays: '1 - 2 Hari Kerja',
     logo: '📦'
   },
@@ -481,7 +481,7 @@ export const SHIPPING_SERVICES: ShippingMethod[] = [
     courier: 'JNE Express',
     service: 'YES (Yakin Esok Sampai)',
     name: 'JNE YES (Garansi 1 Hari)',
-    cost: 18000,
+    cost: 0,
     estimatedDays: '1 Hari (Besok Sampai)',
     logo: '🌟'
   },
@@ -490,7 +490,7 @@ export const SHIPPING_SERVICES: ShippingMethod[] = [
     courier: 'JNE Express',
     service: 'OKE (Ongkos Kirim Ekonomis)',
     name: 'JNE OKE Ekonomis',
-    cost: 8000,
+    cost: 0,
     estimatedDays: '2 - 3 Hari Kerja',
     logo: '🏷️'
   },
@@ -499,7 +499,7 @@ export const SHIPPING_SERVICES: ShippingMethod[] = [
     courier: 'J&T Express',
     service: 'EZ (Reguler)',
     name: 'J&T Express EZ',
-    cost: 10000,
+    cost: 0,
     estimatedDays: '1 - 2 Hari',
     logo: '🚛'
   },
@@ -508,7 +508,7 @@ export const SHIPPING_SERVICES: ShippingMethod[] = [
     courier: 'J&T Express',
     service: 'Super (Next Day)',
     name: 'J&T Express Super',
-    cost: 19000,
+    cost: 0,
     estimatedDays: '1 Hari Garansi Tepat Waktu',
     logo: '⚡'
   },
@@ -517,7 +517,7 @@ export const SHIPPING_SERVICES: ShippingMethod[] = [
     courier: 'SiCepat Ekspres',
     service: 'REG (Reguler)',
     name: 'SiCepat Reguler (1-2 Hari)',
-    cost: 11000,
+    cost: 0,
     estimatedDays: '1 - 2 Hari Kerja',
     logo: '💨'
   },
@@ -526,7 +526,7 @@ export const SHIPPING_SERVICES: ShippingMethod[] = [
     courier: 'DHL Express Worldwide',
     service: 'Express Worldwide',
     name: 'DHL Global Express (Internasional)',
-    cost: 175000,
+    cost: 0,
     estimatedDays: '3 - 5 Hari Kerja (Global)',
     logo: '✈️'
   }

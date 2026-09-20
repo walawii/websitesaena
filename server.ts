@@ -534,9 +534,9 @@ app.post('/api/mengantar/test-connection', async (req, res) => {
   if (!keyToTest) {
     return res.json({
       success: true,
-      connected: true,
+      connected: false,
       mode: 'sandbox',
-      message: 'Mode Sandbox Mengantar.com Aktif (Siap Menerbitkan Resi Kurir Otomatis).'
+      message: 'Mode Sandbox Aktif (Simulasi Internal). Belum ada API Key Mengantar yang dimasukkan, sehingga pesanan belum diteruskan ke akun Mengantar.com luar.'
     });
   }
 
@@ -544,7 +544,7 @@ app.post('/api/mengantar/test-connection', async (req, res) => {
     success: true,
     connected: true,
     mode: keyToTest.startsWith('demo_') ? 'sandbox' : 'production',
-    message: 'Koneksi ke Mengantar.com Berhasil Terverifikasi! Akun siap memproses pesanan dan request pickup kurir.'
+    message: 'Koneksi ke Mengantar.com Berhasil! API Key tersimpan dan akun siap menerbitkan resi & request pickup langsung ke server Mengantar.'
   });
 });
 

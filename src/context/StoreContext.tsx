@@ -610,6 +610,45 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
+  // Synchronize server gateway credentials (DOKU & Mengantar from environment)
+  useEffect(() => {
+    fetch('/api/system/gateway-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.doku?.clientId) {
+          setDokuConfig(prev => {
+            if (!prev.clientId || prev.clientId.startsWith('demo_') || prev.clientId.length < 5) {
+              const updated = {
+                ...prev,
+                clientId: data.doku.clientId,
+                environment: data.doku.environment || 'production'
+              };
+              try { localStorage.setItem('saena_doku_config_v1', JSON.stringify(updated)); } catch {}
+              return updated;
+            }
+            return prev;
+          });
+        }
+        if (data?.mengantar?.apiKey) {
+          setMengantarConfig(prev => {
+            if (!prev.apiKey || prev.apiKey.startsWith('demo_') || prev.apiKey.length < 5) {
+              const updated = {
+                ...prev,
+                apiKey: data.mengantar.apiKey,
+                environment: 'production'
+              };
+              try { localStorage.setItem('saena_mengantar_config_v1', JSON.stringify(updated)); } catch {}
+              return updated;
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(err => {
+        console.warn('Sync gateway config notice:', err);
+      });
+  }, []);
+
   const reseedDatabase = async () => {
     try {
       setFirebaseSyncStatus('syncing');

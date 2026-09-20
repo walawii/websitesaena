@@ -118,149 +118,9 @@ export const CheckoutModal: React.FC = () => {
   // Standard courier rule: minimum billable weight is 1 kg, rounded up
   const billableWeight = Math.max(1, Math.ceil(estimatedWeightKg));
   
-  // Dynamic Shipping calculation based on origin: Kecamatan Tamansari, Kota Tasikmalaya (46196)
-  const calculateShippingRate = (method: ShippingMethod): number => {
-    if (customer.country !== 'Indonesia') {
-      return 175000 * billableWeight; // International flat base for DHL Worldwide
-    }
-
-    const cityLower = (customer.city || '').toLowerCase();
-    const subdistrictLower = (customer.subdistrict || '').toLowerCase();
-    const provinceLower = (customer.province || '').toLowerCase();
-
-    // Zone 1: Intra-City Tasikmalaya (Kec. Tamansari & sekitarnya)
-    const isTamansariTasik = 
-      cityLower.includes('tasikmalaya') || 
-      subdistrictLower.includes('tamansari') ||
-      customer.postalCode === '46196';
-
-    // Zone 2: Priangan Timur (Ciamis, Garut, Banjar, Pangandaran)
-    const isPrianganTimur = 
-      cityLower.includes('ciamis') || 
-      cityLower.includes('garut') || 
-      cityLower.includes('banjar') || 
-      cityLower.includes('pangandaran');
-
-    // Zone 3: Jawa Barat & Jabodetabek (Bandung, Jakarta, Bogor, Depok, Tangerang, Bekasi, Cirebon, dll)
-    const isJabarJabodetabek = 
-      provinceLower.includes('jawa barat') || 
-      provinceLower.includes('dki jakarta') || 
-      provinceLower.includes('jakarta') ||
-      cityLower.includes('bandung') ||
-      cityLower.includes('bekasi') ||
-      cityLower.includes('depok') ||
-      cityLower.includes('bogor') ||
-      cityLower.includes('tangerang') ||
-      cityLower.includes('cirebon') ||
-      cityLower.includes('sukabumi');
-
-    // Zone 4: Banten, Jawa Tengah & DIY (Semarang, Solo, Jogja, dll)
-    const isJatengDIYBanten = 
-      provinceLower.includes('jawa tengah') || 
-      provinceLower.includes('yogyakarta') || 
-      provinceLower.includes('jogja') || 
-      provinceLower.includes('banten') ||
-      cityLower.includes('semarang') ||
-      cityLower.includes('solo') ||
-      cityLower.includes('surakarta');
-
-    // Zone 5: Jawa Timur (Surabaya, Malang, Sidoarjo, dll)
-    const isJatim = provinceLower.includes('jawa timur') || cityLower.includes('surabaya') || cityLower.includes('malang');
-
-    // Zone 6: Bali & Nusa Tenggara
-    const isBaliNT = provinceLower.includes('bali') || provinceLower.includes('nusa tenggara') || cityLower.includes('denpasar');
-
-    // Zone 7: Pulau Sumatera
-    const isSumatera = 
-      provinceLower.includes('sumatera') || 
-      provinceLower.includes('lampung') || 
-      provinceLower.includes('riau') || 
-      provinceLower.includes('aceh') ||
-      provinceLower.includes('jambi') ||
-      provinceLower.includes('bengkulu') ||
-      provinceLower.includes('bangka') ||
-      provinceLower.includes('kepulauan riau');
-
-    // Zone 8: Kalimantan & Sulawesi
-    const isKalimantanSulawesi = 
-      provinceLower.includes('kalimantan') || 
-      provinceLower.includes('sulawesi');
-
-    // JNE Express Tariff Calculation (Origin: Tamansari, Kota Tasikmalaya)
-    if (method.id === 'jne-reg') {
-      if (isTamansariTasik) return 9000 * billableWeight;
-      if (isPrianganTimur) return 10000 * billableWeight;
-      if (isJabarJabodetabek) return 12000 * billableWeight;
-      if (isJatengDIYBanten) return 18000 * billableWeight;
-      if (isJatim) return 21000 * billableWeight;
-      if (isBaliNT) return 28000 * billableWeight;
-      if (isSumatera) return 34000 * billableWeight;
-      if (isKalimantanSulawesi) return 42000 * billableWeight;
-      return 65000 * billableWeight; // Maluku & Papua
-    }
-
-    if (method.id === 'jne-yes') {
-      if (isTamansariTasik) return 15000 * billableWeight;
-      if (isPrianganTimur) return 18000 * billableWeight;
-      if (isJabarJabodetabek) return 22000 * billableWeight;
-      if (isJatengDIYBanten) return 28000 * billableWeight;
-      if (isJatim) return 32000 * billableWeight;
-      if (isBaliNT) return 42000 * billableWeight;
-      if (isSumatera) return 48000 * billableWeight;
-      if (isKalimantanSulawesi) return 58000 * billableWeight;
-      return 85000 * billableWeight;
-    }
-
-    if (method.id === 'jne-oke') {
-      if (isTamansariTasik) return 7500 * billableWeight;
-      if (isPrianganTimur) return 8500 * billableWeight;
-      if (isJabarJabodetabek) return 10000 * billableWeight;
-      if (isJatengDIYBanten) return 14000 * billableWeight;
-      if (isJatim) return 17000 * billableWeight;
-      if (isBaliNT) return 23000 * billableWeight;
-      if (isSumatera) return 27000 * billableWeight;
-      if (isKalimantanSulawesi) return 34000 * billableWeight;
-      return 52000 * billableWeight;
-    }
-
-    // J&T Express Tariff Calculation (Origin: Tamansari, Kota Tasikmalaya)
-    if (method.id === 'jnt-ez') {
-      if (isTamansariTasik) return 9500 * billableWeight;
-      if (isPrianganTimur) return 10000 * billableWeight;
-      if (isJabarJabodetabek) return 12000 * billableWeight;
-      if (isJatengDIYBanten) return 17000 * billableWeight;
-      if (isJatim) return 20000 * billableWeight;
-      if (isBaliNT) return 27000 * billableWeight;
-      if (isSumatera) return 33000 * billableWeight;
-      if (isKalimantanSulawesi) return 40000 * billableWeight;
-      return 62000 * billableWeight;
-    }
-
-    if (method.id === 'jnt-super') {
-      if (isTamansariTasik) return 16000 * billableWeight;
-      if (isPrianganTimur) return 18000 * billableWeight;
-      if (isJabarJabodetabek) return 22000 * billableWeight;
-      if (isJatengDIYBanten) return 27000 * billableWeight;
-      if (isJatim) return 31000 * billableWeight;
-      if (isBaliNT) return 40000 * billableWeight;
-      if (isSumatera) return 47000 * billableWeight;
-      if (isKalimantanSulawesi) return 56000 * billableWeight;
-      return 82000 * billableWeight;
-    }
-
-    // Alternative couriers
-    if (method.id === 'sicepat-reg') {
-      if (isTamansariTasik) return 10000 * billableWeight;
-      if (isPrianganTimur) return 11000 * billableWeight;
-      if (isJabarJabodetabek) return 13000 * billableWeight;
-      if (isJatengDIYBanten) return 18000 * billableWeight;
-      if (isJatim) return 21000 * billableWeight;
-      if (isBaliNT) return 28000 * billableWeight;
-      if (isSumatera) return 35000 * billableWeight;
-      return 45000 * billableWeight;
-    }
-
-    return (method.cost || 12000) * billableWeight;
+  // Dynamic Shipping calculation - PROMO SEMUA GRATIS ONGKIR SE-INDONESIA (Rp 0)
+  const calculateShippingRate = (_method: ShippingMethod): number => {
+    return 0; // Gratis Ongkir untuk semua ekspedisi & wilayah
   };
 
   const dynamicShippingCost = calculateShippingRate(selectedShipping);
@@ -726,11 +586,11 @@ export const CheckoutModal: React.FC = () => {
                         </div>
 
                         <div className="text-right whitespace-nowrap pl-2">
-                          <span className="text-xs font-bold text-[#1C3B2B] block">
-                            {formatPrice(dynamicCost)}
+                          <span className="text-xs font-bold text-emerald-700 block">
+                            GRATIS (Rp 0)
                           </span>
-                          <span className="text-[9px] text-[#8C8377]">
-                            /{billableWeight} kg
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                            Bebas Ongkir
                           </span>
                         </div>
                       </div>
@@ -935,7 +795,7 @@ export const CheckoutModal: React.FC = () => {
 
                 <div className="flex justify-between text-[#5C5549]">
                   <span>Ongkos Kirim ({selectedShipping.courier} - {selectedShipping.service})</span>
-                  <span className="font-semibold text-[#1F2421]">{formatPrice(dynamicShippingCost)}</span>
+                  <span className="font-bold text-emerald-700">GRATIS (Rp 0)</span>
                 </div>
 
                 <div className="flex justify-between text-base font-bold text-[#1C3B2B] pt-2 border-t border-[#E5DDD2]">
@@ -1019,6 +879,19 @@ export const CheckoutModal: React.FC = () => {
                     {formatPrice(createdOrder.total)}
                   </span>
                 </div>
+
+                {/* Direct DOKU Hosted Checkout Link (Buka Halaman Pembayaran DOKU Resmi) */}
+                {createdOrder.payment.doku?.paymentUrl && (
+                  <a
+                    href={createdOrder.payment.doku.paymentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-[#1C3B2B] to-[#28523C] hover:from-[#28523C] hover:to-[#1C3B2B] text-white text-xs sm:text-sm font-bold rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <span>Bayar Langsung di Halaman DOKU Resmi</span>
+                    <ExternalLink className="w-4 h-4 text-[#C5A880]" />
+                  </a>
+                )}
 
                 {/* QRIS Display */}
                 {(createdOrder.payment.channel === 'qris' || createdOrder.payment.channel === 'doku_qris') && (() => {

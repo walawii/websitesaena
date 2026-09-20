@@ -1,74 +1,36 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { DEFAULT_WHATSAPP_CLEAN, DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
+import { normalizeIndonesianPhone, createCustomerWhatsAppMessage } from '../utils/textHelper';
 import { 
   X, 
   Send, 
   Check, 
   Copy, 
-  ExternalLink, 
+  Phone,
   ShieldCheck, 
   Sparkles,
   Smartphone,
-  MessageCircle
+  ExternalLink
 } from 'lucide-react';
 
 export const WhatsAppModal: React.FC = () => {
   const {
     isWhatsAppModalOpen,
     setIsWhatsAppModalOpen,
-    activeWhatsAppOrder,
-    formatPrice
+    activeWhatsAppOrder
   } = useStore();
 
   const [copied, setCopied] = useState(false);
-  const [isOpeningChat, setIsOpeningChat] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
 
   if (!isWhatsAppModalOpen || !activeWhatsAppOrder) return null;
 
   const order = activeWhatsAppOrder;
-
-  // Format WhatsApp message
-  const itemsText = order.items
-    .map((item, idx) => `${idx + 1}. *${item.product.name}*\n   - Varian: ${item.selectedColor.name}, ${item.selectedSize}\n   - Qty: ${item.quantity} pcs (${formatPrice(item.price * item.quantity)})`)
-    .join('\n');
-
-  const waMessage = 
-`*SAENA.ID - NOTIFIKASI PESANAN RESMI* 🌙
-Assalamualaikum wr. wb. Kak *${order.customer.fullName}*,
-
-Terima kasih telah berbelanja busana muslim di *saena.id*. Pesanan Anda telah kami terima dan tercatat di sistem kami:
-
-🧾 *No. Invoice*: ${order.id}
-📅 *Tanggal*: ${order.createdAt}
-🚚 *Ekspedisi*: ${order.shipping.courier} (${order.shipping.service})
-📦 *No. Resi*: *${order.trackingNumber}*
-🏢 *Dikirim Dari*: Kec. Tamansari, Kota Tasikmalaya, Jawa Barat (46196)
-💳 *Metode Pembayaran*: ${order.payment.channelName}
-💎 *Status Transaksi*: ${order.status === 'dibayar' ? '✅ LUNAS (Terverifikasi)' : '⏳ MENUNGGU PEMBAYARAN'}
-
-📋 *Rincian Produk:*
-${itemsText}
-
-💰 *Subtotal*: ${formatPrice(order.subtotal)}
-🏷️ *Diskon*: -${formatPrice(order.discount)}
-🚚 *Ongkos Kirim*: ${formatPrice(order.shippingCost)}
-✨ *TOTAL AKHIR*: *${formatPrice(order.total)}*
-
-📍 *Alamat Pengiriman:*
-${order.customer.address}, ${order.customer.city}, ${order.customer.province} (${order.customer.postalCode})
-
-🔍 *Lacak Pengiriman Real-Time:*
-Klik link berikut untuk memantau perjalanan kurir Anda:
-https://saena.id/lacak?order=${order.id}
-
-Apabila membutuhkan bantuan atau konsultasi ukuran, silakan hubungi Customer Service di ${DEFAULT_WHATSAPP_DISPLAY}.
-_Wassalamu'alaikum wr. wb._
-*Customer Care saena.id* (${DEFAULT_WHATSAPP_NUMBER})`;
-
-  const cleanPhone = order.customer.whatsapp.replace(/^0/, '62').replace(/\D/g, '');
-  const waUrl = `https://wa.me/${cleanPhone || DEFAULT_WHATSAPP_CLEAN}?text=${encodeURIComponent(waMessage)}`;
-  const adminWaUrl = `https://wa.me/${DEFAULT_WHATSAPP_CLEAN}?text=${encodeURIComponent(`Halo Admin saena.id, saya ingin konfirmasi pesanan No. Invoice #${order.id} atas nama ${order.customer.fullName}.`)}`;
+  const waMessage = createCustomerWhatsAppMessage(order);
+  const rawPhone = order.customer.whatsapp || '';
+  const cleanPhone = normalizeIndonesianPhone(rawPhone) || DEFAULT_WHATSAPP_CLEAN;
+  const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMessage)}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(waMessage);
@@ -76,13 +38,10 @@ _Wassalamu'alaikum wr. wb._
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleOpenWhatsApp = () => {
-    setIsOpeningChat(true);
-    setTimeout(() => {
-      // open wa window safely
-      window.open(waUrl, '_blank');
-      setIsOpeningChat(false);
-    }, 400);
+  const handleCopyPhone = () => {
+    navigator.clipboard.writeText(rawPhone);
+    setCopiedPhone(true);
+    setTimeout(() => setCopiedPhone(false), 2500);
   };
 
   return (
@@ -94,22 +53,22 @@ _Wassalamu'alaikum wr. wb._
         {/* Header with WhatsApp Branding */}
         <div className="p-4 sm:p-5 bg-[#075E54] text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-              <Smartphone className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+              <Smartphone className="w-5 h-5 text-white" />
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold flex items-center gap-1.5">
-                <span>Notifikasi WhatsApp Otomatis</span>
+                <span>Hubungi Pengunjung via WhatsApp</span>
                 <Sparkles className="w-3.5 h-3.5 text-[#C5A880]" />
               </h3>
               <p className="text-[11px] text-white/80">
-                Pesan resmi siap dikirim ke {order.customer.whatsapp}
+                Penerima: <strong>{order.customer.fullName}</strong> ({rawPhone})
               </p>
             </div>
           </div>
           <button
             onClick={() => setIsWhatsAppModalOpen(false)}
-            className="p-1 rounded-full text-white/80 hover:text-white transition-colors"
+            className="p-1 rounded-full text-white/80 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -118,13 +77,40 @@ _Wassalamu'alaikum wr. wb._
         {/* Modal Content */}
         <div className="p-4 sm:p-6 space-y-4">
           
+          {/* Customer info bar */}
+          <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#EBE3D7] flex items-center justify-between text-xs">
+            <div>
+              <span className="text-[#7A7266] block text-[10px]">NOMOR WA PENGUNJUNG:</span>
+              <span className="font-bold text-[#1C3B2B] text-sm">{rawPhone}</span>
+              <span className="text-[10px] text-emerald-700 font-semibold block">Format: +{cleanPhone}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyPhone}
+                className="px-2.5 py-1 bg-white border border-[#D5C9B8] hover:bg-[#F2ECE4] text-[#1C3B2B] text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                {copiedPhone ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedPhone ? 'Tersalin' : 'Salin No. HP'}</span>
+              </button>
+              <a
+                href={`tel:+${cleanPhone}`}
+                className="px-2.5 py-1 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors"
+                title="Panggilan telepon biasa"
+              >
+                <Phone className="w-3 h-3" />
+                <span>Telepon</span>
+              </a>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between text-xs">
             <span className="text-[#5A5348] font-medium">
-              Pratinjau Format Pesan Otomatis (Template Resmi):
+              Format Pesan WhatsApp Konfirmasi Resmi:
             </span>
             <button
               onClick={handleCopy}
-              className="text-[#1C3B2B] hover:underline font-semibold flex items-center gap-1 text-[11px]"
+              className="text-[#1C3B2B] hover:underline font-semibold flex items-center gap-1 text-[11px] cursor-pointer"
             >
               {copied ? (
                 <>
@@ -134,54 +120,56 @@ _Wassalamu'alaikum wr. wb._
               ) : (
                 <>
                   <Copy className="w-3 h-3" />
-                  <span>Salin Teks</span>
+                  <span>Salin Pesan</span>
                 </>
               )}
             </button>
           </div>
 
           {/* WhatsApp Chat Bubble Mockup */}
-          <div className="p-4 bg-[#E5DDD5] rounded-xl border border-[#D1C7BB] max-h-72 overflow-y-auto">
+          <div className="p-4 bg-[#E5DDD5] rounded-xl border border-[#D1C7BB] max-h-64 overflow-y-auto">
             <div className="bg-[#DCF8C6] p-3.5 rounded-lg rounded-tl-none shadow-xs text-xs text-[#1F2421] whitespace-pre-wrap font-mono leading-relaxed">
               {waMessage}
             </div>
             <span className="text-[10px] text-[#787063] block text-right mt-1 font-sans">
-              Hari ini • Otomatis dari saena.id Bot API
+              Otomatis tersusun • Bebas Ongkir • Resi: {order.trackingNumber || 'Dalam Proses'}
             </span>
           </div>
 
           {/* Value note */}
-          <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#EBE3D7] flex items-center gap-2.5 text-xs text-[#524B40]">
-            <ShieldCheck className="w-4 h-4 text-[#25D366] shrink-0" />
+          <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-2 text-xs text-emerald-900">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>
-              Nomor resi <strong>{order.trackingNumber}</strong> dan link pelacakan kurir telah disematkan secara otomatis.
+              Klik tombol di bawah untuk langsung membuka WhatsApp Web / Aplikasi WhatsApp resmi ke pengunjung tanpa pop-up terblokir.
             </span>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
-            <button
-              onClick={handleOpenWhatsApp}
-              className="flex-1 py-3 px-4 bg-[#25D366] hover:bg-[#20BA5A] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-3 px-4 bg-[#25D366] hover:bg-[#20BA5A] text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Send className="w-4 h-4" />
-              <span>{isOpeningChat ? 'Membuka WhatsApp...' : 'Buka Obrolan WhatsApp Resmi'}</span>
-            </button>
-
-            <a
-              href={adminWaUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="py-3 px-4 bg-[#FAF7F2] hover:bg-[#F2ECE4] text-[#1C3B2B] border border-[#D5C9B8] text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5"
-              title={`Chat WhatsApp Admin Butik: ${DEFAULT_WHATSAPP_DISPLAY}`}
-            >
-              <MessageCircle className="w-4 h-4 text-[#25D366]" />
-              <span>Chat Admin ({DEFAULT_WHATSAPP_DISPLAY})</span>
+              <span>Buka Chat WhatsApp Pengunjung</span>
+              <ExternalLink className="w-3.5 h-3.5" />
             </a>
 
             <button
+              type="button"
+              onClick={handleCopy}
+              className="py-3 px-4 bg-[#FAF7F2] hover:bg-[#F2ECE4] text-[#1C3B2B] border border-[#D5C9B8] text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Copy className="w-4 h-4 text-[#1C3B2B]" />
+              <span>{copied ? 'Pesan Tersalin!' : 'Salin Pesan'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsWhatsAppModalOpen(false)}
-              className="py-3 px-4 bg-[#F2ECE4] hover:bg-[#EAE2D5] text-[#3D3830] text-xs font-semibold rounded-xl transition-all"
+              className="py-3 px-4 bg-[#F2ECE4] hover:bg-[#EAE2D5] text-[#3D3830] text-xs font-semibold rounded-xl transition-all cursor-pointer"
             >
               Tutup
             </button>
@@ -192,3 +180,4 @@ _Wassalamu'alaikum wr. wb._
     </div>
   );
 };
+

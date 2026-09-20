@@ -35,7 +35,8 @@ import {
   FileText,
   Copy,
   Zap,
-  Globe
+  Globe,
+  Key
 } from 'lucide-react';
 import { OrderStatus, Category, Product } from '../types';
 import { ProductEditModal } from './ProductEditModal';
@@ -48,6 +49,7 @@ import { LandingPageStudio } from './LandingPageStudio';
 import { DEFAULT_WHATSAPP_DISPLAY, DEFAULT_WHATSAPP_NUMBER } from '../data/mockData';
 import { testMengantarConnectionApi } from '../utils/mengantarClient';
 import { testDokuConnectionApi } from '../utils/dokuClient';
+import { normalizeIndonesianPhone, createCustomerWhatsAppUrl } from '../utils/textHelper';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -586,16 +588,16 @@ export const AdminDashboard: React.FC = () => {
                 </button>
                 <button
                   onClick={async () => {
-                    const pendingPaid = orders.filter(o => (o.status === 'dibayar' || o.status === 'sedang_dikemas') && !o.mengantar);
-                    if (pendingPaid.length === 0) {
-                      setBatchDispatchMsg('Semua pesanan lunas sudah terhubung dengan Mengantar.com.');
+                    const pendingOrders = orders.filter(o => !o.mengantar && o.status !== 'dibatalkan');
+                    if (pendingOrders.length === 0) {
+                      setBatchDispatchMsg('Semua pesanan aktif sudah terhubung dengan Mengantar.com.');
                       setTimeout(() => setBatchDispatchMsg(null), 4000);
                       return;
                     }
                     setIsBatchDispatching(true);
-                    setBatchDispatchMsg(`Memproses ${pendingPaid.length} pesanan ke Mengantar...`);
+                    setBatchDispatchMsg(`Memproses ${pendingOrders.length} pesanan ke Mengantar...`);
                     let count = 0;
-                    for (const ord of pendingPaid) {
+                    for (const ord of pendingOrders) {
                       try {
                         await dispatchOrderToMengantar(ord.id);
                         count++;
@@ -609,13 +611,14 @@ export const AdminDashboard: React.FC = () => {
                   }}
                   disabled={isBatchDispatching}
                   className="text-xs bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white font-bold px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
+                  title="Kirim semua pesanan yang belum terdaftar di Mengantar (COD & Transfer)"
                 >
                   {isBatchDispatching ? (
                     <RefreshCw className="w-3 h-3 animate-spin" />
                   ) : (
                     <Truck className="w-3 h-3 text-[#C5A880]" />
                   )}
-                  <span>Kirim Semua Pesanan Lunas</span>
+                  <span>Kirim Semua Pesanan ke Mengantar</span>
                 </button>
               </div>
             </div>
@@ -705,9 +708,21 @@ export const AdminDashboard: React.FC = () => {
 
                       <td className="py-3">
                         <span className="font-bold text-[#1F2421] block">{order.customer.fullName}</span>
-                        <span className="text-[10px] text-[#7A7266] block">
-                          WA: {order.customer.whatsapp}
-                        </span>
+                        {order.customer.whatsapp ? (
+                          <a
+                            href={createCustomerWhatsAppUrl(order)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold hover:underline mt-0.5"
+                            title={`Chat WhatsApp ke ${order.customer.fullName} (${order.customer.whatsapp})`}
+                          >
+                            <Smartphone className="w-3 h-3 text-[#25D366] shrink-0" />
+                            <span>WA: {order.customer.whatsapp}</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-[#7A7266] block">Tanpa No. WA</span>
+                        )}
                         <span className="text-[10px] text-[#7A7266] block truncate max-w-[140px]">
                           {order.customer.city}
                         </span>
@@ -791,43 +806,81 @@ export const AdminDashboard: React.FC = () => {
 
                       <td className="py-3">
                         <div className="flex flex-wrap items-center gap-1.5">
+                          {/* Tombol WhatsApp Utama: Membuka WhatsApp Web / App langsung ke pengunjung */}
+                          <a
+                            href={createCustomerWhatsAppUrl(order)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1 bg-[#25D366] hover:bg-[#20BA5A] text-white text-[11px] font-bold rounded-lg flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                            title={`Chat WhatsApp langsung ke pengunjung (${order.customer.whatsapp || 'tanpa no'})`}
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>Chat WA</span>
+                          </a>
+
+                          {/* Tombol Draf Invoice WA */}
                           <button
                             onClick={() => {
                               setActiveWhatsAppOrder(order);
                               setIsWhatsAppModalOpen(true);
                             }}
-                            className="px-2 py-1 bg-[#25D366] text-white text-[11px] font-semibold rounded-lg hover:bg-[#20BA5A] flex items-center gap-1 transition-colors"
-                            title="Kirim Invoice WhatsApp"
+                            className="px-1.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-medium rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Buka & Sesuaikan Draf Pesan Invoice WhatsApp"
                           >
-                            <Smartphone className="w-3 h-3" />
-                            <span>WA</span>
+                            <FileText className="w-2.5 h-2.5 text-emerald-700" />
+                            <span>Draf</span>
                           </button>
 
+                          {/* Tombol Kirim / Cetak Mengantar */}
                           {order.mengantar ? (
-                            <button
-                              onClick={() => {
-                                setActiveMengantarLabelOrder(order);
-                                setIsMengantarLabelModalOpen(true);
-                              }}
-                              className="px-2 py-1 bg-[#1C3B2B] text-[#F3EFEA] text-[11px] font-semibold rounded-lg hover:bg-[#2A4D3B] flex items-center gap-1 transition-colors shadow-2xs"
-                              title="Cetak Label Resi Thermal Mengantar (100x150 mm)"
-                            >
-                              <Printer className="w-3 h-3 text-[#C5A880]" />
-                              <span>Cetak Resi</span>
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setActiveMengantarLabelOrder(order);
+                                  setIsMengantarLabelModalOpen(true);
+                                }}
+                                className="px-2.5 py-1 bg-[#1C3B2B] text-[#F3EFEA] text-[11px] font-semibold rounded-lg hover:bg-[#2A4D3B] flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                                title="Cetak Label Resi Thermal Mengantar (100x150 mm)"
+                              >
+                                <Printer className="w-3 h-3 text-[#C5A880]" />
+                                <span>Cetak Resi</span>
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setDispatchingOrderId(order.id);
+                                  try {
+                                    const res = await dispatchOrderToMengantar(order.id);
+                                    setBatchDispatchMsg(res.message);
+                                    setTimeout(() => setBatchDispatchMsg(null), 5000);
+                                  } finally {
+                                    setDispatchingOrderId(null);
+                                  }
+                                }}
+                                disabled={dispatchingOrderId === order.id}
+                                className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                title="Sinkron Ulang Resi Mengantar"
+                              >
+                                <RefreshCw className={`w-3 h-3 ${dispatchingOrderId === order.id ? 'animate-spin' : ''}`} />
+                              </button>
+                            </div>
                           ) : (
                             <button
                               onClick={async () => {
                                 setDispatchingOrderId(order.id);
                                 try {
-                                  await dispatchOrderToMengantar(order.id);
+                                  const res = await dispatchOrderToMengantar(order.id);
+                                  setBatchDispatchMsg(res.message);
+                                  setTimeout(() => setBatchDispatchMsg(null), 5000);
+                                } catch (err: any) {
+                                  setBatchDispatchMsg(`Gagal: ${err?.message || 'Error Mengantar'}`);
+                                  setTimeout(() => setBatchDispatchMsg(null), 5000);
                                 } finally {
                                   setDispatchingOrderId(null);
                                 }
                               }}
                               disabled={dispatchingOrderId === order.id}
-                              className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50"
-                              title="Kirim Pesanan ke Mengantar.com untuk Terbitkan Resi Kurir"
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                              title="Kirim Pesanan ke Mengantar.com untuk Terbitkan Resi Kurir (COD / Lunas)"
                             >
                               {dispatchingOrderId === order.id ? (
                                 <RefreshCw className="w-3 h-3 animate-spin" />
@@ -1596,6 +1649,33 @@ export const AdminDashboard: React.FC = () => {
               )}
             </div>
 
+            {/* Prominent Sandbox Notice Banner if no live API key */}
+            {!mengantarConfig.apiKey && (
+              <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-200 text-amber-900 rounded-xl shrink-0 mt-0.5">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs text-amber-950 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-amber-900">Mengapa Pesanan Belum Muncul di Aplikasi Mengantar.com?</span>
+                      <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded-full uppercase">Mode Simulasi / Sandbox</span>
+                    </div>
+                    <p className="leading-relaxed">
+                      Resi yang terbit saat ini (seperti <em>TJNE...</em>) adalah <strong>simulasi sistem internal</strong> untuk kebutuhan tes dan cetak label resi butik. Agar pesanan otomatis masuk ke akun dan aplikasi <strong>Mengantar.com Anda</strong> (sehingga kurir JNE/J&T benar-benar datang pickup ke gudang), Anda perlu memasukkan <strong>API Key Mengantar.com</strong> resmi Anda.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsMengantarConfigModalOpen(true)}
+                  className="px-4 py-2 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white font-bold text-xs rounded-xl shrink-0 flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                >
+                  <Key className="w-3.5 h-3.5 text-[#C5A880]" />
+                  <span>Masukkan API Key Mengantar</span>
+                </button>
+              </div>
+            )}
+
             {/* Metric Status Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-[#E5DDD2] shadow-xs space-y-1">
@@ -1603,11 +1683,11 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2.5 h-2.5 rounded-full ${mengantarConfig.apiKey ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                   <span className="text-sm font-bold text-[#1C3B2B]">
-                    {mengantarConfig.apiKey ? 'Terpasang & Siap' : 'Sandbox Pengujian'}
+                    {mengantarConfig.apiKey ? 'Terpasang & Siap' : 'Sandbox (Simulasi)'}
                   </span>
                 </div>
                 <p className="text-[10px] text-[#8C8377]">
-                  {mengantarConfig.apiKey ? 'Terkoneksi ke server Mengantar.com' : 'Gunakan API key resmi untuk live pickup'}
+                  {mengantarConfig.apiKey ? 'Terkoneksi ke server Mengantar.com' : 'Belum input API Key resmi'}
                 </p>
               </div>
 
@@ -1703,14 +1783,22 @@ export const AdminDashboard: React.FC = () => {
                 <div className="p-3.5 bg-white rounded-xl border border-[#E5DDD2] space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-[#1C3B2B]">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>2. Mengapa di Dashboard Mengantar.com Belum Muncul?</span>
+                    <span>2. Status Koneksi Akun Mengantar.com</span>
                   </div>
-                  <div className="text-xs text-[#524B41] space-y-1.5 leading-relaxed">
+                  <div className="text-xs text-[#524B41] space-y-2 leading-relaxed">
                     <p>
-                      Pesanan masuk ke dashboard luar <a href="https://mengantar.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-[#1C3B2B]">mengantar.com</a> hanya jika <strong>Public API Key Resmi</strong> dari akun Mengantar Anda telah diisi.
+                      Kredensial API Mengantar saat ini telah dihubungkan dan sistem siap mengirimkan pesanan langsung ke <strong>app.mengantar.com</strong>.
                     </p>
+                    <div className="bg-[#FAF8F5] p-2.5 rounded-lg border border-[#E5DDD2] space-y-1 text-[11px]">
+                      <span className="font-bold text-[#1C3B2B] block">Panduan Cepat Mengantar.com:</span>
+                      <ol className="list-decimal list-inside space-y-0.5 text-neutral-700">
+                        <li>Pastikan API Key di menu <strong>"Atur API Key Resmi"</strong> sudah sesuai dengan yang ada di menu Akun Mengantar.com Anda.</li>
+                        <li>Ketika pesanan masuk (atau klik tombol <strong>"Kirim Mengantar"</strong>), pesanan langsung terdaftar dan dapat dipantau di dashboard Mengantar.</li>
+                        <li>Label resi otomatis tercetak lengkap dengan alamat pengirim Butik Tamansari Tasikmalaya.</li>
+                      </ol>
+                    </div>
                     <p className="text-[11px] text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                      <strong>Status saat ini:</strong> {mengantarConfig.apiKey ? 'API Key telah diisi. Pastikan klik tombol "Kirim ke Mengantar" pada pesanan.' : 'Mode Sandbox pengujian. Masukkan API Key resmi di menu konfigurasi agar data terkirim langsung ke dashboard mengantar.com.'}
+                      Setelah API Key tersimpan, setiap kali Anda menekan tombol <strong>"Kirim Mengantar"</strong>, pesanan akan langsung muncul seketika di aplikasi/dashboard Mengantar.com Anda!
                     </p>
                   </div>
                 </div>
@@ -1842,7 +1930,21 @@ export const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="py-3">
                           <span className="font-bold text-[#1F2421] block">{order.customer.fullName}</span>
-                          <span className="text-[10px] text-[#7A7266] block">{order.customer.whatsapp}</span>
+                          {order.customer.whatsapp ? (
+                            <a
+                              href={createCustomerWhatsAppUrl(order)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold hover:underline mt-0.5"
+                              title={`Chat WhatsApp ke ${order.customer.fullName}`}
+                            >
+                              <Smartphone className="w-3 h-3 text-[#25D366] shrink-0" />
+                              <span>{order.customer.whatsapp}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-[#7A7266] block">Tanpa No. WA</span>
+                          )}
                         </td>
                         <td className="py-3">
                           <span className="text-[11px] text-[#1F2421] block font-medium">{order.customer.city}</span>
@@ -1880,13 +1982,23 @@ export const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="py-3">
                           <div className="flex items-center gap-1.5">
+                            <a
+                              href={createCustomerWhatsAppUrl(order)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 bg-[#25D366] hover:bg-[#20BA5A] text-white text-[11px] font-bold rounded-lg flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                              title={`Chat WhatsApp ke ${order.customer.fullName}`}
+                            >
+                              <Smartphone className="w-3 h-3" />
+                              <span>WA</span>
+                            </a>
                             {order.mengantar ? (
                               <button
                                 onClick={() => {
                                   setActiveMengantarLabelOrder(order);
                                   setIsMengantarLabelModalOpen(true);
                                 }}
-                                className="px-2.5 py-1 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors shadow-2xs"
+                                className="px-2.5 py-1 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
                                 title="Cetak Label Resi Thermal Mengantar (100x150 mm)"
                               >
                                 <Printer className="w-3 h-3 text-[#C5A880]" />
@@ -1897,13 +2009,18 @@ export const AdminDashboard: React.FC = () => {
                                 onClick={async () => {
                                   setDispatchingOrderId(order.id);
                                   try {
-                                    await dispatchOrderToMengantar(order.id);
+                                    const res = await dispatchOrderToMengantar(order.id);
+                                    setBatchDispatchMsg(res.message);
+                                    setTimeout(() => setBatchDispatchMsg(null), 5000);
+                                  } catch (err: any) {
+                                    setBatchDispatchMsg(`Gagal: ${err?.message || 'Error Mengantar'}`);
+                                    setTimeout(() => setBatchDispatchMsg(null), 5000);
                                   } finally {
                                     setDispatchingOrderId(null);
                                   }
                                 }}
                                 disabled={dispatchingOrderId === order.id}
-                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50"
+                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
                               >
                                 {dispatchingOrderId === order.id ? (
                                   <RefreshCw className="w-3 h-3 animate-spin" />
@@ -2146,7 +2263,21 @@ export const AdminDashboard: React.FC = () => {
                             </td>
                             <td className="py-3">
                               <span className="font-bold text-[#1F2421] block">{order.customer.fullName}</span>
-                              <span className="text-[10px] text-[#7A7266] block">{order.customer.whatsapp}</span>
+                              {order.customer.whatsapp ? (
+                                <a
+                                  href={createCustomerWhatsAppUrl(order)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold hover:underline mt-0.5"
+                                  title={`Chat WhatsApp ke ${order.customer.fullName}`}
+                                >
+                                  <Smartphone className="w-3 h-3 text-[#25D366] shrink-0" />
+                                  <span>{order.customer.whatsapp}</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-[#7A7266] block">Tanpa No. WA</span>
+                              )}
                             </td>
                             <td className="py-3 font-mono text-[11px] text-[#1C3B2B]">
                               {dokuInvoice}
@@ -2174,32 +2305,44 @@ export const AdminDashboard: React.FC = () => {
                               )}
                             </td>
                             <td className="py-3 text-right">
-                              {isPaid ? (
-                                <span className="text-[11px] text-[#2E7D32] font-semibold flex items-center justify-end gap-1">
-                                  <Check className="w-3.5 h-3.5" /> Terverifikasi Lunas
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={async () => {
-                                    setConfirmingPaymentOrderId(order.id);
-                                    try {
-                                      confirmOrderPayment(order.id);
-                                    } finally {
-                                      setConfirmingPaymentOrderId(null);
-                                    }
-                                  }}
-                                  disabled={confirmingPaymentOrderId === order.id}
-                                  className="px-2.5 py-1 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-[11px] font-semibold rounded-lg inline-flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
-                                  title="Konfirmasi pembayaran lunas secara manual"
+                              <div className="flex items-center justify-end gap-1.5">
+                                <a
+                                  href={createCustomerWhatsAppUrl(order)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 bg-[#25D366] hover:bg-[#20BA5A] text-white text-[11px] font-bold rounded-lg inline-flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                                  title={`Chat WhatsApp langsung ke pengunjung (${order.customer.whatsapp})`}
                                 >
-                                  {confirmingPaymentOrderId === order.id ? (
-                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-[#C5A880]" />
-                                  )}
-                                  <span>Konfirmasi Lunas Manual</span>
-                                </button>
-                              )}
+                                  <Smartphone className="w-3 h-3" />
+                                  <span>WA</span>
+                                </a>
+                                {isPaid ? (
+                                  <span className="text-[11px] text-[#2E7D32] font-semibold flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" /> Lunas
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={async () => {
+                                      setConfirmingPaymentOrderId(order.id);
+                                      try {
+                                        confirmOrderPayment(order.id);
+                                      } finally {
+                                        setConfirmingPaymentOrderId(null);
+                                      }
+                                    }}
+                                    disabled={confirmingPaymentOrderId === order.id}
+                                    className="px-2.5 py-1 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-[11px] font-semibold rounded-lg inline-flex items-center gap-1 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                                    title="Konfirmasi pembayaran lunas secara manual"
+                                  >
+                                    {confirmingPaymentOrderId === order.id ? (
+                                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-[#C5A880]" />
+                                    )}
+                                    <span>Konfirmasi Lunas</span>
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

@@ -161,17 +161,10 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
     return () => { isCancelled = true; };
   }, [customerCity, totalWeightInGrams]);
 
-  // Current shipping cost for selected courier
-  const baseShippingCost = courierRates[selectedCourier] || (
-    selectedCourier === 'JNE' ? 18000 * weightInKg :
-    selectedCourier === 'J&T Express' ? 17000 * weightInKg :
-    16000 * weightInKg
-  );
-
-  // Business Rule: COD has NO free shipping (shipping fee added from Mengantar).
-  // Free shipping ONLY applies if customer pays upfront (TRANSFER via DOKU QRIS/VA).
-  const shippingCost = paymentMethod === 'COD' ? baseShippingCost : 0;
-  const finalTotal = currentPackage.promoPrice + shippingCost;
+  // Current shipping cost calculation - SEMUA GRATIS ONGKIR SE-INDONESIA (Rp 0)
+  const baseShippingCost = courierRates[selectedCourier] || 18000;
+  const shippingCost = 0; // SEMUA GRATIS ONGKIR (baik COD maupun Transfer/QRIS)
+  const finalTotal = currentPackage.promoPrice;
 
   useEffect(() => {
     document.title = 'Formulir Pemesanan Resmi Mukena Alisa - saena.my.id';
@@ -854,7 +847,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                   onClick={() => setPaymentMethod('COD')}
                   className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
                     paymentMethod === 'COD'
-                      ? 'border-[#88222A] bg-amber-50/70 shadow-md ring-1 ring-[#88222A]'
+                      ? 'border-[#1C3B2B] bg-emerald-50/60 shadow-md ring-1 ring-[#1C3B2B]'
                       : 'border-gray-200 hover:border-gray-300 bg-white'
                   }`}
                 >
@@ -864,20 +857,21 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       name="paymentMethodOption"
                       checked={paymentMethod === 'COD'}
                       onChange={() => setPaymentMethod('COD')}
-                      className="mt-0.5 accent-[#88222A] cursor-pointer"
+                      className="mt-0.5 accent-[#1C3B2B] cursor-pointer"
                     />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-[#88222A]">COD (Bayar di Tempat)</span>
-                        <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded">
-                          +ONGKIR MENGANTAR
+                        <span className="text-xs font-bold text-[#1C3B2B]">COD (Bayar di Tempat)</span>
+                        <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">
+                          GRATIS ONGKIR
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-600 leading-snug">
-                        Bayar tunai ke kurir saat barang tiba. <strong>Tidak ada promo gratis ongkir kecuali bayar dimuka</strong>.
+                        Bayar tunai ke kurir Mengantar saat barang tiba di rumah — <strong>Bebas Ongkir Se-Indonesia (Rp 0)</strong>!
                       </p>
-                      <div className="mt-1.5 text-[10px] text-amber-900 font-semibold">
-                        Ongkir kurir: +Rp {baseShippingCost.toLocaleString('id-ID')}
+                      <div className="mt-1.5 text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        <span>Bebas ongkir kurir Mengantar (Hemat Rp {baseShippingCost.toLocaleString('id-ID')})</span>
                       </div>
                     </div>
                   </div>
@@ -948,34 +942,21 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
               </div>
               <div className="flex justify-between items-center text-gray-600">
                 <span>Ongkos Kirim Mengantar:</span>
-                {paymentMethod === 'TRANSFER' ? (
-                  <span className="text-emerald-700 font-bold flex items-center gap-1.5">
-                    <span>Rp 0 (GRATIS ONGKIR - Bayar Dimuka)</span>
-                    <del className="text-gray-400 font-normal">Rp {baseShippingCost.toLocaleString('id-ID')}</del>
-                  </span>
-                ) : (
-                  <span className="text-gray-900 font-bold">
-                    +Rp {baseShippingCost.toLocaleString('id-ID')} (Tarif Kurir Mengantar)
-                  </span>
-                )}
+                <span className="text-emerald-700 font-bold flex items-center gap-1.5">
+                  <span>Rp 0 (GRATIS ONGKIR SE-INDONESIA)</span>
+                  <del className="text-gray-400 font-normal">Rp {baseShippingCost.toLocaleString('id-ID')}</del>
+                </span>
               </div>
 
               {paymentMethod === 'COD' && (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-900 space-y-1">
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-900 space-y-1">
                   <div className="flex items-start gap-1.5 font-bold">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>Metode COD: Jumlah Pesanan Disesuaikan + Ongkir Mengantar</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Metode COD: Bebas Ongkos Kirim (Gratis)!</span>
                   </div>
-                  <p className="text-[10px] text-amber-800 leading-relaxed">
-                    Promo Bebas Ongkir hanya berlaku untuk pembayaran di muka (Transfer/QRIS). Untuk COD, ongkos kirim ekspedisi Mengantar sebesar <strong>Rp {baseShippingCost.toLocaleString('id-ID')}</strong> ditambahkan ke total pesanan Anda dan dibayar tunai saat kurir tiba.
+                  <p className="text-[10px] text-emerald-800 leading-relaxed">
+                    Anda cukup menyiapkan uang pas sebesar <strong>Rp {finalTotal.toLocaleString('id-ID')}</strong> kepada kurir Mengantar saat paket tiba di alamat Anda. Tidak ada biaya tambahan apapun.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('TRANSFER')}
-                    className="text-[10px] text-emerald-800 font-bold hover:underline cursor-pointer flex items-center gap-1 mt-1"
-                  >
-                    <span>👉 Mau Bebas Ongkir? Klik di sini untuk beralih ke Bayar Dimuka (Transfer/QRIS)</span>
-                  </button>
                 </div>
               )}
 
