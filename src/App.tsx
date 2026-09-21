@@ -261,23 +261,33 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /order, display standalone Order Form
+  // If path is /order, redirect immediately to external server order.saena.my.id
   if (isOrderPage) {
+    if (typeof window !== 'undefined') {
+      const search = window.location.search || '';
+      // Arahkan otomatis ke server formulir pemesanan resmi
+      window.location.replace(`https://order.saena.my.id${search}`);
+    }
     return (
-      <>
-        <OrderPage 
-          onNavigateToPayment={(orderId) => navigateTo(`/payment?orderId=${orderId}`)}
-          onNavigateHome={() => navigateTo('/')}
-        />
-        <DokuConfigModal
-          isOpen={isDokuConfigModalOpen}
-          onClose={() => setIsDokuConfigModalOpen(false)}
-        />
-        <MengantarConfigModal
-          isOpen={isMengantarConfigModalOpen}
-          onClose={() => setIsMengantarConfigModalOpen(false)}
-        />
-      </>
+      <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 text-center">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E8DFC8] shadow-lg max-w-md w-full space-y-4">
+          <div className="w-14 h-14 rounded-full bg-[#1C3B2B]/10 text-[#1C3B2B] flex items-center justify-center mx-auto">
+            <ShoppingBag className="w-7 h-7 animate-pulse text-[#88222A]" />
+          </div>
+          <h2 className="font-serif text-lg sm:text-xl font-bold text-[#1C3B2B]">
+            Membuka Formulir Pemesanan Resmi
+          </h2>
+          <p className="text-xs sm:text-sm text-[#615446] leading-relaxed">
+            Anda sedang dialihkan ke server pemesanan resmi toko di <strong>order.saena.my.id</strong>...
+          </p>
+          <a
+            href={`https://order.saena.my.id${typeof window !== 'undefined' ? window.location.search : ''}`}
+            className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#88222A] hover:bg-[#721B22] text-white font-bold text-xs sm:text-sm rounded-xl shadow transition-all cursor-pointer"
+          >
+            <span>Buka Langsung order.saena.my.id →</span>
+          </a>
+        </div>
+      </div>
     );
   }
 
@@ -287,7 +297,7 @@ const MainContent: React.FC = () => {
       <>
         <PaymentPage 
           onNavigateHome={() => navigateTo('/')}
-          onNavigateNewOrder={() => navigateTo('/order')}
+          onNavigateNewOrder={() => { window.location.href = 'https://order.saena.my.id'; }}
         />
         <DokuConfigModal
           isOpen={isDokuConfigModalOpen}

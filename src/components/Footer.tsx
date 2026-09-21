@@ -162,16 +162,13 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a 
-                  href="/order" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.history.pushState({}, '', '/order');
-                    window.dispatchEvent(new PopStateEvent('popstate'));
-                  }}
+                  href="https://order.saena.my.id" 
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="hover:text-white transition-colors flex items-center gap-1.5 text-left"
                 >
                   <ClipboardList className="w-3.5 h-3.5 text-[#C5A880]" />
-                  <span>Formulir Pemesanan Resmi (/order)</span>
+                  <span>Formulir Pemesanan Resmi (order.saena.my.id)</span>
                 </a>
               </li>
               <li>

@@ -520,7 +520,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                   if (onNavigateNewOrder) {
                     onNavigateNewOrder();
                   } else {
-                    window.location.href = '/order';
+                    window.location.href = 'https://order.saena.my.id';
                   }
                 }}
                 className="bg-[#1C3B2B] hover:bg-[#14291e] text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"

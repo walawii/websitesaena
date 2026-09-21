@@ -318,11 +318,11 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
     const qs = params.toString();
     const targetUrl = qs ? `https://order.saena.my.id?${qs}` : 'https://order.saena.my.id';
 
+    // Karena domain order.saena.my.id tersimpan di host/server eksternal terpisah:
     if (onNavigateOrder) {
       onNavigateOrder(pkg, col);
-    } else {
-      window.location.href = targetUrl;
     }
+    window.location.href = targetUrl;
   };
 
   const scrollToForm = (pkgId?: any, colName?: any) => {
@@ -379,40 +379,6 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#2C241E] font-sans antialiased pb-24">
-      {/* Top Floating Preview / Store Switcher */}
-      {onNavigateHome && (
-        <div className="bg-[#1C3B2B] text-white px-4 py-2 text-xs flex items-center justify-between border-b border-[#C5A880]/30 sticky top-0 z-50">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-medium text-[#E6CBA6]">saena.my.id / alisa</span>
-            <span className="hidden sm:inline text-white/60">| Official Landing Page Mukena Traveling 2in1</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {isAuthenticatedAdmin && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAdminMode(true);
-                  if (onNavigateHome) onNavigateHome();
-                }}
-                className="flex items-center gap-1.5 text-xs text-amber-200 hover:text-white bg-amber-900/60 hover:bg-amber-900/90 border border-amber-500/40 px-3 py-1 rounded-full transition-all cursor-pointer font-semibold shadow-sm"
-                title="Buka Manajemen Pesanan Real-Time di Dashboard Admin"
-              >
-                <LayoutDashboard className="w-3.5 h-3.5 text-amber-300" />
-                <span>Pesanan ({orders.length})</span>
-              </button>
-            )}
-            <button
-              onClick={onNavigateHome}
-              className="flex items-center gap-1.5 text-xs text-[#E6CBA6] hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition-all cursor-pointer"
-            >
-              <ArrowLeft className="w-3 h-3" />
-              <span>Ke Toko Utama</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* 1. Urgency Countdown Top Ribbon */}
       <div className="bg-gradient-to-r from-[#88222A] via-[#9E2A2B] to-[#751A20] text-white py-2 px-3 text-center text-xs sm:text-sm font-medium shadow-sm">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-4">
@@ -432,7 +398,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
       </div>
 
       {/* 2. Brand Nav Header */}
-      <header className="bg-white/95 backdrop-blur border-b border-[#E8DFC8]/60 py-3.5 px-4 sticky top-[33px] sm:top-[37px] z-40">
+      <header className="bg-white/95 backdrop-blur border-b border-[#E8DFC8]/60 py-3.5 px-4 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#1C3B2B] flex items-center justify-center text-[#E6CBA6] font-serif font-bold text-lg shadow-sm">

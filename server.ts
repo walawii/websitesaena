@@ -19,6 +19,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Redirect /order request directly to the external server at https://order.saena.my.id
+app.get(['/order', '/order/*'], (req, res) => {
+  const query = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+  res.redirect(302, `https://order.saena.my.id${query}`);
+});
+
 // Curated high quality presets for fallback images & colors
 const DEFAULT_PRESET_COLORS = [
   {
