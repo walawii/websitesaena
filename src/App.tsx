@@ -230,7 +230,7 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /alisa, display Alisa Landing Page with all order buttons directed to order.saena.my.id
+  // If path is /alisa, display Alisa Landing Page with all order buttons directed to https://order.saena.my.id/order
   if (isAlisaPage) {
     return (
       <>
@@ -241,7 +241,7 @@ const MainContent: React.FC = () => {
             if (packageId) params.set('package', packageId);
             if (color) params.set('color', color);
             const qs = params.toString();
-            window.location.href = qs ? `https://order.saena.my.id?${qs}` : 'https://order.saena.my.id';
+            window.location.href = qs ? `https://order.saena.my.id/order?${qs}` : 'https://order.saena.my.id/order';
           }}
         />
         <DokuConfigModal
@@ -261,12 +261,12 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /order, redirect immediately to external server order.saena.my.id
+  // If path is /order, redirect immediately to external server order.saena.my.id/order
   if (isOrderPage) {
     if (typeof window !== 'undefined') {
       const search = window.location.search || '';
       // Arahkan otomatis ke server formulir pemesanan resmi
-      window.location.replace(`https://order.saena.my.id${search}`);
+      window.location.replace(`https://order.saena.my.id/order${search}`);
     }
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 text-center">
@@ -278,13 +278,13 @@ const MainContent: React.FC = () => {
             Membuka Formulir Pemesanan Resmi
           </h2>
           <p className="text-xs sm:text-sm text-[#615446] leading-relaxed">
-            Anda sedang dialihkan ke server pemesanan resmi toko di <strong>order.saena.my.id</strong>...
+            Anda sedang dialihkan ke server pemesanan resmi toko di <strong>order.saena.my.id/order</strong>...
           </p>
           <a
-            href={`https://order.saena.my.id${typeof window !== 'undefined' ? window.location.search : ''}`}
+            href={`https://order.saena.my.id/order${typeof window !== 'undefined' ? window.location.search : ''}`}
             className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#88222A] hover:bg-[#721B22] text-white font-bold text-xs sm:text-sm rounded-xl shadow transition-all cursor-pointer"
           >
-            <span>Buka Langsung order.saena.my.id →</span>
+            <span>Buka Langsung order.saena.my.id/order →</span>
           </a>
         </div>
       </div>
@@ -297,7 +297,7 @@ const MainContent: React.FC = () => {
       <>
         <PaymentPage 
           onNavigateHome={() => navigateTo('/')}
-          onNavigateNewOrder={() => { window.location.href = 'https://order.saena.my.id'; }}
+          onNavigateNewOrder={() => { window.location.href = 'https://order.saena.my.id/order'; }}
         />
         <DokuConfigModal
           isOpen={isDokuConfigModalOpen}

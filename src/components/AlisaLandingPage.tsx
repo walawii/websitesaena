@@ -295,7 +295,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
   // Stock scarcity indicator
   const [stockLeft] = useState(14);
 
-  // Central redirect function to domain order.saena.my.id
+  // Central redirect function to domain https://order.saena.my.id/order
   const handleGoToOrder = (packageId?: string, color?: string) => {
     const pkg = packageId || selectedPackageId;
     const col = color || selectedColor;
@@ -316,7 +316,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
     if (pkg) params.set('package', pkg);
     if (col) params.set('color', col);
     const qs = params.toString();
-    const targetUrl = qs ? `https://order.saena.my.id?${qs}` : 'https://order.saena.my.id';
+    const targetUrl = qs ? `https://order.saena.my.id/order?${qs}` : 'https://order.saena.my.id/order';
 
     // Karena domain order.saena.my.id tersimpan di host/server eksternal terpisah:
     if (onNavigateOrder) {

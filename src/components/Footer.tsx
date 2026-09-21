@@ -162,13 +162,13 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a 
-                  href="https://order.saena.my.id" 
+                  href="https://order.saena.my.id/order" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-white transition-colors flex items-center gap-1.5 text-left"
                 >
                   <ClipboardList className="w-3.5 h-3.5 text-[#C5A880]" />
-                  <span>Formulir Pemesanan Resmi (order.saena.my.id)</span>
+                  <span>Formulir Pemesanan Resmi (order.saena.my.id/order)</span>
                 </a>
               </li>
               <li>
