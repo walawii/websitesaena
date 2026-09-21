@@ -230,7 +230,7 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /alisa, display Alisa Landing Page with all order buttons directed to /order
+  // If path is /alisa, display Alisa Landing Page with all order buttons directed to order.saena.my.id
   if (isAlisaPage) {
     return (
       <>
@@ -241,7 +241,7 @@ const MainContent: React.FC = () => {
             if (packageId) params.set('package', packageId);
             if (color) params.set('color', color);
             const qs = params.toString();
-            navigateTo(qs ? `/order?${qs}` : '/order');
+            window.location.href = qs ? `https://order.saena.my.id?${qs}` : 'https://order.saena.my.id';
           }}
         />
         <DokuConfigModal

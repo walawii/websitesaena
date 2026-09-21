@@ -893,7 +893,7 @@ export const CheckoutModal: React.FC = () => {
                   </a>
                 )}
 
-                {/* QRIS Display */}
+                {/* QRIS Display & Payment Options */}
                 {(createdOrder.payment.channel === 'qris' || createdOrder.payment.channel === 'doku_qris') && (() => {
                   const smartQris = getSmartQrisForOrder({
                     orderId: createdOrder.id,
@@ -901,11 +901,39 @@ export const CheckoutModal: React.FC = () => {
                     config: dokuConfig
                   });
                   return (
-                    <div className="space-y-3 text-center bg-white p-3.5 rounded-xl border border-[#E2D8CA]">
+                    <div className="space-y-3.5 text-center bg-white p-4 rounded-xl border border-[#E2D8CA] shadow-sm">
+                      {/* Priority 1: Direct DOKU Hosted Checkout Payment Button */}
+                      {createdOrder.payment.doku?.paymentUrl && (
+                        <div className="p-3 bg-[#1C3B2B]/5 rounded-xl border border-[#1C3B2B]/20 text-left space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#1C3B2B] flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-[#2E7D32]" />
+                              Portal Pembayaran Resmi DOKU
+                            </span>
+                            <span className="text-[10px] bg-[#2E7D32] text-white px-2 py-0.5 rounded-full font-bold">
+                              TERVERIFIKASI
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#524B40] leading-relaxed">
+                            Buka portal DOKU untuk membayar dengan QRIS resmi berlisensi Bank Indonesia (ShopeePay, GoPay, OVO, BCA, AstraPay), Virtual Account, atau Kartu:
+                          </p>
+                          <a
+                            href={createdOrder.payment.doku.paymentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-full py-2.5 px-4 bg-[#1C3B2B] hover:bg-[#28523C] text-white text-xs font-bold rounded-lg shadow flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          >
+                            <span>Buka Halaman Pembayaran DOKU Resmi</span>
+                            <ExternalLink className="w-4 h-4 text-[#C5A880]" />
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Priority 2: QR Code Barcode */}
                       <div className="inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full border border-emerald-200">
                         Scan QRIS dengan Aplikasi Mobile Banking / E-Wallet Anda
                       </div>
-                      <div className="w-52 h-52 mx-auto p-2 bg-white rounded-xl shadow-md border-2 border-dashed border-[#1C3B2B]/20">
+                      <div className="w-56 h-56 mx-auto p-2.5 bg-white rounded-xl shadow-md border-2 border-dashed border-[#1C3B2B]/20 flex items-center justify-center">
                         <img
                           src={smartQris.qrImageUrl}
                           alt="QRIS Resmi Toko saena.id"
@@ -917,7 +945,9 @@ export const CheckoutModal: React.FC = () => {
                         <span>•</span>
                         <span>Merchant: {smartQris.merchantName}</span>
                       </div>
-                      <div className="bg-[#FAF8F5] p-2.5 rounded-lg border border-[#EAE4D9] text-[11px] text-[#524B40] text-left space-y-1">
+
+                      {/* Panduan Pembayaran QRIS */}
+                      <div className="bg-[#FAF8F5] p-3 rounded-lg border border-[#EAE4D9] text-[11px] text-[#524B40] text-left space-y-1.5">
                         <p className="font-semibold text-[#1C3B2B]">
                           💡 Panduan Pembayaran QRIS:
                         </p>
@@ -925,23 +955,59 @@ export const CheckoutModal: React.FC = () => {
                           1. Buka aplikasi m-Banking (BCA Mobile, Livin by Mandiri, BRImo, BNI) atau E-Wallet (GoPay, OVO, ShopeePay, DANA).
                         </p>
                         <p>
-                          2. Pilih menu <strong>Scan / Bayar</strong> (jangan gunakan kamera biasa HP).
+                          2. Pilih menu <strong>Scan / Bayar</strong> di aplikasi m-Banking/E-Wallet Anda.
                         </p>
                         <p>
                           3. Periksa nominal <strong>{formatPrice(createdOrder.total)}</strong> dan selesaikan pembayaran.
                         </p>
                       </div>
+
                       <div className="flex items-center justify-center gap-2 pt-1">
                         <a
                           href={smartQris.qrImageUrl}
                           target="_blank"
                           rel="noreferrer"
                           download={`QRIS-${createdOrder.id}.png`}
-                          className="text-xs bg-[#EAE4D9] hover:bg-[#D5C9B8] text-[#1C3B2B] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="text-xs bg-[#EAE4D9] hover:bg-[#D5C9B8] text-[#1C3B2B] font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <QrCode className="w-3.5 h-3.5" />
                           <span>Unduh / Buka Gambar QRIS</span>
                         </a>
+                      </div>
+
+                      {/* Fallback Transfer Bank Manual jika QRIS kendala di m-Banking */}
+                      <div className="mt-3 pt-3 border-t border-[#EAE4D9] text-left">
+                        <p className="text-[11px] font-semibold text-[#1C3B2B] mb-1.5">
+                          Alternatif: Rekening Bank Resmi Toko saena.id
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                          <div className="p-2 bg-[#FAF8F5] rounded border border-[#E5DDD2] flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-[#005EAA] block">BCA: 1480928371</span>
+                              <span className="text-[#7A7266]">a.n. SAENA BUTIK MUSLIMAH</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyVA('1480928371')}
+                              className="px-2 py-0.5 bg-white border border-[#D5C9B8] rounded text-[10px] font-semibold text-[#1C3B2B] hover:bg-[#EAE4D9]"
+                            >
+                              Salin
+                            </button>
+                          </div>
+                          <div className="p-2 bg-[#FAF8F5] rounded border border-[#E5DDD2] flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-[#003D79] block">Mandiri: 1310018293847</span>
+                              <span className="text-[#7A7266]">a.n. SAENA BUTIK MUSLIMAH</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyVA('1310018293847')}
+                              className="px-2 py-0.5 bg-white border border-[#D5C9B8] rounded text-[10px] font-semibold text-[#1C3B2B] hover:bg-[#EAE4D9]"
+                            >
+                              Salin
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );

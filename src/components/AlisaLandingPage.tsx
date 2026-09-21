@@ -295,10 +295,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
   // Stock scarcity indicator
   const [stockLeft] = useState(14);
 
-  // Target navigation for order
-  const formRef = useRef<HTMLDivElement>(null);
-
-  // Central redirect function to /order
+  // Central redirect function to domain order.saena.my.id
   const handleGoToOrder = (packageId?: string, color?: string) => {
     const pkg = packageId || selectedPackageId;
     const col = color || selectedColor;
@@ -315,10 +312,16 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
       // ignore
     }
 
+    const params = new URLSearchParams();
+    if (pkg) params.set('package', pkg);
+    if (col) params.set('color', col);
+    const qs = params.toString();
+    const targetUrl = qs ? `https://order.saena.my.id?${qs}` : 'https://order.saena.my.id';
+
     if (onNavigateOrder) {
       onNavigateOrder(pkg, col);
     } else {
-      window.location.href = '/order?package=' + pkg + '&color=' + encodeURIComponent(col);
+      window.location.href = targetUrl;
     }
   };
 
@@ -1318,160 +1321,6 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
               <p className="text-xs sm:text-sm text-white/80 mt-1.5 leading-relaxed">
                 Kami sangat yakin Anda akan jatuh cinta dengan kelembutan dan kepraktisan Mukena Alisa ini. Jika saat barang sampai terdapat cacat jahitan, kain sobek, atau salah warna, kami <strong>ganti baru</strong> atau <strong>kembalikan uang Anda 100%</strong> tanpa dipersulit!
               </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 10. Pricing Packages & Order Gateway Section */}
-      <section id="order-section" ref={formRef} className="py-12 px-4 bg-gradient-to-b from-[#FAF8F5] to-white border-t border-[#E8DFC8]">
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Header */}
-          <div className="text-center space-y-2.5">
-            <div className="inline-flex items-center gap-1.5 bg-[#88222A] text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-sm uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-              <span>PENAWARAN PROMO SPESIAL HARI INI</span>
-            </div>
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#1C3B2B]">
-              Pilih Paket Promo Mukena Traveling Alisa
-            </h2>
-            <p className="text-xs sm:text-sm text-[#615446] max-w-xl mx-auto leading-relaxed">
-              Klik paket promo pilihan Anda di bawah untuk melanjutkan ke formulir pemesanan resmi (halaman order). 
-              Tersedia metode pembayaran <strong>Transfer Bank / QRIS via DOKU Gateway</strong> dan <strong>Bayar di Tempat (COD) via Mengantar.com</strong>.
-            </p>
-          </div>
-
-          {/* 3 Package Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {packages.map((pkg) => {
-              const isSelected = selectedPackageId === pkg.id;
-              return (
-                <div
-                  key={pkg.id}
-                  onClick={() => {
-                    setSelectedPackageId(pkg.id);
-                    handleGoToOrder(pkg.id);
-                  }}
-                  className={`relative bg-white rounded-2xl p-5 border-2 transition-all flex flex-col justify-between cursor-pointer hover:shadow-lg ${
-                    isSelected
-                      ? 'border-[#88222A] shadow-md ring-2 ring-[#88222A]/20 bg-rose-50/10'
-                      : pkg.isPopular
-                        ? 'border-[#C5A880] shadow-sm hover:border-[#88222A]'
-                        : 'border-[#E8DFC8] shadow-sm hover:border-gray-400'
-                  }`}
-                >
-                  {/* Badge */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                      pkg.isPopular 
-                        ? 'bg-[#88222A] text-white' 
-                        : 'bg-[#1C3B2B] text-[#E6CBA6]'
-                    }`}>
-                      {pkg.badge}
-                    </span>
-                    {pkg.isPopular && (
-                      <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Flame className="w-3 h-3 text-red-500 fill-red-500" /> PALING LARIS
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Title & Description */}
-                  <div className="space-y-2 mb-4">
-                    <h3 className="font-serif text-lg font-bold text-[#1C3B2B]">
-                      {pkg.title}
-                    </h3>
-                    <p className="text-xs text-[#615446] leading-relaxed">
-                      {pkg.description}
-                    </p>
-                  </div>
-
-                  {/* Pricing Box */}
-                  <div className="pt-3 border-t border-[#E8DFC8]/60 space-y-3">
-                    <div className="flex items-baseline justify-between">
-                      <div>
-                        <div className="text-xl sm:text-2xl font-black text-[#88222A]">
-                          Rp {pkg.promoPrice.toLocaleString('id-ID')}
-                        </div>
-                        <div className="text-xs text-gray-400 line-through">
-                          Rp {pkg.normalPrice.toLocaleString('id-ID')}
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
-                        Hemat Rp {pkg.savings.toLocaleString('id-ID')}
-                      </span>
-                    </div>
-
-                    {/* Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedPackageId(pkg.id);
-                        handleGoToOrder(pkg.id);
-                      }}
-                      className={`w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        pkg.isPopular || isSelected
-                          ? 'bg-[#88222A] hover:bg-[#721B22] text-white hover:scale-[1.02]'
-                          : 'bg-[#1C3B2B] hover:bg-[#14291e] text-[#E6CBA6] hover:scale-[1.02]'
-                      }`}
-                    >
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>PESAN PAKET INI ({pkg.qty} PCS) →</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Direct CTA Big Banner */}
-          <div className="bg-[#1C3B2B] text-white rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-xl border border-[#C5A880]/40">
-            <div className="max-w-xl mx-auto space-y-2">
-              <span className="text-xs text-[#E6CBA6] uppercase font-bold tracking-widest flex items-center justify-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                TRANSAKSI RESMI, AMAN &amp; BERGARANSI
-              </span>
-              <h3 className="font-serif text-xl sm:text-2xl font-bold text-white">
-                Siap Melakukan Pemesanan Mukena Alisa?
-              </h3>
-              <p className="text-xs sm:text-sm text-white/80 leading-relaxed">
-                Klik tombol di bawah ini untuk mengisi formulir alamat pengiriman Anda pada halaman pemesanan resmi saena.my.id. 
-                Resi kurir ekspedisi Mengantar.com dan QRIS DOKU akan langsung otomatis diterbitkan.
-              </p>
-            </div>
-
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleGoToOrder()}
-                className="w-full sm:w-auto bg-[#88222A] hover:bg-[#721B22] text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer text-sm sm:text-base flex items-center justify-center gap-2"
-              >
-                <ShoppingBag className="w-5 h-5" />
-                <span>LANJUT KE FORMULIR PEMESANAN RESMI (/order) →</span>
-              </button>
-            </div>
-
-            {/* Partner Trust Badges */}
-            <div className="pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-              <div className="bg-white/5 backdrop-blur p-3 rounded-xl border border-white/10 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[#88222A] text-white flex items-center justify-center shrink-0 font-black text-xs">
-                  DOKU
-                </div>
-                <div className="text-[11px] leading-tight text-white/90">
-                  <div className="font-bold text-[#E6CBA6]">DOKU Payment Gateway</div>
-                  <div className="text-white/60 text-[10px]">QRIS Semua Bank &amp; Virtual Account PCI-DSS Level 1</div>
-                </div>
-              </div>
-              <div className="bg-white/5 backdrop-blur p-3 rounded-xl border border-white/10 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                  <Truck className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-[11px] leading-tight text-white/90">
-                  <div className="font-bold text-[#E6CBA6]">Mengantar.com Logistik</div>
-                  <div className="text-white/60 text-[10px]">Resi Otomatis JNE, J&amp;T, SiCepat &amp; COD Bayar di Tempat</div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
