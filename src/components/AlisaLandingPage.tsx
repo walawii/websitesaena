@@ -64,9 +64,9 @@ import {
 const IMAGES = {
   pinkModel: '/assets/alisa/alisa-pink-model.webp',
   pinkClose: '/assets/alisa/alisa-pink-close.webp',
-  blueModel: '/assets/alisa/alisa-blue-model.webp',
-  blueDetail: '/assets/alisa/alisa-blue-detail.webp',
-  blueFull: '/assets/alisa/alisa-blue-full.webp'
+  sageModel: '/assets/alisa/alisa-sage-model-v3.webp',
+  sageDetail: '/assets/alisa/alisa-sage-detail-v3.webp',
+  sageFull: '/assets/alisa/alisa-sage-full-v3.webp'
 };
 
 // Curated Gallery Items with rich metadata
@@ -92,33 +92,33 @@ export const GALLERY_PHOTOS = [
     tag: 'Fitur 2in1'
   },
   {
-    id: 'blue-model',
-    src: IMAGES.blueModel,
-    title: 'Mukena Alisa Sky Blue - Tampak Penuh Model',
-    shortTitle: 'Model Biru',
-    category: 'Varian Sky Blue',
-    description: 'Nuansa biru langit pastel yang sejuk dan menenangkan dipadu aksen bunga lavender dan dedaunan zaitun.',
-    color: 'Sky Blue' as const,
+    id: 'sage-model',
+    src: IMAGES.sageModel,
+    title: 'Mukena Alisa Sage Green - Tampak Penuh Model',
+    shortTitle: 'Model Sage Green',
+    category: 'Varian Sage Green',
+    description: 'Nuansa hijau sage floral pastel yang sejuk, adem, dan menenangkan dipadu motif bunga mekar lembut dan aksen daun.',
+    color: 'Sage Green' as const,
     tag: 'Warna Sejuk'
   },
   {
-    id: 'blue-detail',
-    src: IMAGES.blueDetail,
+    id: 'sage-detail',
+    src: IMAGES.sageDetail,
     title: 'Finishing Pinggiran Laser Cut Bergelombang Presisi',
     shortTitle: 'Laser Cut Presisi',
     category: 'Finishing Mewah',
     description: 'Tepian dipotong menggunakan laser cut presisi membentuk motif kelopak melengkung rapi tanpa benang obras yang berudul.',
-    color: 'Sky Blue' as const,
+    color: 'Sage Green' as const,
     tag: 'Laser Cut'
   },
   {
-    id: 'blue-full',
-    src: IMAGES.blueFull,
+    id: 'sage-full',
+    src: IMAGES.sageFull,
     title: 'Satu Set Lengkap Mukena + Mini Pouch Traveling',
     shortTitle: 'Set + Mini Pouch',
     category: 'Kelengkapan Set',
     description: 'Satu set terdiri dari atasan mukena jumbo (117/120 cm), rok bawahan (110x73 cm), dan tas pouch traveling ringkas (18x15 cm, ±400 gr).',
-    color: 'Sky Blue' as const,
+    color: 'Sage Green' as const,
     tag: 'Set Lengkap'
   }
 ];
@@ -149,7 +149,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
   } = useStore();
 
   // Variant & Image State
-  const [selectedColor, setSelectedColor] = useState<'Dusty Pink' | 'Sky Blue'>('Dusty Pink');
+  const [selectedColor, setSelectedColor] = useState<'Dusty Pink' | 'Sage Green'>('Dusty Pink');
   const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
   const [lightboxOpen, setLightboxOpen] = useState<boolean>(false);
   const [lightboxIndex, setLightboxIndex] = useState<number>(0);
@@ -167,9 +167,9 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
         setActivePhotoIndex(idx);
       }
     } else {
-      // Find first blue photo
-      const idx = GALLERY_PHOTOS.findIndex(p => p.color === 'Sky Blue');
-      if (idx !== -1 && GALLERY_PHOTOS[activePhotoIndex]?.color !== 'Sky Blue') {
+      // Find first sage green photo
+      const idx = GALLERY_PHOTOS.findIndex(p => p.color === 'Sage Green');
+      if (idx !== -1 && GALLERY_PHOTOS[activePhotoIndex]?.color !== 'Sage Green') {
         setActivePhotoIndex(idx);
       }
     }
@@ -267,7 +267,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
   const currentPackage = packages.find(p => p.id === selectedPackageId) || packages[1];
 
   // Secondary color for 2pcs / 3pcs bundle
-  const [secondaryColor, setSecondaryColor] = useState<'Dusty Pink' | 'Sky Blue'>('Sky Blue');
+  const [secondaryColor, setSecondaryColor] = useState<'Dusty Pink' | 'Sage Green'>('Sage Green');
 
   // Countdown timer state (hours, minutes, seconds)
   const [timeLeft, setTimeLeft] = useState({ hours: 2, minutes: 47, seconds: 18 });
@@ -345,7 +345,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
     },
     {
       q: 'Bagaimana syarat mendapatkan Gratis Ongkir?',
-      a: 'Sangat mudah! Beli 2 Pcs atau lebih, promo Bebas Ongkos Kirim (Gratis Ongkir) ke seluruh wilayah Indonesia langsung aktif secara otomatis di formulir pesanan Anda. Anda juga bebas memilih kombinasi warna (Dusty Pink & Sky Blue).'
+      a: 'Sangat mudah! Beli 2 Pcs atau lebih, promo Bebas Ongkos Kirim (Gratis Ongkir) ke seluruh wilayah Indonesia langsung aktif secara otomatis di formulir pesanan Anda. Anda juga bebas memilih kombinasi warna (Dusty Pink & Sage Green).'
     },
     {
       q: 'Apakah bahan katun mikro Alisa ini panas atau menerawang?',
@@ -487,7 +487,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   <div className="bg-[#1C3B2B]/90 backdrop-blur text-[#E6CBA6] text-xs font-bold px-3 py-1 rounded-full shadow flex items-center gap-1.5 border border-white/20">
                     <span 
                       className="w-2.5 h-2.5 rounded-full border border-white/50" 
-                      style={{ backgroundColor: selectedColor === 'Dusty Pink' ? '#E8A5A5' : '#99BBE0' }}
+                      style={{ backgroundColor: selectedColor === 'Dusty Pink' ? '#E8A5A5' : '#7D9C86' }}
                     />
                     <span>{GALLERY_PHOTOS[activePhotoIndex]?.color || selectedColor}</span>
                   </div>
@@ -590,7 +590,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                     <Truck className="w-4 h-4 text-emerald-700 shrink-0" />
                     <div>
                       <span className="font-bold text-emerald-800">Beli 2 Pcs Langsung GRATIS ONGKIR!</span>
-                      <p className="text-[11px] text-emerald-700 font-normal">Bisa campur warna Dusty Pink & Sky Blue.</p>
+                      <p className="text-[11px] text-emerald-700 font-normal">Bisa campur warna Dusty Pink & Sage Green.</p>
                     </div>
                   </div>
 
@@ -637,18 +637,18 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedColor('Sky Blue');
+                        setSelectedColor('Sage Green');
                       }}
                       className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
-                        selectedColor === 'Sky Blue'
-                          ? 'border-[#1C3B2B] bg-sky-50 text-[#1C3B2B] font-bold shadow-sm'
+                        selectedColor === 'Sage Green'
+                          ? 'border-[#1C3B2B] bg-emerald-50 text-[#1C3B2B] font-bold shadow-sm'
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       }`}
                     >
-                      <span className="w-5 h-5 rounded-full bg-[#99BBE0] border border-black/10 shadow-inner" />
+                      <span className="w-5 h-5 rounded-full bg-[#7D9C86] border border-black/10 shadow-inner" />
                       <div className="text-left">
-                        <div className="text-xs">Sky Blue</div>
-                        <div className="text-[10px] text-gray-500 font-normal">Floral Lavender Sejuk</div>
+                        <div className="text-xs">Sage Green</div>
+                        <div className="text-[10px] text-gray-500 font-normal">Floral Sage Lembut</div>
                       </div>
                     </button>
                   </div>
@@ -780,7 +780,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
             >
               <div className="relative aspect-[16/10] bg-gray-100 overflow-hidden">
                 <img 
-                  src={IMAGES.blueDetail} 
+                  src={IMAGES.sageDetail} 
                   alt="Detail Laser Cut Mukena Alisa" 
                   className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                 />
@@ -879,7 +879,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
             >
               <div className="relative aspect-[16/10] bg-gray-100 overflow-hidden">
                 <img 
-                  src={IMAGES.blueFull} 
+                  src={IMAGES.sageFull} 
                   alt="Satu Set Lengkap + Mini Pouch Mukena Alisa" 
                   className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                 />
@@ -1055,28 +1055,28 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
               </div>
             </div>
 
-            {/* Color 2: Sky Blue */}
+            {/* Color 2: Sage Green */}
             <div className="bg-white rounded-2xl overflow-hidden border border-[#E8DFC8] shadow-sm hover:shadow-md transition-all flex flex-col">
               <div 
                 onClick={() => openLightbox(2)}
                 className="relative aspect-[4/5] bg-gray-100 overflow-hidden group cursor-pointer"
               >
                 <img 
-                  src={IMAGES.blueModel} 
-                  alt="Mukena Alisa Sky Blue" 
+                  src={IMAGES.sageModel} 
+                  alt="Mukena Alisa Sage Green Floral" 
                   className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute top-3 left-3 bg-[#1C3B2B] text-[#E6CBA6] text-xs font-bold px-3 py-1 rounded-full shadow flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-[#E6CBA6]" /> Nuansa Sejuk
+                  <Sparkles className="w-3 h-3 text-[#E6CBA6]" /> Nuansa Sejuk Alami
                 </div>
                 <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur text-white text-[10px] font-semibold px-2 py-1 rounded-md flex items-center gap-1">
                   <ZoomIn className="w-3 h-3 text-[#E6CBA6]" /> Klik Zoom HD
                 </div>
               </div>
 
-              {/* Sub photo selectors for Sky Blue */}
+              {/* Sub photo selectors for Sage Green */}
               <div className="px-4 pt-3 pb-2 bg-[#FAF8F5] border-y border-[#E8DFC8] flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#7A6E5F]">Sudut Foto Blue:</span>
+                <span className="text-[11px] font-semibold text-[#7A6E5F]">Sudut Foto Sage:</span>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -1105,13 +1105,13 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
               <div className="p-5 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-serif text-lg font-bold text-[#1C3B2B]">Sky Blue Lavender</h3>
-                    <span className="text-[11px] bg-sky-50 text-sky-800 font-bold px-2 py-0.5 rounded border border-sky-200">
+                    <h3 className="font-serif text-lg font-bold text-[#1C3B2B]">Sage Green Floral</h3>
+                    <span className="text-[11px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200">
                       Stok Tersedia
                     </span>
                   </div>
                   <p className="text-xs text-[#615446] leading-relaxed">
-                    Warna biru langit muda yang sejuk dipadu dengan motif bunga mawar pastel. Memberikan kesan adem, bersih, dan menentramkan jiwa saat menunaikan ibadah shalat.
+                    Warna hijau sage lembut natural (matte pastel alami) hasil jepretan asli kamera, dipadu motif bunga mekar dan dedaunan zaitun. Sangat adem di mata, tidak mencolok, dan menenangkan jiwa saat beribadah.
                   </p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2">
@@ -1126,13 +1126,13 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedColor('Sky Blue');
+                      setSelectedColor('Sage Green');
                       setActivePhotoIndex(2);
-                      handleGoToOrder(undefined, 'Sky Blue');
+                      handleGoToOrder(undefined, 'Sage Green');
                     }}
                     className="flex-1 bg-[#1C3B2B] hover:bg-[#14291e] text-[#E6CBA6] text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-sm hover:shadow"
                   >
-                    Pilih Warna Sky Blue
+                    Pilih Warna Sage Green
                   </button>
                 </div>
               </div>
@@ -1208,7 +1208,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   </div>
                 </div>
                 <p className="text-xs text-[#524436] italic leading-relaxed">
-                  "Laser cut-nya rapi banget gak ada benang rontok sama sekali. Pouch-nya imut banget, muat di sling bag saya. Warna Sky Blue nya mewah banget dipakai. Teman sekantor pada nanya beli di mana, akhirnya order lagi buat kado."
+                  "Laser cut-nya rapi banget gak ada benang rontok sama sekali. Pouch-nya imut banget, muat di sling bag saya. Warna Sage Green nya mewah dan adem banget dipakai. Teman sekantor pada nanya beli di mana, akhirnya order lagi buat kado."
                 </p>
               </div>
 
@@ -1217,7 +1217,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   onClick={() => openLightbox(3)}
                   className="flex items-center gap-2 p-1.5 rounded-lg bg-[#FAF8F5] border border-gray-200 hover:border-[#C5A880] cursor-pointer group transition-all"
                 >
-                  <img src={IMAGES.blueDetail} alt="Foto dari Riana Nurul" className="w-10 h-10 object-cover rounded-md" />
+                  <img src={IMAGES.sageDetail} alt="Foto dari Riana Nurul" className="w-10 h-10 object-cover rounded-md" />
                   <div className="text-[11px] leading-tight">
                     <span className="font-bold text-[#1C3B2B] group-hover:text-[#88222A] block">Foto Laser Cut Riana</span>
                     <span className="text-gray-500 text-[10px] flex items-center gap-1">
@@ -1226,7 +1226,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   </div>
                 </div>
                 <div className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Membeli Sky Blue Lavender
+                  <Check className="w-3 h-3" /> Membeli Sage Green Floral
                 </div>
               </div>
             </div>
@@ -1253,7 +1253,7 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
                   onClick={() => openLightbox(4)}
                   className="flex items-center gap-2 p-1.5 rounded-lg bg-[#FAF8F5] border border-gray-200 hover:border-[#C5A880] cursor-pointer group transition-all"
                 >
-                  <img src={IMAGES.blueFull} alt="Foto dari Hj. Siti Maryam" className="w-10 h-10 object-cover rounded-md" />
+                  <img src={IMAGES.sageFull} alt="Foto dari Hj. Siti Maryam" className="w-10 h-10 object-cover rounded-md" />
                   <div className="text-[11px] leading-tight">
                     <span className="font-bold text-[#1C3B2B] group-hover:text-[#88222A] block">Foto Pouch Umroh</span>
                     <span className="text-gray-500 text-[10px] flex items-center gap-1">

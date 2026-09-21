@@ -82,18 +82,18 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
   });
   const currentPackage = packages.find(p => p.id === selectedPackageId) || packages[1];
 
-  const [selectedColor, setSelectedColor] = useState<'Dusty Pink' | 'Sky Blue'>(() => {
+  const [selectedColor, setSelectedColor] = useState<'Dusty Pink' | 'Sage Green'>(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const c = sp.get('color');
-      if (c && c.toLowerCase().includes('blue')) return 'Sky Blue';
+      if (c && (c.toLowerCase().includes('sage') || c.toLowerCase().includes('green') || c.toLowerCase().includes('blue'))) return 'Sage Green';
       if (c && c.toLowerCase().includes('pink')) return 'Dusty Pink';
     } catch {
       // fallback
     }
     return 'Dusty Pink';
   });
-  const [secondaryColor, setSecondaryColor] = useState<'Dusty Pink' | 'Sky Blue'>('Sky Blue');
+  const [secondaryColor, setSecondaryColor] = useState<'Dusty Pink' | 'Sage Green'>('Sage Green');
 
   // Customer Data
   const [customerName, setCustomerName] = useState('');
@@ -498,15 +498,15 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
 
                   <button
                     type="button"
-                    onClick={() => setSelectedColor('Sky Blue')}
+                    onClick={() => setSelectedColor('Sage Green')}
                     className={`p-3 rounded-xl border-2 flex items-center gap-2.5 transition-all cursor-pointer ${
-                      selectedColor === 'Sky Blue'
-                        ? 'border-[#1C3B2B] bg-sky-50 text-[#1C3B2B] font-bold shadow-sm'
+                      selectedColor === 'Sage Green'
+                        ? 'border-[#1C3B2B] bg-emerald-50 text-[#1C3B2B] font-bold shadow-sm'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <span className="w-5 h-5 rounded-full bg-[#99BBE0] border border-black/10 shrink-0" />
-                    <span className="text-xs">Sky Blue Lavender</span>
+                    <span className="w-5 h-5 rounded-full bg-[#7D9C86] border border-black/10 shrink-0" />
+                    <span className="text-xs">Sage Green Floral</span>
                   </button>
                 </div>
               ) : (
@@ -525,12 +525,12 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectedColor('Sky Blue')}
+                        onClick={() => setSelectedColor('Sage Green')}
                         className={`p-2 rounded-lg border text-xs font-medium cursor-pointer ${
-                          selectedColor === 'Sky Blue' ? 'bg-[#1C3B2B] text-white border-[#1C3B2B]' : 'bg-white text-gray-700'
+                          selectedColor === 'Sage Green' ? 'bg-[#1C3B2B] text-white border-[#1C3B2B]' : 'bg-white text-gray-700'
                         }`}
                       >
-                        Sky Blue
+                        Sage Green
                       </button>
                     </div>
                   </div>
@@ -549,12 +549,12 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSecondaryColor('Sky Blue')}
+                        onClick={() => setSecondaryColor('Sage Green')}
                         className={`p-2 rounded-lg border text-xs font-medium cursor-pointer ${
-                          secondaryColor === 'Sky Blue' ? 'bg-[#1C3B2B] text-white border-[#1C3B2B]' : 'bg-white text-gray-700'
+                          secondaryColor === 'Sage Green' ? 'bg-[#1C3B2B] text-white border-[#1C3B2B]' : 'bg-white text-gray-700'
                         }`}
                       >
-                        Sky Blue
+                        Sage Green
                       </button>
                     </div>
                   </div>

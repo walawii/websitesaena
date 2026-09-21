@@ -313,17 +313,17 @@ export const INITIAL_PRODUCTS: Product[] = [
     ],
     colors: [
       { name: 'Dusty Pink', hex: '#E8A5A5', stock: 28, image: '/assets/alisa/alisa-pink-model.webp' },
-      { name: 'Sky Blue', hex: '#99BBE0', stock: 24, image: '/assets/alisa/alisa-blue-model.webp' }
+      { name: 'Sage Green', hex: '#7D9C86', stock: 24, image: '/assets/alisa/alisa-sage-model-v3.webp' }
     ],
     sizes: ['All Size Dewasa Jumbo'],
-    stock: { 'Dusty Pink': 28, 'Sky Blue': 24 },
+    stock: { 'Dusty Pink': 28, 'Sage Green': 24 },
     totalStock: 52,
     images: [
       '/assets/alisa/alisa-pink-model.webp',
       '/assets/alisa/alisa-pink-close.webp',
-      '/assets/alisa/alisa-blue-model.webp',
-      '/assets/alisa/alisa-blue-detail.webp',
-      '/assets/alisa/alisa-blue-full.webp'
+      '/assets/alisa/alisa-sage-model-v3.webp',
+      '/assets/alisa/alisa-sage-detail-v3.webp',
+      '/assets/alisa/alisa-sage-full-v3.webp'
     ],
     isNewArrival: true,
     isBestSeller: true,
@@ -342,8 +342,8 @@ export const INITIAL_PRODUCTS: Product[] = [
         userName: 'Riana Nurul Hidayah',
         rating: 5,
         date: '14 September 2026',
-        comment: 'Laser cut-nya rapi banget gak ada benang rontok. Pouch-nya imut muat di sling bag kerja. Warna Sky Blue sangat sejuk!',
-        variantInfo: 'Sky Blue / All Size',
+        comment: 'Laser cut-nya rapi banget gak ada benang rontok. Pouch-nya imut muat di sling bag kerja. Warna Sage Green sangat sejuk dan adem!',
+        variantInfo: 'Sage Green / All Size',
         verifiedBuyer: true
       }
     ]
