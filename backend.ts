@@ -1252,10 +1252,11 @@ app.all(['/api/doku/notification', '/api/webhooks/doku'], async (req: any, res) 
         }
       }
     } else if (rawStatus === 'FAILED') {
-      await updateOrderPayment(order.orderNumber, 'FAILED', {
-        dokuResponse: notificationData,
-        webhookId: requestId
-      });
+      // DOKU Checkout can emit FAILED for an attempted payment method while
+      // the customer may still switch to another available payment method.
+      // Per DOKU notification guidance, do not cancel the Checkout order on
+      // this intermediate FAILED notification.
+      console.log(`[DOKU Webhook] Ignoring Checkout FAILED notification for order ${order.orderNumber}; waiting for final status.`);
     } else if (rawStatus === 'EXPIRED') {
       await updateOrderPayment(order.orderNumber, 'EXPIRED', {
         dokuResponse: notificationData,
