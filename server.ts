@@ -6,6 +6,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnectivity } from './server/mengantarService';
 import { processDokuPayment, verifyDokuWebhookSignature, testDokuApiConnectivity } from './server/dokuService';
 import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService';
+import { sendMetaCapiEvent, sendMetaCapiPurchase, META_DATASET_ID } from './server/metaCapiService';
 import {
   generateOrderNumber,
   saveOrder,
@@ -13,6 +14,7 @@ import {
   updateOrderPayment,
   updateOrderShipping,
   getAllOrdersList,
+  claimOrderForMetaPurchase,
   StoredOrder
 } from './server/orderRepository';
 
@@ -508,8 +510,81 @@ app.get('/api/system/gateway-config', (req, res) => {
     },
     mengantar: {
       configured: !!process.env.MENGANTAR_API_KEY
+    },
+    meta: {
+      configured: !!process.env.META_CAPI_ACCESS_TOKEN,
+      datasetId: META_DATASET_ID
     }
   });
+});
+
+// API Route: Meta Conversions API (CAPI) Proxy Dispatcher
+// Note: Strict validation enforced. Client cannot dispatch Purchase events directly.
+app.post('/api/meta/events', async (req, res) => {
+  try {
+    const { eventName, eventId, eventSourceUrl, customData, userData } = req.body;
+
+    // Strict validation: Purchase is server-authoritative upon payment confirmation only!
+    if (eventName === 'Purchase') {
+      return res.status(403).json({
+        success: false,
+        error: 'Event Purchase hanya dapat diterbitkan oleh server backend setelah pembayaran berhasil dikonfirmasi.'
+      });
+    }
+
+    if (!eventName || !eventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Parameter eventName dan eventId wajib diisi.'
+      });
+    }
+
+    // Extract client IP and User-Agent from HTTP request
+    const forwarded = req.headers['x-forwarded-for'];
+    const clientIp = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.socket.remoteAddress || '';
+    const clientUserAgent = (req.headers['user-agent'] as string) || '';
+
+    // Extract _fbp and _fbc cookies if available
+    let cookieFbp = userData?.fbp;
+    let cookieFbc = userData?.fbc;
+    const cookieHeader = req.headers.cookie;
+    if (cookieHeader) {
+      if (!cookieFbp) {
+        const matchFbp = cookieHeader.match(/(^|;\s*)_fbp=([^;]+)/);
+        if (matchFbp) cookieFbp = decodeURIComponent(matchFbp[2]);
+      }
+      if (!cookieFbc) {
+        const matchFbc = cookieHeader.match(/(^|;\s*)_fbc=([^;]+)/);
+        if (matchFbc) cookieFbc = decodeURIComponent(matchFbc[2]);
+      }
+    }
+
+    const result = await sendMetaCapiEvent({
+      eventName,
+      eventId,
+      eventSourceUrl: eventSourceUrl || 'https://saena.my.id/alisa',
+      actionSource: 'website',
+      userData: {
+        ...userData,
+        clientIp,
+        clientUserAgent,
+        fbp: cookieFbp,
+        fbc: cookieFbc
+      },
+      customData
+    });
+
+    return res.json({
+      success: true,
+      eventName,
+      eventId,
+      skipped: result.skipped,
+      eventsReceived: result.eventsReceived
+    });
+  } catch (err: any) {
+    console.error('[Meta CAPI Route] Exception:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Server-Authoritative Product & Bundle Catalog
@@ -565,7 +640,8 @@ app.post('/api/orders/create', async (req, res) => {
       packageId,
       paymentMethod, // 'DOKU' | 'COD'
       paymentChannel, // e.g. 'doku_checkout'
-      notes
+      notes,
+      metaTracking
     } = req.body;
 
     // 1. Validate Customer
@@ -719,7 +795,14 @@ app.post('/api/orders/create', async (req, res) => {
       status: 'menunggu_pembayaran',
       trackingNumber: '',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      metaTracking: {
+        fbp: metaTracking?.fbp,
+        fbc: metaTracking?.fbc,
+        clientIp: typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.socket.remoteAddress || '',
+        clientUserAgent: (req.headers['user-agent'] as string) || '',
+        eventSourceUrl: metaTracking?.eventSourceUrl || 'https://saena.my.id/alisa'
+      }
     };
 
     // 7. Handle COD Flow
@@ -1092,6 +1175,16 @@ app.all(['/api/doku/notification', '/api/webhooks/doku'], async (req: any, res) 
         webhookId: requestId
       });
       console.log(`[DOKU Webhook] Order ${order.orderNumber} successfully updated to PAID.`);
+
+      // 5.1 Trigger Meta Conversions API (CAPI) Purchase Event (Strict idempotency: 1 purchase event per order)
+      const canSendPurchase = await claimOrderForMetaPurchase(order.orderNumber);
+      if (canSendPurchase) {
+        sendMetaCapiPurchase(order).catch(capiErr => {
+          console.error(`[Meta CAPI] Error dispatching Purchase for ${order.orderNumber}:`, capiErr.message);
+        });
+      } else {
+        console.log(`[Meta CAPI] Purchase event already sent or claimed for order ${order.orderNumber}. Skipping duplicate.`);
+      }
 
       // 6. Trigger Mengantar Shipment Creation (Idempotent: only if not already created)
       if (process.env.MENGANTAR_API_KEY && order.shipping.shippingStatus !== 'CREATED' && !order.shipping.trackingNumber) {

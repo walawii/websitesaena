@@ -125,6 +125,14 @@ export interface StoredOrder {
   trackingNumber: string;
   createdAt: string;
   updatedAt: string;
+  metaTracking?: {
+    fbp?: string;
+    fbc?: string;
+    clientIp?: string;
+    clientUserAgent?: string;
+    eventSourceUrl?: string;
+  };
+  metaCapiPurchaseSent?: boolean;
 }
 
 // In-memory fallback cache if Firestore is temporarily offline
@@ -307,6 +315,39 @@ export async function updateOrderPayment(
   return saveOrder(order);
 }
 
+// In-memory set to guarantee strict idempotency even under concurrent webhook triggers
+const sentMetaPurchaseOrders = new Set<string>();
+
+/**
+ * Atomically claim order for Meta CAPI Purchase dispatch.
+ * Guarantees that even with multiple webhooks, retries, or reloads,
+ * exactly one Purchase event is dispatched per order.
+ */
+export async function claimOrderForMetaPurchase(orderNumber: string): Promise<boolean> {
+  if (!orderNumber) return false;
+
+  // 1. Fast in-memory check
+  if (sentMetaPurchaseOrders.has(orderNumber)) {
+    return false;
+  }
+
+  // 2. Fetch order to verify persistence state
+  const order = await findOrderByNumber(orderNumber);
+  if (!order) return false;
+
+  // 3. Persistent flag check
+  if (order.metaCapiPurchaseSent) {
+    sentMetaPurchaseOrders.add(orderNumber);
+    return false;
+  }
+
+  // 4. Atomically claim & persist
+  sentMetaPurchaseOrders.add(orderNumber);
+  order.metaCapiPurchaseSent = true;
+  await saveOrder(order);
+  return true;
+}
+
 
 export async function updateOrderShipping(
   orderNumber: string,
@@ -459,6 +500,8 @@ function mapFirestoreDataToStoredOrder(data: any, id: string): StoredOrder {
     status: data.status || (paymentStatus === 'PAID' ? 'dibayar' : 'menunggu_pembayaran'),
     trackingNumber: data.shipping?.trackingNumber || data.trackingNumber || '',
     createdAt: data.createdAt || new Date().toISOString(),
-    updatedAt: data.updatedAt || new Date().toISOString()
+    updatedAt: data.updatedAt || new Date().toISOString(),
+    metaTracking: data.metaTracking,
+    metaCapiPurchaseSent: Boolean(data.metaCapiPurchaseSent)
   };
 }

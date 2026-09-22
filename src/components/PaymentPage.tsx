@@ -14,7 +14,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useStore } from '../context/StoreContext';
 import { getSmartQrisForOrder } from '../utils/qrisGenerator';
-import { trackMetaPageView, trackMetaPurchase } from '../utils/metaPixel';
+import { trackMetaPageView } from '../utils/metaPixel';
 
 interface PaymentPageProps {
   orderId?: string;
@@ -129,16 +129,6 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
       });
     } catch {
       // ignore
-    }
-
-    // Track Meta Purchase
-    if (matched) {
-      trackMetaPurchase({
-        contentName: matched.packageName,
-        value: matched.total,
-        currency: 'IDR',
-        orderId: matched.id
-      });
     }
   }, [orders, propOrderId]);
 

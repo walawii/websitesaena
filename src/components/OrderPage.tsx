@@ -16,7 +16,7 @@ import { Order, PaymentChannel } from '../types';
 import { createDokuPaymentApi } from '../utils/dokuClient';
 import { validateIndonesianAddress, AddressValidationResult } from '../utils/addressValidation';
 import { getSmartQrisForOrder } from '../utils/qrisGenerator';
-import { trackMetaInitiateCheckout, trackMetaPageView } from '../utils/metaPixel';
+import { trackMetaInitiateCheckout, trackMetaPageView, getFbpCookie, getFbcCookie } from '../utils/metaPixel';
 
 interface OrderPageProps {
   onNavigateToPayment?: (orderId: string) => void;
@@ -254,7 +254,12 @@ export const OrderPage: React.FC<OrderPageProps> = ({
         shippingCost: 0,
         paymentMethod: paymentMethod === 'COD' ? 'COD' : 'DOKU',
         paymentChannel: paymentMethod === 'COD' ? 'cod' : selectedDokuChannel,
-        notes: notes || undefined
+        notes: notes || undefined,
+        metaTracking: {
+          fbp: getFbpCookie(),
+          fbc: getFbcCookie(),
+          eventSourceUrl: window.location.href
+        }
       };
 
       const res = await fetch('/api/orders/create', {

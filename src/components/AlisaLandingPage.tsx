@@ -56,8 +56,7 @@ import { generateValidQrisPayload, getQrisImageUrl, getSmartQrisForOrder } from 
 import { 
   trackMetaPageView, 
   trackMetaViewContent, 
-  trackMetaInitiateCheckout, 
-  trackMetaPurchase 
+  trackMetaInitiateCheckout 
 } from '../utils/metaPixel';
 
 // Visual Assets downloaded locally
