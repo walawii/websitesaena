@@ -12,6 +12,12 @@ const CATALOG: Record<string, { name: string; price: number; weight: number; qty
   'paket-3': { name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Best Seller 3 Pcs)', price: 238500, weight: 1800, qty: 3 }
 };
 
+const SERVER_COUPONS: Record<string, { discountPercent: number; maxDiscount?: number }> = {
+  SAENARAMADHAN: { discountPercent: 15, maxDiscount: 150000 },
+  WELCOME10: { discountPercent: 10 },
+  ELEGANT20: { discountPercent: 20, maxDiscount: 200000 }
+};
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method Not Allowed' });
 
@@ -29,9 +35,18 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ success: false, error: 'Nomor WhatsApp tidak valid.' });
     }
 
+    const couponCode = String(req.body?.couponCode || '').trim().toUpperCase();
+    const coupon = couponCode ? SERVER_COUPONS[couponCode] : null;
+    if (couponCode && !coupon) {
+      return res.status(400).json({ success: false, error: 'Kode voucher promo tidak valid.' });
+    }
+
     const catalogItems = items.map((it: any) => {
       const key = String(it.productId || it.id || '').toLowerCase();
-      const catalog = CATALOG[key] || CATALOG['alisa-01'];
+      const catalog = CATALOG[key];
+      if (!catalog) {
+        throw new Error(`Produk tidak dikenali: ${key || 'tanpa ID'}`);
+      }
       return {
         id: 'item-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
         productId: key || 'alisa-01',
@@ -57,7 +72,10 @@ export default async function handler(req: any, res: any) {
     };
     const shippingId = String(shipping?.id || '').toLowerCase();
     const shippingCost = SHIPPING_RATES[shippingId] ?? 15000;
-    const grandTotal = subtotal + shippingCost;
+    const discount = coupon
+      ? Math.min((subtotal * coupon.discountPercent) / 100, coupon.maxDiscount ?? Number.POSITIVE_INFINITY)
+      : 0;
+    const grandTotal = Math.max(0, subtotal - discount + shippingCost);
     const { orderNumber, invoiceNumber, accessToken } = generateOrderNumber();
 
     if (paymentMethod === 'COD') {
@@ -100,7 +118,7 @@ export default async function handler(req: any, res: any) {
       },
       items: catalogItems, quantity: catalogItems.reduce((s,it)=>s+it.quantity,0),
       weight: catalogItems.reduce((s,it)=>s+it.weight*it.quantity,0),
-      price: { subtotal, discount: 0, shippingCost, grandTotal },
+      price: { subtotal, discount, shippingCost, grandTotal },
       payment: {
         paymentMethod:'DOKU', paymentProvider:'DOKU', paymentChannel: paymentChannel || 'doku_checkout',
         paymentStatus:'PENDING', paymentReference: invoiceNumber, paymentAmount:grandTotal,

@@ -1192,7 +1192,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       },
       paymentMethod: paymentChannel === 'cod' ? 'COD' : 'DOKU',
       paymentChannel: paymentChannel,
-      notes: customer.notes
+      notes: customer.notes,
+      couponCode: appliedCoupon || undefined
     };
 
     const res = await fetch('/api/orders/create', {
