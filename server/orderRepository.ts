@@ -38,9 +38,9 @@ async function ensureDb(): Promise<any> {
 
 async function getFirestoreApi() {
   const {
-    collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit
+    collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit, runTransaction
   } = await import('firebase/firestore');
-  return { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit };
+  return { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit, runTransaction };
 }
 
 export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
@@ -434,28 +434,38 @@ const sentMetaPurchaseOrders = new Set<string>();
  * exactly one Purchase event is dispatched per order.
  */
 export async function claimOrderForMetaPurchase(orderNumber: string): Promise<boolean> {
-  if (!orderNumber) return false;
+  if (!orderNumber || !(await ensureDb())) return false;
 
-  // 1. Fast in-memory check
   if (sentMetaPurchaseOrders.has(orderNumber)) {
     return false;
   }
 
-  // 2. Fetch order to verify persistence state
-  const order = await findOrderByNumber(orderNumber);
-  if (!order) return false;
+  try {
+    const { doc, runTransaction } = await getFirestoreApi();
+    const orderRef = doc(db, 'orders', orderNumber);
 
-  // 3. Persistent flag check
-  if (order.metaCapiPurchaseSent) {
-    sentMetaPurchaseOrders.add(orderNumber);
+    const claimed = await runTransaction(db, async (transaction: any) => {
+      const snap = await transaction.get(orderRef);
+      if (!snap.exists()) return false;
+
+      const data = snap.data() as any;
+      if (data.metaCapiPurchaseSent) return false;
+
+      transaction.update(orderRef, {
+        metaCapiPurchaseSent: true,
+        updatedAt: new Date().toISOString()
+      });
+      return true;
+    });
+
+    if (claimed) {
+      sentMetaPurchaseOrders.add(orderNumber);
+    }
+    return claimed;
+  } catch (err: any) {
+    console.error(`[OrderRepository] Failed to atomically claim Meta Purchase for ${orderNumber}:`, err?.message || err);
     return false;
   }
-
-  // 4. Atomically claim & persist
-  sentMetaPurchaseOrders.add(orderNumber);
-  order.metaCapiPurchaseSent = true;
-  await saveOrder(order);
-  return true;
 }
 
 
@@ -512,8 +522,8 @@ export async function getAllOrdersList(limitCount = 50): Promise<StoredOrder[]> 
     });
     return list;
   } catch (err: any) {
-    console.warn('[OrderRepository] Failed to query all orders, falling back to memory:', err.message);
-    return Array.from(memoryOrders.values()).slice(0, limitCount);
+    console.error('[OrderRepository] Failed to query all orders from Firestore:', err.message);
+    throw new Error(`Gagal mengambil daftar pesanan dari Firestore: ${err.message || 'database error'}`);
   }
 }
 
