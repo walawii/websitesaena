@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { GoogleGenAI, Type } from '@google/genai';
 import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnectivity } from './server/mengantarService';
 import { verifyMengantarWebhookSignature, processMengantarWebhook } from './server/mengantarWebhook';
@@ -22,6 +23,41 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+function createAdminSession(secret: string): string {
+  const payload = Buffer.from(JSON.stringify({
+    exp: Date.now() + ADMIN_SESSION_TTL_MS
+  })).toString('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyAdminSession(token: string, secret: string): boolean {
+  const [payload, signature] = String(token || '').split('.');
+  if (!payload || !signature || !secret) return false;
+  try {
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return Number(data.exp) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function requireAdmin(req: any, res: any): boolean {
+  const secret = process.env.SAENA_ADMIN_KEY?.trim() || '';
+  const auth = String(req.headers.authorization || '');
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!secret || !verifyAdminSession(token, secret)) {
+    res.status(401).json({ success: false, error: 'Autentikasi admin diperlukan.' });
+    return false;
+  }
+  return true;
+}
+
 
 // Specialized raw-body capture for incoming Mengantar webhooks
 // Preserves exact unparsed bytes for HMAC-SHA256 signature verification without affecting other JSON routes
@@ -983,8 +1019,14 @@ app.get('/api/orders/:orderNumber', async (req, res) => {
 
     // Security check: Customer must provide matching accessToken or phone verification
     const isTokenMatch = order.accessToken && token && (token === order.accessToken);
-    const isPhoneMatch = req.query.phone && order.customer.phone.endsWith(String(req.query.phone).replace(/\D/g, '').slice(-4));
-    const isAdmin = !!(req.headers['x-admin-key'] || req.headers['x-admin-token']);
+    const requestedPhone = String(req.query.phone || '').replace(/\D/g, '');
+    const normalizedOrderPhone = String(order.customer.phone || '').replace(/\D/g, '');
+    const isPhoneMatch = requestedPhone.length >= 10 && normalizedOrderPhone === requestedPhone;
+    const isAdmin = (() => {
+      const secret = process.env.SAENA_ADMIN_KEY?.trim() || '';
+      const auth = String(req.headers.authorization || '');
+      return !!secret && auth.startsWith('Bearer ') && verifyAdminSession(auth.slice(7).trim(), secret);
+    })();
 
     if (!isTokenMatch && !isPhoneMatch && !isAdmin) {
       return res.status(403).json({
@@ -1061,7 +1103,11 @@ app.get('/api/orders/:orderNumber/status', async (req, res) => {
       });
     }
 
-    if (order.accessToken && token && token !== order.accessToken && !req.headers['x-admin-key']) {
+    if (order.accessToken && token && token !== order.accessToken && !(() => {
+      const secret = process.env.SAENA_ADMIN_KEY?.trim() || '';
+      const auth = String(req.headers.authorization || '');
+      return !!secret && auth.startsWith('Bearer ') && verifyAdminSession(auth.slice(7).trim(), secret);
+    })()) {
       return res.status(403).json({
         success: false,
         error: 'Akses status pesanan ditolak.'
@@ -1281,8 +1327,24 @@ app.all(['/api/doku/notification', '/api/webhooks/doku'], async (req: any, res) 
 });
 
 
+
+// Admin authentication: credentials never live in the client bundle.
+app.post('/api/admin/login', express.json(), (req, res) => {
+  const configuredKey = process.env.SAENA_ADMIN_KEY?.trim() || '';
+  const suppliedKey = String(req.body?.secret || '').trim();
+  if (!configuredKey) {
+    return res.status(503).json({ success: false, error: 'SAENA_ADMIN_KEY belum dikonfigurasi di server.' });
+  }
+  const a = Buffer.from(suppliedKey);
+  const b = Buffer.from(configuredKey);
+  const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+  if (!valid) return res.status(401).json({ success: false, error: 'Kode akses admin salah.' });
+  return res.json({ success: true, token: createAdminSession(configuredKey) });
+});
+
 // API Route: Admin Retry Shipping (Dispatch Paid / COD Order to Mengantar)
 app.post('/api/admin/orders/:orderNumber/retry-shipping', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
     const { orderNumber } = req.params;
     const order = await findOrderByNumber(orderNumber);
@@ -1477,6 +1539,7 @@ app.post('/api/mengantar/create-order', async (req, res) => {
 
 // API Route: Admin Get Orders List
 app.get('/api/admin/orders', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
     const limitCount = Math.min(100, Number(req.query.limit) || 50);
     const list = await getAllOrdersList(limitCount);

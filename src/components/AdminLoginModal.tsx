@@ -38,7 +38,7 @@ export const AdminLoginModal: React.FC = () => {
 
   if (!isAdminLoginModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!secretInput.trim()) {
       setErrorMessage('Silakan masukkan PIN atau email pengelola.');
@@ -48,14 +48,12 @@ export const AdminLoginModal: React.FC = () => {
     setIsSubmitting(true);
     setErrorMessage('');
 
-    setTimeout(() => {
-      const result = loginAsAdmin(secretInput);
-      setIsSubmitting(false);
-      if (!result.success) {
-        setErrorMessage(result.message);
-        inputRef.current?.select();
-      }
-    }, 400);
+    const result = await loginAsAdmin(secretInput);
+    setIsSubmitting(false);
+    if (!result.success) {
+      setErrorMessage(result.message);
+      inputRef.current?.select();
+    }
   };
 
   return (
@@ -98,7 +96,7 @@ export const AdminLoginModal: React.FC = () => {
 
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-[#3D3830]">
-              PIN Staf / Email Akun Admin
+              PIN / Kode Akses Admin
             </label>
             <div className="relative">
               <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8C8377]">
@@ -112,7 +110,7 @@ export const AdminLoginModal: React.FC = () => {
                   setSecretInput(e.target.value);
                   if (errorMessage) setErrorMessage('');
                 }}
-                placeholder="Masukkan PIN atau email pengelola..."
+                placeholder="Masukkan kode akses admin..."
                 className="w-full pl-10 pr-10 py-2.5 text-sm bg-white border border-[#DCD2C3] rounded-xl text-[#242320] placeholder-[#A0988A] focus:outline-none focus:border-[#1C3B2B] focus:ring-1 focus:ring-[#1C3B2B] transition-all"
                 autoComplete="current-password"
               />

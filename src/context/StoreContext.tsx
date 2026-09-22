@@ -149,7 +149,7 @@ interface StoreContextType {
   setIsPushPromptOpen: (open: boolean) => void;
   setIsAdminMode: (admin: boolean) => void;
   setIsAdminLoginModalOpen: (open: boolean) => void;
-  loginAsAdmin: (secret: string) => { success: boolean; message: string };
+  loginAsAdmin: (secret: string) => Promise<{ success: boolean; message: string }>;
   logoutAdmin: () => void;
   setSelectedProductForDetail: (p: Product | null) => void;
   setActiveWhatsAppOrder: (o: Order | null) => void;
@@ -1676,36 +1676,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   };
 
-  const loginAsAdmin = (secret: string): { success: boolean; message: string } => {
-    const trimmed = secret.trim();
-    // Valid admin credentials:
-    // PIN: saena2026, 8899, 46196 (kode pos Tamansari Tasikmalaya), admin123
-    // Email: isrofi999@gmail.com
-    const validCodes = ['saena2026', '8899', '46196', 'admin123', 'isrofi999@gmail.com'];
-    const isMatched = validCodes.includes(trimmed.toLowerCase()) || 
-                      trimmed.toLowerCase().startsWith('isrofi999@gmail.com');
+  const loginAsAdmin = async (secret: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret })
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.token) {
+        return { success: false, message: data?.error || 'Autentikasi admin gagal.' };
+      }
 
-    if (isMatched) {
       setIsAuthenticatedAdmin(true);
       setIsAdminModeState(true);
       setIsAdminLoginModalOpen(false);
-      try {
-        localStorage.setItem('saena_admin_auth_v1', 'true');
-      } catch (err) {
-        console.warn('LocalStorage admin auth warning:', err);
-      }
+      sessionStorage.setItem('saena_admin_session_v1', data.token);
       sendPushNotification(
         'Akses Pengelola Terbuka 👑',
-        'Panel Kontrol Butik & Gudang saena.id Tamansari Tasikmalaya aktif.',
+        'Panel kontrol admin berhasil diautentikasi.',
         'system'
       );
-      return { success: true, message: 'Autentikasi berhasil! Mengalihkan ke Dashboard Pengelola...' };
+      return { success: true, message: 'Autentikasi berhasil.' };
+    } catch {
+      return { success: false, message: 'Server autentikasi admin tidak dapat dihubungi.' };
     }
-
-    return { 
-      success: false, 
-      message: 'Kode akses salah. Masukkan PIN pengelola (default: saena2026) atau email terdaftar.' 
-    };
   };
 
   const logoutAdmin = () => {
