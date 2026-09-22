@@ -844,7 +844,14 @@ export const CheckoutModal: React.FC = () => {
                 </div>
               )}
 
-              {/* Submit CTA */}
+              {submitError && (
+                <div className="p-3 bg-red-50 border border-red-300 rounded-xl text-xs text-red-900">
+                  <div className="font-bold">Pembayaran belum dapat diproses</div>
+                  <div className="mt-1">{submitError}</div>
+                </div>
+              )}
+
+                            {/* Submit CTA */}
               <button
                 type="button"
                 onClick={() => { void handleSubmitOrder(); }}
