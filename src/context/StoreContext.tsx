@@ -1186,6 +1186,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         weight: item.product.weight || 600
       })),
       shipping: {
+        id: shipping.id,
         courier: shipping.courier,
         service: shipping.service
       },
