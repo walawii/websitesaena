@@ -186,7 +186,12 @@ export const CheckoutModal: React.FC = () => {
         cost: dynamicShippingCost
       };
 
-      const order = await placeOrder(customer, shippingWithDynamicCost, selectedPayment);
+      const order = await Promise.race([
+        placeOrder(customer, shippingWithDynamicCost, selectedPayment),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Server pembayaran tidak merespons dalam 15 detik. Silakan coba lagi setelah koneksi gateway diperiksa.')), 15000)
+        )
+      ]);
       setCreatedOrder(order);
 
       // Track Meta Ads Purchase Event safely
@@ -207,8 +212,9 @@ export const CheckoutModal: React.FC = () => {
       } else {
         setStep('payment_pending');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('[Checkout] Order submission failed:', err);
+      setSubmitError(err?.message || 'Pesanan gagal diproses. Silakan coba lagi.');
     } finally {
       setIsSubmitting(false);
     }
