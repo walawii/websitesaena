@@ -4,6 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
 import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnectivity } from './server/mengantarService';
+import { verifyMengantarWebhookSignature, processMengantarWebhook } from './server/mengantarWebhook';
 import { processDokuPayment, verifyDokuWebhookSignature, testDokuApiConnectivity } from './server/dokuService';
 import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService';
 import { sendMetaCapiEvent, sendMetaCapiPurchase, META_DATASET_ID } from './server/metaCapiService';
@@ -22,6 +23,20 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Specialized raw-body capture for incoming Mengantar webhooks
+// Preserves exact unparsed bytes for HMAC-SHA256 signature verification without affecting other JSON routes
+app.use('/api/webhooks/mengantar', express.raw({ type: '*/*', limit: '10mb' }), (req: any, _res, next) => {
+  if (Buffer.isBuffer(req.body)) {
+    req.rawBody = req.body.toString('utf8');
+    try {
+      req.body = req.rawBody ? JSON.parse(req.rawBody) : {};
+    } catch {
+      // Retain as string or empty object if not JSON
+    }
+  }
+  next();
+});
 
 app.use(express.json({ 
   limit: '10mb',
@@ -1537,6 +1552,103 @@ app.post('/api/mengantar/test-connection', async (_req, res) => {
       endpointVerified: false,
       verificationStatus: 'MENGANTAR_ENDPOINT_NOT_VERIFIED',
       message: `Gagal menjalankan test konektivitas Mengantar: ${err.message}`
+    });
+  }
+});
+
+// ============================================================================
+// API Route: Mengantar Incoming Webhook
+// Endpoint: https://api.saena.my.id/api/webhooks/mengantar
+// Handles real-time shipment status callbacks dispatched by Mengantar.com logistics.
+// ============================================================================
+app.get('/api/webhooks/mengantar', (_req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    endpoint: '/api/webhooks/mengantar',
+    message: 'Endpoint Incoming Webhook Mengantar aktif dan siap menerima HTTP POST payload.',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/api/webhooks/mengantar', async (req: any, res) => {
+  try {
+    const signature = (
+      req.headers['x-signature'] || 
+      req.headers['X-Signature'] || 
+      req.headers['x-mengantar-signature'] || 
+      ''
+    ) as string;
+
+    const timestamp = (
+      req.headers['x-timestamp'] || 
+      req.headers['X-Timestamp'] || 
+      req.headers['x-mengantar-timestamp'] || 
+      ''
+    ) as string;
+
+    const rawBody = req.rawBody ?? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+    const secret = process.env.MENGANTAR_WEBHOOK_SECRET?.trim() || '';
+
+    console.log(`[Mengantar Webhook] Incoming POST received. Timestamp: "${timestamp}", Sig length: ${signature.length}`);
+
+    // 1. Signature Verification
+    if (!signature) {
+      console.warn('[Mengantar Webhook] Rejected: Missing required x-signature header.');
+      return res.status(401).json({
+        success: false,
+        error: 'Missing required x-signature header.'
+      });
+    }
+
+    if (!timestamp) {
+      console.warn('[Mengantar Webhook] Rejected: Missing required x-timestamp header.');
+      return res.status(401).json({
+        success: false,
+        error: 'Missing required x-timestamp header.'
+      });
+    }
+
+    if (!secret) {
+      console.warn('[Mengantar Webhook] Rejected: MENGANTAR_WEBHOOK_SECRET is not configured on server.');
+      return res.status(401).json({
+        success: false,
+        error: 'MENGANTAR_WEBHOOK_SECRET is not configured on server. Signature verification cannot proceed.'
+      });
+    }
+
+    const { valid, reason } = verifyMengantarWebhookSignature(timestamp, rawBody, signature, secret);
+
+    if (!valid) {
+      console.warn(`[Mengantar Webhook] Rejected: Invalid signature. Reason: ${reason}`);
+      return res.status(401).json({
+        success: false,
+        error: reason || 'Invalid webhook signature.'
+      });
+    }
+
+    // 2. Parse JSON payload
+    let payload = req.body;
+    if (typeof payload === 'string') {
+      try {
+        payload = JSON.parse(payload);
+      } catch (err: any) {
+        console.warn('[Mengantar Webhook] Rejected: Malformed JSON payload.', err.message);
+        return res.status(400).json({
+          success: false,
+          error: 'Malformed JSON payload.'
+        });
+      }
+    }
+
+    // 3. Process status update idempotently
+    const result = await processMengantarWebhook(payload, timestamp);
+    return res.status(result.statusCode).json(result.response);
+
+  } catch (err: any) {
+    console.error('[Mengantar Webhook] Server error handling webhook:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: `Internal server error: ${err.message}`
     });
   }
 });

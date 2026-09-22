@@ -200,9 +200,9 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
       subtotal: order.price.subtotal,
       shippingCost: order.price.shippingCost,
       discount: order.price.discount,
-      status: order.payment.paymentStatus === 'PAID' 
+      status: order.status || (order.payment.paymentStatus === 'PAID' 
         ? (order.shipping.shippingStatus === 'CREATED' ? 'sedang_dikemas' : 'dibayar')
-        : 'menunggu_pembayaran',
+        : 'menunggu_pembayaran'),
       trackingNumber: order.shipping.trackingNumber || ''
     });
 
@@ -270,6 +270,102 @@ export async function findOrderByNumber(identifier: string): Promise<StoredOrder
     }
   } catch (err: any) {
     console.error(`[OrderRepository] Error finding order ${identifier}:`, err.message);
+  }
+
+  return null;
+}
+
+export async function findOrderByShipmentIdentity(
+  orderId?: string,
+  cnoteNo?: string
+): Promise<StoredOrder | null> {
+  const cleanOrderId = (orderId || '').trim();
+  const cleanCnoteNo = (cnoteNo || '').trim();
+
+  if (!cleanOrderId && !cleanCnoteNo) {
+    return null;
+  }
+
+  // 1. Search in-memory cache
+  for (const ord of memoryOrders.values()) {
+    if (cleanOrderId) {
+      if (
+        ord.orderNumber === cleanOrderId ||
+        ord.id === cleanOrderId ||
+        ord.invoiceNumber === cleanOrderId ||
+        ord.shipping?.mengantarOrderId === cleanOrderId
+      ) {
+        return ord;
+      }
+    }
+    if (cleanCnoteNo) {
+      if (
+        ord.shipping?.trackingNumber === cleanCnoteNo ||
+        ord.trackingNumber === cleanCnoteNo ||
+        ord.shipping?.airwaybill === cleanCnoteNo
+      ) {
+        return ord;
+      }
+    }
+  }
+
+  // 2. Lookup by orderId
+  if (cleanOrderId) {
+    const found = await findOrderByNumber(cleanOrderId);
+    if (found) return found;
+
+    if (db) {
+      try {
+        const qMgt = query(collection(db, 'orders'), where('shipping.mengantarOrderId', '==', cleanOrderId), limit(1));
+        const snapMgt = await getDocs(qMgt);
+        if (!snapMgt.empty) {
+          const docSnap = snapMgt.docs[0];
+          const order = mapFirestoreDataToStoredOrder(docSnap.data(), docSnap.id);
+          memoryOrders.set(order.orderNumber, order);
+          memoryOrders.set(order.id, order);
+          return order;
+        }
+      } catch (err: any) {
+        console.warn('[OrderRepository] Query by shipping.mengantarOrderId failed:', err.message);
+      }
+    }
+  }
+
+  // 3. Lookup by cnoteNo (resi / waybill)
+  if (cleanCnoteNo && db) {
+    try {
+      const qTrack1 = query(collection(db, 'orders'), where('shipping.trackingNumber', '==', cleanCnoteNo), limit(1));
+      const snapTrack1 = await getDocs(qTrack1);
+      if (!snapTrack1.empty) {
+        const docSnap = snapTrack1.docs[0];
+        const order = mapFirestoreDataToStoredOrder(docSnap.data(), docSnap.id);
+        memoryOrders.set(order.orderNumber, order);
+        memoryOrders.set(order.id, order);
+        return order;
+      }
+
+      const qTrack2 = query(collection(db, 'orders'), where('trackingNumber', '==', cleanCnoteNo), limit(1));
+      const snapTrack2 = await getDocs(qTrack2);
+      if (!snapTrack2.empty) {
+        const docSnap = snapTrack2.docs[0];
+        const order = mapFirestoreDataToStoredOrder(docSnap.data(), docSnap.id);
+        memoryOrders.set(order.orderNumber, order);
+        memoryOrders.set(order.id, order);
+        return order;
+      }
+
+      const qTrack3 = query(collection(db, 'orders'), where('shipping.airwaybill', '==', cleanCnoteNo), limit(1));
+      const snapTrack3 = await getDocs(qTrack3);
+      if (!snapTrack3.empty) {
+        const docSnap = snapTrack3.docs[0];
+        const order = mapFirestoreDataToStoredOrder(docSnap.data(), docSnap.id);
+        memoryOrders.set(order.orderNumber, order);
+        memoryOrders.set(order.id, order);
+        return order;
+      }
+    } catch (err: any) {
+      console.warn('[OrderRepository] Query by cnoteNo failed:', err.message);
+    }
   }
 
   return null;
