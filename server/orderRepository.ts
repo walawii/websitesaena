@@ -171,8 +171,7 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
 
   await ensureDb();
   if (!db) {
-    console.warn('[OrderRepository] Firestore DB not ready, stored in memory cache.');
-    return order;
+    throw new Error('Penyimpanan pesanan Firestore tidak tersedia. Pesanan tidak boleh dianggap tersimpan.');
   }
 
   try {
@@ -220,6 +219,7 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
     console.log(`[OrderRepository] Order saved to Firestore successfully: ${order.orderNumber} (ID: ${order.id})`);
   } catch (err: any) {
     console.error(`[OrderRepository] Failed to save order to Firestore (${order.orderNumber}):`, err.message);
+    throw new Error(`Gagal menyimpan pesanan ke Firestore: ${err.message || 'database error'}`);
   }
 
   return order;
