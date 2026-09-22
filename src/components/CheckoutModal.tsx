@@ -58,6 +58,7 @@ export const CheckoutModal: React.FC = () => {
   const [copiedVA, setCopiedVA] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Customer Shipping Address Form (Defaults to blank/clean for public users, caches to localStorage)
   const [customer, setCustomer] = useState<CustomerDetails>(() => {
@@ -839,7 +840,8 @@ export const CheckoutModal: React.FC = () => {
 
               {/* Submit CTA */}
               <button
-                type="submit"
+                type="button"
+                onClick={() => { void handleSubmitOrder(); }}
                 disabled={isSubmitting}
                 className="w-full py-3.5 px-4 bg-[#1C3B2B] text-white text-xs sm:text-sm font-semibold rounded-xl hover:bg-[#28523C] shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
