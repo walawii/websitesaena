@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
 import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnectivity } from './server/mengantarService';
@@ -1767,6 +1766,7 @@ Tuliskan dalam format JSON murni dengan struktur persis seperti berikut:
 export { app };
 
 async function startServer() {
+  const { createServer: createViteServer } = await import('vite');
   // Serve static files from public directory
   app.use(express.static(path.join(process.cwd(), 'public')));
 
