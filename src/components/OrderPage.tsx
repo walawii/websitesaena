@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { Order, PaymentChannel } from '../types';
-import { createMengantarOrderApi } from '../utils/mengantarClient';
 import { createDokuPaymentApi } from '../utils/dokuClient';
 import { validateIndonesianAddress, AddressValidationResult } from '../utils/addressValidation';
 import { getSmartQrisForOrder } from '../utils/qrisGenerator';
@@ -21,10 +20,15 @@ import { trackMetaInitiateCheckout, trackMetaPageView } from '../utils/metaPixel
 
 interface OrderPageProps {
   onNavigateToPayment?: (orderId: string) => void;
+  onNavigateToThankYou?: (orderNumber: string) => void;
   onNavigateHome?: () => void;
 }
 
-export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNavigateHome }) => {
+export const OrderPage: React.FC<OrderPageProps> = ({ 
+  onNavigateToPayment, 
+  onNavigateToThankYou, 
+  onNavigateHome 
+}) => {
   const { 
     dokuConfig, 
     mengantarConfig, 
@@ -121,19 +125,19 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
   const totalWeightInGrams = currentPackage.qty * PRODUCT_WEIGHT_GRAMS;
   const weightInKg = Math.max(1, Math.ceil(totalWeightInGrams / 1000));
 
-  // Courier base rates from Central Warehouse Tasikmalaya
-  const [courierRates, setCourierRates] = useState<Record<string, number>>({
-    'JNE': 18000,
-    'J&T Express': 17000,
-    'SiCepat': 16000
-  });
+  // Courier live rates from Mengantar.com (No hardcoded fake fallback rates)
+  const [courierRates, setCourierRates] = useState<Record<string, number>>({});
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesError, setRatesError] = useState<string | null>(null);
 
   // Dynamic rates from Mengantar endpoint
   useEffect(() => {
     let isCancelled = false;
     const fetchRates = async () => {
+      setRatesLoading(true);
+      setRatesError(null);
       try {
-        const res = await fetch('/api/mengantar/rates', {
+        const res = await fetch('/api/shipping/rates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -143,17 +147,35 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
           })
         });
         const data = await res.json();
-        if (!isCancelled && data.success && Array.isArray(data.rates)) {
-          const newRates: Record<string, number> = {};
-          data.rates.forEach((r: any) => {
-            if (r.courier && r.cost) {
-              newRates[r.courier] = r.cost;
+        if (!isCancelled) {
+          if (data && data.success && Array.isArray(data.rates) && data.rates.length > 0) {
+            const newRates: Record<string, number> = {};
+            data.rates.forEach((r: any) => {
+              if (r.courier && typeof r.cost === 'number' && Number.isFinite(r.cost) && r.cost > 0) {
+                newRates[r.courier] = r.cost;
+              }
+            });
+            if (Object.keys(newRates).length > 0) {
+              setCourierRates(newRates);
+              setRatesError(null);
+            } else {
+              setCourierRates({});
+              setRatesError('Ongkir belum dapat dihitung. Silakan coba lagi.');
             }
-          });
-          setCourierRates(prev => ({ ...prev, ...newRates }));
+          } else {
+            setCourierRates({});
+            setRatesError('Ongkir belum dapat dihitung. Silakan coba lagi.');
+          }
         }
       } catch {
-        // fallback to standard rates per kg
+        if (!isCancelled) {
+          setCourierRates({});
+          setRatesError('Ongkir belum dapat dihitung. Silakan coba lagi.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setRatesLoading(false);
+        }
       }
     };
 
@@ -162,7 +184,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
   }, [customerCity, totalWeightInGrams]);
 
   // Current shipping cost calculation - SEMUA GRATIS ONGKIR SE-INDONESIA (Rp 0)
-  const baseShippingCost = courierRates[selectedCourier] || 18000;
+  const actualCourierRate = courierRates[selectedCourier];
   const shippingCost = 0; // SEMUA GRATIS ONGKIR (baik COD maupun Transfer/QRIS)
   const finalTotal = currentPackage.promoPrice;
 
@@ -198,185 +220,68 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
     setIsSubmitting(true);
 
     try {
-      const orderId = `ALS-${Date.now().toString().slice(-6)}`;
       const colorSelection = currentPackage.qty > 1 
         ? `${selectedColor} & ${secondaryColor}`
         : selectedColor;
 
-      // 1. Electronic Payment processing via DOKU Payment Gateway
-      let dokuResult: any = undefined;
-      if (paymentMethod === 'TRANSFER') {
-        const dokuRes = await createDokuPaymentApi({
-          orderId,
-          invoiceNumber: `INV-DOKU-${orderId}`,
-          amount: currentPackage.promoPrice,
-          customer: {
-            fullName: customerName,
-            whatsapp: customerPhone,
-            address: `${customerAddress}, ${customerSubdistrict ? `Kec. ${customerSubdistrict}, ` : ''}${customerCity || 'Kota Tasikmalaya'}`
-          },
-          items: [{
-            name: `Mukena Traveling 2in1 Alisa Premium (${currentPackage.title} - ${colorSelection})`,
-            quantity: currentPackage.qty,
-            price: Math.round(currentPackage.promoPrice / currentPackage.qty)
-          }],
-          channel: selectedDokuChannel
-        }, dokuConfig);
-
-        if (dokuRes.success && dokuRes.data) {
-          dokuResult = dokuRes.data;
-        }
-      }
-
-      // 2. Dispatch Order to Mengantar.com
-      const targetProduct = products.find(p => p.id === 'alisa-01') || {
-        id: 'alisa-01',
-        name: 'Mukena Traveling 2in1 Laser Cut Alisa Premium',
-        price: 79500,
-        weight: 600 * currentPackage.qty,
-        images: ['/assets/alisa/alisa-pink-model.webp']
-      };
-
-      const fullOrder: Order = {
-        id: orderId,
-        createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+      const orderPayload = {
         customer: {
-          fullName: customerName,
-          whatsapp: customerPhone,
-          email: `${customerPhone.replace(/[^0-9]/g, '')}@saena.my.id`,
-          address: customerAddress,
-          city: customerCity || 'Kota Tasikmalaya',
-          subdistrict: customerSubdistrict || 'Tamansari',
+          customerName: customerName.trim(),
+          phone: customerPhone.trim(),
+          email: `${customerPhone.replace(/[^0-9]/g, '')}@saena.my.id`
+        },
+        shippingAddress: {
+          address: customerAddress.trim(),
           province: 'Jawa Barat',
-          postalCode: '46196',
-          country: 'Indonesia',
-          notes: notes || undefined
+          city: customerCity || 'Kota Tasikmalaya',
+          district: customerSubdistrict || 'Tamansari',
+          postalCode: '46196'
         },
-        items: [{
-          id: `ci-${Date.now()}`,
-          productId: 'alisa-01',
-          product: { ...(targetProduct as any), weight: 600 * currentPackage.qty },
-          selectedColor: { name: colorSelection, hex: '#C48B9F' },
-          selectedSize: 'Standar Jumbo Dewasa',
-          quantity: currentPackage.qty,
-          price: Math.round(currentPackage.promoPrice / currentPackage.qty)
-        }],
-        shipping: {
-          id: `ship-${selectedCourier.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-          name: `Mengantar.com - ${selectedCourier}`,
-          courier: selectedCourier,
-          service: 'REG',
-          cost: shippingCost,
-          estimatedDays: '1-3 Hari Kerja',
-          logo: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=100&q=80'
-        },
-        payment: {
-          channel: paymentMethod === 'COD' ? 'cod' : selectedDokuChannel,
-          channelName: paymentMethod === 'COD' 
-            ? 'COD (Bayar di Tempat - Mengantar.com)' 
-            : (dokuResult?.virtualAccountInfo 
-                ? `${dokuResult.virtualAccountInfo.bank} Virtual Account (DOKU)` 
-                : 'QRIS Realtime Dynamic (DOKU Gateway)'),
-          virtualAccount: dokuResult?.virtualAccountInfo?.vaNumber || (selectedDokuChannel.includes('va_') ? `88888${Math.floor(1000000000 + Math.random() * 9000000000)}` : undefined),
-          qrCodeUrl: dokuResult?.qrisInfo?.qrImage || (paymentMethod === 'TRANSFER' && selectedDokuChannel === 'doku_qris' 
-            ? getSmartQrisForOrder({ orderId, amount: currentPackage.promoPrice, config: dokuConfig }).qrImageUrl 
-            : undefined),
-          expiryMinutes: 60,
-          doku: dokuResult
-        },
-        subtotal: currentPackage.promoPrice,
-        discount: 0,
-        shippingCost: shippingCost,
-        total: finalTotal,
-        currency: 'IDR',
-        currencyRate: 1,
-        status: 'menunggu_pembayaran',
-        trackingNumber: '',
-        trackingHistory: [
+        items: [
           {
-            time: 'Baru saja',
-            location: 'Central Warehouse saena.my.id Tasikmalaya (Mengantar.com Hub)',
-            description: `Pesanan dibuat dan dialokasikan ke ekspedisi ${selectedCourier} via Mengantar.com (Berat: ${totalWeightInGrams}gr, Ongkir: Rp ${shippingCost.toLocaleString('id-ID')}).`
+            id: 'alisa-01',
+            name: `Mukena Traveling 2in1 Laser Cut Alisa (${currentPackage.title})`,
+            variant: colorSelection,
+            color: selectedColor,
+            size: 'Standar Jumbo Dewasa',
+            price: Math.round(currentPackage.promoPrice / currentPackage.qty),
+            quantity: currentPackage.qty,
+            weight: 600 * currentPackage.qty
           }
         ],
-        notes
+        courier: selectedCourier,
+        service: 'REG',
+        shippingCost: 0,
+        paymentMethod: paymentMethod === 'COD' ? 'COD' : 'DOKU',
+        paymentChannel: paymentMethod === 'COD' ? 'cod' : selectedDokuChannel,
+        notes: notes || undefined
       };
 
-      // Call Mengantar.com API
-      const mengantarRes = await createMengantarOrderApi(fullOrder, mengantarConfig);
-      if (mengantarRes.success && mengantarRes.data) {
-        fullOrder.mengantar = mengantarRes.data;
-        fullOrder.trackingNumber = mengantarRes.data.trackingNumber;
-        fullOrder.trackingHistory.push({
-          time: 'Baru saja',
-          location: 'Mengantar.com Hub Tasikmalaya',
-          description: `Nomor resi ${mengantarRes.data.courier} terbit otomatis (${mengantarRes.data.trackingNumber}). Kurir dijadwalkan pickup ${mengantarRes.data.pickupTime}.`
-        });
+      const res = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload)
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success || !json.data) {
+        throw new Error(json.error || 'Gagal menerbitkan pesanan resmi.');
+      }
+
+      const orderNumber = json.data.orderNumber;
+      const accessToken = json.data.accessToken;
+
+      if (accessToken) {
+        try {
+          sessionStorage.setItem(`order_token_${orderNumber}`, accessToken);
+        } catch {}
+      }
+
+      if (onNavigateToThankYou) {
+        onNavigateToThankYou(orderNumber);
       } else {
-        const fallbackResi = `MGT-${selectedCourier.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-8)}`;
-        fullOrder.trackingNumber = fallbackResi;
-        fullOrder.mengantar = {
-          mengantarOrderId: `MGT-${orderId}`,
-          trackingNumber: fallbackResi,
-          courier: selectedCourier,
-          serviceType: 'REG',
-          status: 'MENUNGGU_PICKUP',
-          pickupTime: 'Hari ini, 14:00 - 17:00 WIB',
-          shippingFee: shippingCost,
-          isCod: paymentMethod === 'COD',
-          codAmount: paymentMethod === 'COD' ? finalTotal : 0,
-          syncedAt: new Date().toISOString()
-        };
-      }
-
-      // Success data stored to localStorage so /payment can pick it up immediately
-      const successData = {
-        order: fullOrder,
-        id: orderId,
-        packageName: currentPackage.title,
-        color: colorSelection,
-        total: finalTotal,
-        shippingCost,
-        weightGrams: totalWeightInGrams,
-        paymentMethod,
-        name: customerName,
-        phone: customerPhone,
-        address: customerAddress,
-        city: customerCity || 'Kota Tasikmalaya',
-        date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-        doku: fullOrder.payment.doku,
-        mengantar: fullOrder.mengantar,
-        selectedCourier,
-        selectedDokuChannel
-      };
-
-      try {
-        localStorage.setItem('saena_latest_order', JSON.stringify(successData));
-      } catch {
-        // ignore
-      }
-
-      // Save to centralized store & Firestore
-      try {
-        if (typeof recordDirectOrder === 'function') {
-          await recordDirectOrder(fullOrder);
-        } else {
-          if (typeof setOrders === 'function') {
-            setOrders(prev => Array.isArray(prev) ? [fullOrder, ...prev.filter(o => o.id !== fullOrder.id)] : [fullOrder]);
-          }
-          if (typeof syncOrderToFirestore === 'function') {
-            await syncOrderToFirestore(fullOrder);
-          }
-        }
-      } catch (saveErr) {
-        console.warn('Order state save notice:', saveErr);
-      }
-
-      // Navigate to /payment?orderId=...
-      if (onNavigateToPayment) {
-        onNavigateToPayment(orderId);
-      } else {
-        window.location.href = `/payment?orderId=${orderId}`;
+        const tokenQuery = accessToken ? `&token=${encodeURIComponent(accessToken)}` : '';
+        window.location.href = `/thank-you?order=${encodeURIComponent(orderNumber)}${tokenQuery}`;
       }
     } catch (err: any) {
       alert(`Terjadi kendala saat memproses pesanan: ${err.message || 'Silakan coba lagi.'}`);
@@ -744,11 +649,8 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                   { id: 'J&T Express', name: 'J&T Express', desc: 'Layanan EZ Cepat (1-3 hari)', badge: 'PRIORITAS' },
                   { id: 'SiCepat', name: 'SiCepat', desc: 'Layanan REG (1-3 hari)', badge: 'AMAN' }
                 ].map((courier) => {
-                  const rate = courierRates[courier.id] || (
-                    courier.id === 'JNE' ? 18000 * weightInKg :
-                    courier.id === 'J&T Express' ? 17000 * weightInKg :
-                    16000 * weightInKg
-                  );
+                  const rate = courierRates[courier.id];
+                  const hasValidRate = typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
                   return (
                     <button
                       key={courier.id}
@@ -769,13 +671,13 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       <p className="text-[11px] text-gray-500">{courier.desc}</p>
                       <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between text-[11px]">
                         <span className="text-gray-500">Tarif ({totalWeightInGrams}gr):</span>
-                        {paymentMethod === 'TRANSFER' ? (
+                        {hasValidRate ? (
                           <span className="font-bold text-emerald-700">
                             GRATIS <del className="text-gray-400 font-normal">Rp {rate.toLocaleString('id-ID')}</del>
                           </span>
                         ) : (
-                          <span className="font-bold text-[#88222A]">
-                            Rp {rate.toLocaleString('id-ID')}
+                          <span className="font-bold text-emerald-700">
+                            GRATIS ONGKIR
                           </span>
                         )}
                       </div>
@@ -783,6 +685,20 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                   );
                 })}
               </div>
+
+              {ratesLoading && (
+                <div className="mt-2 text-[11px] text-gray-500 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                  <span>Menghubungi API Mengantar untuk kalkulasi tarif resmi...</span>
+                </div>
+              )}
+
+              {ratesError && (
+                <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Ongkir belum dapat dihitung. Silakan coba lagi. (Promo aktif: Seluruh pesanan tetap Bebas Ongkir Rp 0).</span>
+                </div>
+              )}
 
               <div className="mt-2.5 p-2.5 rounded-lg bg-[#FAF8F5] border border-[#E8DFC8] flex items-center justify-between gap-2 text-[11px] text-[#615446]">
                 <div className="flex items-center gap-2">
@@ -835,7 +751,9 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       </p>
                       <div className="mt-1.5 text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
                         <Check className="w-3 h-3" />
-                        <span>Bebas ongkir kurir Mengantar (Hemat Rp {baseShippingCost.toLocaleString('id-ID')})</span>
+                        <span>
+                          Bebas ongkir kurir Mengantar {typeof actualCourierRate === 'number' && actualCourierRate > 0 ? `(Hemat Rp ${actualCourierRate.toLocaleString('id-ID')})` : '(Promo Bebas Ongkir Rp 0)'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -871,7 +789,9 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                       </p>
                       <div className="mt-1.5 text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
                         <Check className="w-3 h-3" />
-                        <span>Bebas ongkir kurir Mengantar (Hemat Rp {baseShippingCost.toLocaleString('id-ID')})</span>
+                        <span>
+                          Bebas ongkir kurir Mengantar {typeof actualCourierRate === 'number' && actualCourierRate > 0 ? `(Hemat Rp ${actualCourierRate.toLocaleString('id-ID')})` : '(Promo Bebas Ongkir Rp 0)'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -944,7 +864,9 @@ export const OrderPage: React.FC<OrderPageProps> = ({ onNavigateToPayment, onNav
                 <span>Ongkos Kirim Mengantar:</span>
                 <span className="text-emerald-700 font-bold flex items-center gap-1.5">
                   <span>Rp 0 (GRATIS ONGKIR SE-INDONESIA)</span>
-                  <del className="text-gray-400 font-normal">Rp {baseShippingCost.toLocaleString('id-ID')}</del>
+                  {typeof actualCourierRate === 'number' && actualCourierRate > 0 && (
+                    <del className="text-gray-400 font-normal">Rp {actualCourierRate.toLocaleString('id-ID')}</del>
+                  )}
                 </span>
               </div>
 

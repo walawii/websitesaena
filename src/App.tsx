@@ -20,6 +20,7 @@ import { ProductLandingPage } from './components/ProductLandingPage';
 import { AlisaPage } from './components/AlisaPage';
 import { OrderPage } from './components/OrderPage';
 import { PaymentPage } from './components/PaymentPage';
+import { ThankYouPage } from './components/ThankYouPage';
 import { 
   Filter, 
   SlidersHorizontal, 
@@ -196,6 +197,15 @@ const MainContent: React.FC = () => {
       new URLSearchParams(window.location.search).get('page') === 'order'
     ));
 
+  const isThankYouPage = 
+    currentPath === '/thank-you' || 
+    currentPath.startsWith('/thank-you') ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.toLowerCase().startsWith('/thank-you') ||
+      new URLSearchParams(window.location.search).get('path') === 'thank-you' ||
+      new URLSearchParams(window.location.search).get('page') === 'thank-you'
+    ));
+
   const isPaymentPage = 
     currentPath === '/payment' || 
     currentPath.startsWith('/payment') ||
@@ -230,7 +240,7 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /alisa, display Alisa Landing Page with all order buttons directed to https://order.saena.my.id/order
+  // If path is /alisa, display Alisa Landing Page
   if (isAlisaPage) {
     return (
       <>
@@ -241,7 +251,7 @@ const MainContent: React.FC = () => {
             if (packageId) params.set('package', packageId);
             if (color) params.set('color', color);
             const qs = params.toString();
-            window.location.href = qs ? `https://order.saena.my.id/order?${qs}` : 'https://order.saena.my.id/order';
+            navigateTo(qs ? `/order?${qs}` : '/order');
           }}
         />
         <DokuConfigModal
@@ -261,33 +271,54 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /order, redirect immediately to external server order.saena.my.id/order
+  // If path is /order, render internal OrderPage
   if (isOrderPage) {
-    if (typeof window !== 'undefined') {
-      const search = window.location.search || '';
-      // Arahkan otomatis ke server formulir pemesanan resmi
-      window.location.replace(`https://order.saena.my.id/order${search}`);
-    }
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 text-center">
-        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E8DFC8] shadow-lg max-w-md w-full space-y-4">
-          <div className="w-14 h-14 rounded-full bg-[#1C3B2B]/10 text-[#1C3B2B] flex items-center justify-center mx-auto">
-            <ShoppingBag className="w-7 h-7 animate-pulse text-[#88222A]" />
-          </div>
-          <h2 className="font-serif text-lg sm:text-xl font-bold text-[#1C3B2B]">
-            Membuka Formulir Pemesanan Resmi
-          </h2>
-          <p className="text-xs sm:text-sm text-[#615446] leading-relaxed">
-            Anda sedang dialihkan ke server pemesanan resmi toko di <strong>order.saena.my.id/order</strong>...
-          </p>
-          <a
-            href={`https://order.saena.my.id/order${typeof window !== 'undefined' ? window.location.search : ''}`}
-            className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#88222A] hover:bg-[#721B22] text-white font-bold text-xs sm:text-sm rounded-xl shadow transition-all cursor-pointer"
-          >
-            <span>Buka Langsung order.saena.my.id/order →</span>
-          </a>
-        </div>
-      </div>
+      <>
+        <OrderPage 
+          onNavigateHome={() => navigateTo('/')}
+          onNavigateToThankYou={(orderNo) => navigateTo(`/thank-you?order=${encodeURIComponent(orderNo)}`)}
+          onNavigateToPayment={(orderId) => navigateTo(`/thank-you?order=${encodeURIComponent(orderId)}`)}
+        />
+        <DokuConfigModal
+          isOpen={isDokuConfigModalOpen}
+          onClose={() => setIsDokuConfigModalOpen(false)}
+        />
+        <MengantarConfigModal
+          isOpen={isMengantarConfigModalOpen}
+          onClose={() => setIsMengantarConfigModalOpen(false)}
+        />
+        <MengantarLabelModal
+          order={activeMengantarLabelOrder}
+          isOpen={isMengantarLabelModalOpen}
+          onClose={() => setIsMengantarLabelModalOpen(false)}
+        />
+      </>
+    );
+  }
+
+  // If path is /thank-you, render ThankYouPage
+  if (isThankYouPage) {
+    return (
+      <>
+        <ThankYouPage 
+          onNavigateHome={() => navigateTo('/')}
+          onNavigateOrder={() => navigateTo('/order')}
+        />
+        <DokuConfigModal
+          isOpen={isDokuConfigModalOpen}
+          onClose={() => setIsDokuConfigModalOpen(false)}
+        />
+        <MengantarConfigModal
+          isOpen={isMengantarConfigModalOpen}
+          onClose={() => setIsMengantarConfigModalOpen(false)}
+        />
+        <MengantarLabelModal
+          order={activeMengantarLabelOrder}
+          isOpen={isMengantarLabelModalOpen}
+          onClose={() => setIsMengantarLabelModalOpen(false)}
+        />
+      </>
     );
   }
 
@@ -297,7 +328,7 @@ const MainContent: React.FC = () => {
       <>
         <PaymentPage 
           onNavigateHome={() => navigateTo('/')}
-          onNavigateNewOrder={() => { window.location.href = 'https://order.saena.my.id/order'; }}
+          onNavigateNewOrder={() => navigateTo('/order')}
         />
         <DokuConfigModal
           isOpen={isDokuConfigModalOpen}

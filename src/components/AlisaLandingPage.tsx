@@ -316,13 +316,13 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
     if (pkg) params.set('package', pkg);
     if (col) params.set('color', col);
     const qs = params.toString();
-    const targetUrl = qs ? `https://order.saena.my.id/order?${qs}` : 'https://order.saena.my.id/order';
+    const targetUrl = qs ? `/order?${qs}` : '/order';
 
-    // Karena domain order.saena.my.id tersimpan di host/server eksternal terpisah:
     if (onNavigateOrder) {
       onNavigateOrder(pkg, col);
+    } else {
+      window.location.href = targetUrl;
     }
-    window.location.href = targetUrl;
   };
 
   const scrollToForm = (pkgId?: any, colName?: any) => {

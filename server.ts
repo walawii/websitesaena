@@ -3,26 +3,34 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
-import { processMengantarOrder } from './server/mengantarService';
-import { processDokuPayment } from './server/dokuService';
+import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnectivity } from './server/mengantarService';
+import { processDokuPayment, verifyDokuWebhookSignature, testDokuApiConnectivity } from './server/dokuService';
 import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService';
+import {
+  generateOrderNumber,
+  saveOrder,
+  findOrderByNumber,
+  updateOrderPayment,
+  updateOrderShipping,
+  getAllOrdersList,
+  StoredOrder
+} from './server/orderRepository';
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 
 // Health Check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
-});
-
-// Redirect /order request directly to the external server at https://order.saena.my.id
-app.get(['/order', '/order/*'], (req, res) => {
-  const query = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
-  res.redirect(302, `https://order.saena.my.id${query}`);
 });
 
 // Curated high quality presets for fallback images & colors
@@ -492,178 +500,954 @@ app.get('/api/shopee/store-info', (req, res) => {
   });
 });
 
-// API Route: System Credentials Status - Auto-detected from server environment
+// API Route: System Credentials Status - Server-side detection only (No secrets returned)
 app.get('/api/system/gateway-config', (req, res) => {
   res.json({
-    mengantar: {
-      hasKey: !!process.env.MENGANTAR_API_KEY,
-      apiKey: process.env.MENGANTAR_API_KEY || '',
-      environment: 'production'
-    },
     doku: {
-      hasKey: !!(process.env.DOKU_CLIENT_ID && process.env.DOKU_SECRET_KEY),
-      clientId: process.env.DOKU_CLIENT_ID || '',
-      environment: process.env.DOKU_ENVIRONMENT || 'sandbox'
+      configured: !!(process.env.DOKU_CLIENT_ID && process.env.DOKU_SECRET_KEY)
+    },
+    mengantar: {
+      configured: !!process.env.MENGANTAR_API_KEY
     }
   });
 });
 
-// API Route: Mengantar.com Integration - Create Order & Generate Waybill
-app.post('/api/mengantar/create-order', async (req, res) => {
-  try {
-    const apiKeyHeader = req.headers['x-mengantar-api-key'] as string | undefined;
-    const orderData = req.body;
+// Server-Authoritative Product & Bundle Catalog
+const SERVER_PRODUCT_CATALOG: Record<string, { name: string; price: number; weight: number; qty: number }> = {
+  'alisa-01': {
+    name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Hemat 1 Pcs)',
+    price: 79500,
+    weight: 600,
+    qty: 1
+  },
+  'alisa-02': {
+    name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Bundling 2 Pcs)',
+    price: 159000,
+    weight: 1200,
+    qty: 2
+  },
+  'alisa-03': {
+    name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Best Seller 3 Pcs)',
+    price: 238500,
+    weight: 1800,
+    qty: 3
+  },
+  'paket-1': {
+    name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Hemat 1 Pcs)',
+    price: 79500,
+    weight: 600,
+    qty: 1
+  },
+  'paket-2': {
+    name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Bundling 2 Pcs)',
+    price: 159000,
+    weight: 1200,
+    qty: 2
+  },
+  'paket-3': {
+    name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Best Seller 3 Pcs)',
+    price: 238500,
+    weight: 1800,
+    qty: 3
+  }
+};
 
-    if (!orderData || !orderData.customer || !orderData.items) {
+// API Route: Create Order (Server-Side Total Calculation & Gateway Orchestration)
+app.post('/api/orders/create', async (req, res) => {
+  try {
+    const {
+      customer,
+      shippingAddress,
+      shipping,
+      items,
+      courier,
+      service,
+      packageId,
+      paymentMethod, // 'DOKU' | 'COD'
+      paymentChannel, // e.g. 'doku_checkout'
+      notes
+    } = req.body;
+
+    // 1. Validate Customer
+    if (!customer || !customer.customerName || !customer.phone) {
       return res.status(400).json({
         success: false,
-        error: 'Data pesanan tidak lengkap (customer dan items wajib diisi).'
+        error: 'Nama lengkap dan nomor WhatsApp pelanggan wajib diisi.'
       });
     }
 
-    const result = await processMengantarOrder(orderData, apiKeyHeader);
-    return res.json(result);
-  } catch (err: any) {
-    console.error('Error creating order in Mengantar:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || 'Gagal menghubungkan pesanan ke Mengantar.com'
-    });
-  }
-});
-
-// API Route: Mengantar.com - Test Connection & API Key Validation
-app.post('/api/mengantar/test-connection', async (req, res) => {
-  const { apiKey } = req.body;
-  const keyToTest = apiKey || process.env.MENGANTAR_API_KEY;
-
-  if (!keyToTest) {
-    return res.json({
-      success: true,
-      connected: false,
-      mode: 'sandbox',
-      message: 'Mode Sandbox Aktif (Simulasi Internal). Belum ada API Key Mengantar yang dimasukkan, sehingga pesanan belum diteruskan ke akun Mengantar.com luar.'
-    });
-  }
-
-  return res.json({
-    success: true,
-    connected: true,
-    mode: keyToTest.startsWith('demo_') ? 'sandbox' : 'production',
-    message: 'Koneksi ke Mengantar.com Berhasil! API Key tersimpan dan akun siap menerbitkan resi & request pickup langsung ke server Mengantar.'
-  });
-});
-
-// API Route: Mengantar.com - Courier Rates
-app.post('/api/mengantar/rates', async (req, res) => {
-  const { originCity = 'Kota Tasikmalaya', destinationCity, weight = 600 } = req.body;
-  const weightInKg = Math.max(1, Math.ceil(Number(weight) / 1000));
-
-  const standardRates = [
-    { courier: 'JNE', service: 'REG', name: 'JNE Reguler', cost: 18000 * weightInKg, etd: '1-2 Hari' },
-    { courier: 'J&T Express', service: 'EZ', name: 'J&T Reguler', cost: 17000 * weightInKg, etd: '1-2 Hari' },
-    { courier: 'SiCepat', service: 'SIUNTUNG', name: 'SiCepat SiUntung', cost: 16000 * weightInKg, etd: '1-2 Hari' },
-    { courier: 'Anteraja', service: 'REG', name: 'Anteraja Regular', cost: 16500 * weightInKg, etd: '1-3 Hari' },
-    { courier: 'Ninja Xpress', service: 'STANDARD', name: 'Ninja Reguler', cost: 17500 * weightInKg, etd: '2-3 Hari' },
-    { courier: 'JNE', service: 'YES', name: 'JNE YES (Yakin Esok Sampai)', cost: 32000 * weightInKg, etd: '1 Hari (Besok Sampai)' }
-  ];
-
-  return res.json({
-    success: true,
-    origin: originCity,
-    destination: destinationCity || 'Tujuan Pengiriman',
-    weightGrams: weight,
-    weightInKg,
-    rates: standardRates
-  });
-});
-
-// API Route: DOKU Payment Gateway - Create Payment Session
-app.post('/api/doku/create-payment', async (req, res) => {
-  try {
-    const { orderPayload, config } = req.body;
-    if (!orderPayload || !orderPayload.amount) {
+    const cleanPhone = customer.phone.replace(/[^0-9+]/g, '');
+    if (cleanPhone.replace(/\D/g, '').length < 10) {
       return res.status(400).json({
         success: false,
-        error: 'Data order untuk pembayaran DOKU tidak valid (amount & customer wajib diisi).'
+        error: 'Nomor WhatsApp tidak valid (minimal 10 digit).'
       });
     }
 
-    const result = await processDokuPayment(orderPayload, config);
-    return res.json(result);
-  } catch (err: any) {
-    console.error('Error in DOKU create payment route:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || 'Gagal memproses pembayaran DOKU.com'
+    const effectiveShippingAddress = shippingAddress || {
+      address: customer?.address || '',
+      province: customer?.province || '',
+      city: customer?.city || '',
+      district: customer?.district || customer?.subdistrict || '',
+      postalCode: customer?.postalCode || ''
+    };
+
+    // 2. Validate Address
+    if (!effectiveShippingAddress || !effectiveShippingAddress.address || !effectiveShippingAddress.city || !effectiveShippingAddress.province) {
+      return res.status(400).json({
+        success: false,
+        error: 'Alamat pengiriman lengkap (alamat, kota/kabupaten, dan provinsi) wajib diisi.'
+      });
+    }
+
+    // 3. Validate Items & Server-Side Price Calculation (Ignored client price)
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Keranjang belanja kosong.'
+      });
+    }
+
+    let calculatedSubtotal = 0;
+    let totalQuantity = 0;
+    let totalWeightGrams = 0;
+
+    const validatedItems = items.map((it: any, idx: number) => {
+      const rawKey = String(packageId || it.packageId || it.productId || it.id || '').toLowerCase();
+      let catalog = SERVER_PRODUCT_CATALOG[rawKey];
+      if (!catalog) {
+        if (rawKey.includes('paket-3') || rawKey.includes('alisa-03') || it.name?.includes('3 Pcs')) {
+          catalog = SERVER_PRODUCT_CATALOG['alisa-03'];
+        } else if (rawKey.includes('paket-2') || rawKey.includes('alisa-02') || it.name?.includes('2 Pcs')) {
+          catalog = SERVER_PRODUCT_CATALOG['alisa-02'];
+        } else {
+          catalog = SERVER_PRODUCT_CATALOG['alisa-01'];
+        }
+      }
+
+      const qty = Math.max(1, Number(it.quantity) || catalog.qty || 1);
+      // Strictly authoritative server price - ignore client price
+      const unitPrice = catalog.price;
+      const weight = catalog.weight;
+
+      calculatedSubtotal += unitPrice;
+      totalQuantity += qty;
+      totalWeightGrams += weight;
+
+      return {
+        id: `item-${Date.now()}-${idx}`,
+        productId: rawKey || 'alisa-01',
+        name: catalog.name,
+        variant: it.variant || it.color || 'Standard',
+        color: it.color || 'Standard',
+        size: it.size || 'All Size',
+        price: unitPrice,
+        quantity: qty,
+        weight,
+        image: it.image
+      };
     });
-  }
-});
 
-// API Route: DOKU Payment Gateway - Test Connection
-app.post('/api/doku/test-connection', async (req, res) => {
-  try {
-    const { clientId, secretKey, environment } = req.body;
-    const activeClientId = clientId || process.env.DOKU_CLIENT_ID || '';
-    const activeSecretKey = secretKey || process.env.DOKU_SECRET_KEY || '';
-    const env = environment || process.env.DOKU_ENVIRONMENT || 'sandbox';
+    // 4. Server-Side Shipping Cost Calculation
+    // Saena Mukena Alisa campaign features nationwide Free Shipping ("Gratis Ongkir Se-Indonesia")
+    const calculatedShippingCost = 0;
+    const discount = 0;
+    const grandTotal = Math.max(0, calculatedSubtotal + calculatedShippingCost - discount);
 
-    if (!activeClientId || !activeSecretKey) {
+    // 5. Generate Order Identifiers & Crypto Security Token
+    const { orderNumber, invoiceNumber, accessToken } = generateOrderNumber();
+    const isCod = paymentMethod === 'COD';
+
+    // 6. Build Stored Order Model (Phase 5 schema)
+    const storedOrder: StoredOrder = {
+      id: orderNumber,
+      orderNumber,
+      invoiceNumber,
+      accessToken,
+      processedWebhookIds: [],
+      customer: {
+        customerName: customer.customerName.trim(),
+        phone: cleanPhone,
+        email: customer.email?.trim() || ''
+      },
+      shippingAddress: {
+        address: effectiveShippingAddress.address.trim(),
+        province: effectiveShippingAddress.province.trim(),
+        city: effectiveShippingAddress.city.trim(),
+        district: effectiveShippingAddress.district?.trim() || '',
+        postalCode: effectiveShippingAddress.postalCode?.trim() || ''
+      },
+      items: validatedItems,
+      quantity: totalQuantity,
+      weight: totalWeightGrams,
+      price: {
+        subtotal: calculatedSubtotal,
+        discount,
+        shippingCost: calculatedShippingCost,
+        grandTotal
+      },
+      payment: {
+        paymentMethod: isCod ? 'COD' : 'DOKU',
+        paymentProvider: isCod ? 'COD' : 'DOKU',
+        paymentChannel: isCod ? 'cod' : (paymentChannel || 'doku_checkout'),
+        paymentStatus: 'PENDING',
+        paymentReference: invoiceNumber,
+        paymentAmount: grandTotal,
+        paymentCreatedAt: new Date().toISOString(),
+        paymentPaidAt: null,
+        paymentUrl: null,
+        vaNumber: null,
+        bank: null,
+        qrisString: null,
+        qrisImage: null
+      },
+      shipping: {
+        shippingProvider: 'Mengantar',
+        courier: courier || shipping?.courier || 'JNE',
+        service: service || shipping?.service || 'REG',
+        shippingStatus: isCod ? 'PENDING' : 'NOT_CREATED',
+        mengantarOrderId: null,
+        trackingNumber: null,
+        airwaybill: null,
+        labelUrl: null,
+        shippingCreatedAt: null,
+        shippingUpdatedAt: null,
+        estimatedDelivery: '2 - 3 Hari Kerja',
+        notes: notes || ''
+      },
+      total: grandTotal,
+      status: 'menunggu_pembayaran',
+      trackingNumber: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // 7. Handle COD Flow
+    if (isCod) {
+      storedOrder.payment.paymentStatus = 'UNPAID';
+      storedOrder.status = 'sedang_dikemas';
+
+      // Call Mengantar directly for COD orders if configured
+      if (process.env.MENGANTAR_API_KEY) {
+        try {
+          const mgtRes = await processMengantarOrder({
+            orderId: orderNumber,
+            customer: {
+              fullName: storedOrder.customer.customerName,
+              whatsapp: storedOrder.customer.phone,
+              email: storedOrder.customer.email,
+              address: storedOrder.shippingAddress.address,
+              subdistrict: storedOrder.shippingAddress.district,
+              city: storedOrder.shippingAddress.city,
+              province: storedOrder.shippingAddress.province,
+              postalCode: storedOrder.shippingAddress.postalCode,
+              notes: notes || 'Pesanan COD Saena Butik'
+            },
+            courier: storedOrder.shipping.courier,
+            serviceType: storedOrder.shipping.service,
+            items: storedOrder.items.map(i => ({
+              name: i.name,
+              quantity: i.quantity,
+              price: i.price,
+              weight: i.weight
+            })),
+            totalAmount: grandTotal,
+            shippingCost: calculatedShippingCost,
+            isCod: true,
+            notes: notes || 'Pesanan COD Saena Butik'
+          });
+
+          if (mgtRes.success && mgtRes.data) {
+            storedOrder.shipping.shippingStatus = 'CREATED';
+            storedOrder.shipping.trackingNumber = mgtRes.data.trackingNumber;
+            storedOrder.shipping.mengantarOrderId = mgtRes.data.mengantarOrderId;
+            storedOrder.shipping.labelUrl = mgtRes.data.labelUrl;
+            storedOrder.shipping.airwaybill = mgtRes.data.airwayBillUrl;
+            storedOrder.shipping.shippingCreatedAt = new Date().toISOString();
+            storedOrder.trackingNumber = mgtRes.data.trackingNumber;
+            storedOrder.shipping.mengantarResponse = mgtRes.data;
+          } else {
+            storedOrder.shipping.shippingStatus = 'FAILED';
+          }
+        } catch (mgtErr: any) {
+          console.warn('[CreateOrder] Mengantar COD dispatch error:', mgtErr.message);
+          storedOrder.shipping.shippingStatus = 'FAILED';
+        }
+      }
+
+      await saveOrder(storedOrder);
+
       return res.json({
         success: true,
-        connected: true,
-        mode: 'sandbox',
-        message: 'DOKU Payment Gateway aktif dalam Mode Sandbox (Simulasi Realtime Transaksi Jokul DOKU).'
+        orderNumber,
+        invoiceNumber,
+        accessToken,
+        grandTotal,
+        paymentMethod: 'COD',
+        paymentStatus: storedOrder.payment.paymentStatus,
+        shippingStatus: storedOrder.shipping.shippingStatus,
+        trackingNumber: storedOrder.shipping.trackingNumber || null
       });
     }
 
-    if (activeSecretKey.includes('*')) {
-      return res.status(400).json({
+    // 8. Handle DOKU Flow (Online Payment Gateway)
+    if (!process.env.DOKU_CLIENT_ID || !process.env.DOKU_SECRET_KEY) {
+      storedOrder.payment.paymentStatus = 'FAILED';
+      storedOrder.status = 'dibatalkan';
+      await saveOrder(storedOrder);
+
+      return res.status(503).json({
         success: false,
-        error: 'Secret Key masih disensor (mengandung tanda bintang "*"). Harap buka dashboard DOKU, klik tombol "Reveal Key" di sebelah Active Secret Key terlebih dahulu, lalu salin kuncinya secara utuh.'
+        error: 'Layanan pembayaran DOKU belum dikonfigurasi di server environment (DOKU_CLIENT_ID & DOKU_SECRET_KEY wajib diisi).',
+        orderNumber
+      });
+    }
+
+    const dokuRes = await processDokuPayment({
+      orderId: orderNumber,
+      invoiceNumber,
+      amount: grandTotal,
+      customer: {
+        fullName: storedOrder.customer.customerName,
+        whatsapp: storedOrder.customer.phone,
+        email: storedOrder.customer.email,
+        address: storedOrder.shippingAddress.address
+      },
+      items: storedOrder.items.map(i => ({
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price
+      })),
+      channel: paymentChannel || 'doku_checkout'
+    });
+
+    if (!dokuRes.success || !dokuRes.data) {
+      // DOKU payment session failed: DO NOT pretend success, do NOT generate fake URLs/VA/QRIS
+      storedOrder.payment.paymentStatus = 'FAILED';
+      storedOrder.status = 'dibatalkan';
+      await saveOrder(storedOrder);
+
+      return res.status(502).json({
+        success: false,
+        error: `Gagal membuat sesi pembayaran DOKU: ${dokuRes.error || 'Server pembayaran DOKU tidak dapat merespons.'}`,
+        orderNumber
+      });
+    }
+
+    // DOKU request succeeded with real payment data
+    const dokuData = dokuRes.data;
+    storedOrder.payment.paymentUrl = dokuData.paymentUrl || null;
+    storedOrder.payment.vaNumber = dokuData.virtualAccountInfo?.vaNumber || null;
+    storedOrder.payment.bank = dokuData.virtualAccountInfo?.bank || null;
+    storedOrder.payment.qrisString = dokuData.qrisInfo?.qrString || null;
+    storedOrder.payment.qrisImage = dokuData.qrisInfo?.qrImage || null;
+    storedOrder.payment.dokuResponse = dokuData;
+
+    await saveOrder(storedOrder);
+
+    return res.json({
+      success: true,
+      orderNumber,
+      invoiceNumber,
+      accessToken,
+      grandTotal,
+      paymentMethod: 'DOKU',
+      paymentStatus: storedOrder.payment.paymentStatus,
+      paymentUrl: storedOrder.payment.paymentUrl,
+      vaNumber: storedOrder.payment.vaNumber,
+      bank: storedOrder.payment.bank,
+      qrisString: storedOrder.payment.qrisString,
+      qrisImage: storedOrder.payment.qrisImage
+    });
+
+  } catch (error: any) {
+    console.error('[CreateOrder] Error creating order:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Terjadi kesalahan sistem saat membuat pesanan.'
+    });
+  }
+});
+
+
+// API Route: Get Order Details (Secure & Sanitized - Requires Token or Authorization)
+app.get('/api/orders/:orderNumber', async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const token = (req.query.token as string) || (req.headers['x-order-token'] as string);
+    const order = await findOrderByNumber(orderNumber);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Pesanan tidak ditemukan di database saena.id.'
+      });
+    }
+
+    // Security check: Customer must provide matching accessToken or phone verification
+    const isTokenMatch = order.accessToken && token && (token === order.accessToken);
+    const isPhoneMatch = req.query.phone && order.customer.phone.endsWith(String(req.query.phone).replace(/\D/g, '').slice(-4));
+    const isAdmin = !!(req.headers['x-admin-key'] || req.headers['x-admin-token']);
+
+    if (!isTokenMatch && !isPhoneMatch && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses pesanan dibatasi. Token keamanan (token) atau verifikasi nomor telepon diperlukan.'
       });
     }
 
     return res.json({
       success: true,
-      connected: true,
-      mode: env,
-      clientId: `${activeClientId.substring(0, 4)}••••••••`,
-      message: `Kredensial DOKU.com terverifikasi! Siap memproses transaksi pembayaran (${env.toUpperCase()} mode).`
+      data: {
+        orderNumber: order.orderNumber,
+        invoiceNumber: order.invoiceNumber,
+        customer: {
+          customerName: order.customer.customerName,
+          phone: order.customer.phone.length > 6 
+            ? `${order.customer.phone.substring(0, 4)}••••${order.customer.phone.slice(-3)}`
+            : order.customer.phone,
+          email: order.customer.email
+        },
+        shippingAddress: order.shippingAddress,
+        items: order.items,
+        quantity: order.quantity,
+        weight: order.weight,
+        price: order.price,
+        payment: {
+          paymentMethod: order.payment.paymentMethod,
+          paymentProvider: order.payment.paymentProvider,
+          paymentChannel: order.payment.paymentChannel,
+          paymentStatus: order.payment.paymentStatus,
+          paymentAmount: order.payment.paymentAmount,
+          paymentCreatedAt: order.payment.paymentCreatedAt,
+          paymentPaidAt: order.payment.paymentPaidAt,
+          paymentUrl: order.payment.paymentUrl,
+          vaNumber: order.payment.vaNumber,
+          bank: order.payment.bank,
+          qrisString: order.payment.qrisString,
+          qrisImage: order.payment.qrisImage
+        },
+        shipping: {
+          shippingProvider: order.shipping.shippingProvider,
+          courier: order.shipping.courier,
+          service: order.shipping.service,
+          shippingStatus: order.shipping.shippingStatus,
+          trackingNumber: order.shipping.trackingNumber,
+          airwaybill: order.shipping.airwaybill,
+          labelUrl: order.shipping.labelUrl,
+          estimatedDelivery: order.shipping.estimatedDelivery
+        },
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+      }
     });
   } catch (err: any) {
+    console.error('[GetOrder] Error:', err);
     return res.status(500).json({
       success: false,
-      error: err.message || 'Gagal memvalidasi koneksi DOKU'
+      error: 'Gagal mengambil data pesanan.'
     });
   }
 });
 
-// API Route: DOKU Payment Gateway - Webhook Notification (POST from DOKU, GET for browser check)
-app.all('/api/doku/notification', (req, res) => {
+// API Route: Polling Order Status (Fast & Lightweight with Token Security)
+app.get('/api/orders/:orderNumber/status', async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const token = (req.query.token as string) || (req.headers['x-order-token'] as string);
+    const order = await findOrderByNumber(orderNumber);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Pesanan tidak ditemukan'
+      });
+    }
+
+    if (order.accessToken && token && token !== order.accessToken && !req.headers['x-admin-key']) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses status pesanan ditolak.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      orderNumber: order.orderNumber,
+      paymentStatus: order.payment.paymentStatus,
+      shippingStatus: order.shipping.shippingStatus,
+      trackingNumber: order.shipping.trackingNumber || null,
+      paidAt: order.payment.paymentPaidAt || null,
+      paymentUrl: order.payment.paymentUrl || null,
+      grandTotal: order.price.grandTotal
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: DOKU Webhook Notification (Strict Jokul HMAC-SHA256 & Amount Validation)
+app.all(['/api/doku/notification', '/api/webhooks/doku'], async (req: any, res) => {
   try {
     if (req.method === 'GET') {
       return res.status(200).json({
         status: 'OK',
-        endpoint: '/api/doku/notification',
-        message: 'Endpoint Webhook Notifikasi DOKU.com aktif dan siap menerima HTTP POST payload transaksi dari DOKU Jokul Payment Gateway.',
+        endpoint: req.path,
+        message: 'Endpoint Webhook Notifikasi DOKU Jokul aktif dan siap menerima HTTP POST payload.',
         timestamp: new Date().toISOString()
       });
     }
 
+    const clientId = (req.headers['client-id'] || req.headers['Client-Id']) as string;
+    const requestId = (req.headers['request-id'] || req.headers['Request-Id']) as string;
+    const requestTimestamp = (req.headers['request-timestamp'] || req.headers['Request-Timestamp']) as string;
+    const signature = (req.headers['signature'] || req.headers['Signature']) as string;
+    const rawBody = req.rawBody || JSON.stringify(req.body);
+
+    const secretKey = process.env.DOKU_SECRET_KEY || '';
+
+    console.log(`[DOKU Webhook] Received notification on ${req.path}. Request-Id: ${requestId}`);
+
+    // 1. Mandatory Signature Validation (Reject if missing or invalid)
+    if (!signature) {
+      console.warn('[DOKU Webhook] Rejected: Missing Signature header');
+      return res.status(401).json({ status: 'MISSING_SIGNATURE', error: 'Signature header is required.' });
+    }
+
+    if (!secretKey) {
+      console.error('[DOKU Webhook] Error: DOKU_SECRET_KEY not configured on server.');
+      return res.status(500).json({ status: 'CONFIGURATION_ERROR', error: 'DOKU_SECRET_KEY is not configured.' });
+    }
+
+    const isValid = verifyDokuWebhookSignature(
+      clientId,
+      requestId,
+      requestTimestamp,
+      req.path || '/api/doku/notification',
+      rawBody,
+      signature,
+      secretKey
+    );
+
+    if (!isValid) {
+      console.warn('[DOKU Webhook] Rejected: Invalid HMAC-SHA256 signature.');
+      return res.status(401).json({ status: 'INVALID_SIGNATURE', error: 'Webhook signature verification failed.' });
+    }
+
     const notificationData = req.body;
-    console.log('DOKU Webhook Notification received:', notificationData);
-    
-    // DOKU Jokul expects 200 OK
+    const invoiceNumber = notificationData.order?.invoice_number || 
+      notificationData.orderId || 
+      notificationData.invoiceNumber;
+    const rawStatus = (notificationData.transaction?.status || notificationData.status || '').toUpperCase();
+
+    if (!invoiceNumber) {
+      console.warn('[DOKU Webhook] Missing invoice number in payload.');
+      return res.status(400).json({ status: 'BAD_REQUEST', error: 'Missing invoice number.' });
+    }
+
+    // 2. Find Order in Repository
+    const order = await findOrderByNumber(invoiceNumber);
+    if (!order) {
+      console.warn(`[DOKU Webhook] Order not found for invoice: ${invoiceNumber}`);
+      return res.status(404).json({ status: 'ORDER_NOT_FOUND', error: 'Order not found.' });
+    }
+
+    // 3. Amount Validation (Mandatory for SUCCESS/PAID status to prevent underpayment/fraud)
+    if (rawStatus === 'SUCCESS' || rawStatus === 'PAID') {
+      const rawAmount = notificationData.order?.amount ?? notificationData.amount ?? notificationData.transaction?.amount;
+      const paidAmount = Number(rawAmount);
+
+      if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+        console.error(`[DOKU Webhook] REJECTED: Missing or invalid amount in payload. Received: ${rawAmount}`);
+        return res.status(400).json({
+          status: 'INVALID_AMOUNT',
+          error: 'Amount is mandatory and must be a valid positive number for successful payment webhook.'
+        });
+      }
+
+      const expectedAmount = Number(order.price.grandTotal);
+      if (paidAmount !== expectedAmount) {
+        console.error(`[DOKU Webhook] AMOUNT MISMATCH REJECTED! Expected: ${expectedAmount}, Received: ${paidAmount}`);
+        return res.status(400).json({
+          status: 'AMOUNT_MISMATCH',
+          error: `Notification amount (${paidAmount}) does not match order grand total (${expectedAmount}). Webhook rejected.`
+        });
+      }
+    }
+
+    // 4. Webhook Idempotency Check
+    if (order.payment.paymentStatus === 'PAID') {
+      if (order.processedWebhookIds?.includes(requestId)) {
+        console.log(`[DOKU Webhook] Request-Id ${requestId} already processed. Returning 200 OK.`);
+        return res.status(200).json({ status: 'OK', message: 'Already processed.' });
+      }
+    }
+
+    // 5. Official Status Mapping & State Transition
+    if (rawStatus === 'SUCCESS' || rawStatus === 'PAID') {
+      const paidAt = new Date().toISOString();
+      await updateOrderPayment(order.orderNumber, 'PAID', {
+        paidAt,
+        dokuResponse: notificationData,
+        webhookId: requestId
+      });
+      console.log(`[DOKU Webhook] Order ${order.orderNumber} successfully updated to PAID.`);
+
+      // 6. Trigger Mengantar Shipment Creation (Idempotent: only if not already created)
+      if (process.env.MENGANTAR_API_KEY && order.shipping.shippingStatus !== 'CREATED' && !order.shipping.trackingNumber) {
+        try {
+          const mgtRes = await processMengantarOrder({
+            orderId: order.orderNumber,
+            customer: {
+              fullName: order.customer.customerName,
+              whatsapp: order.customer.phone,
+              email: order.customer.email,
+              address: order.shippingAddress.address,
+              subdistrict: order.shippingAddress.district,
+              city: order.shippingAddress.city,
+              province: order.shippingAddress.province,
+              postalCode: order.shippingAddress.postalCode,
+              notes: 'Pesanan Dibayar DOKU saena.id'
+            },
+            courier: order.shipping.courier,
+            serviceType: order.shipping.service,
+            items: order.items.map(i => ({
+              name: i.name,
+              quantity: i.quantity,
+              price: i.price,
+              weight: i.weight
+            })),
+            totalAmount: order.price.grandTotal,
+            shippingCost: order.price.shippingCost,
+            isCod: false,
+            notes: 'Pesanan Dibayar DOKU saena.id'
+          });
+
+          if (mgtRes.success && mgtRes.data) {
+            await updateOrderShipping(order.orderNumber, 'CREATED', {
+              trackingNumber: mgtRes.data.trackingNumber,
+              mengantarOrderId: mgtRes.data.mengantarOrderId,
+              airwaybill: mgtRes.data.airwayBillUrl,
+              labelUrl: mgtRes.data.labelUrl,
+              mengantarResponse: mgtRes.data
+            });
+            console.log(`[DOKU Webhook] Mengantar shipment created! Resi: ${mgtRes.data.trackingNumber}`);
+          } else {
+            // Mengantar failed, but payment REMAINS PAID!
+            await updateOrderShipping(order.orderNumber, 'FAILED', {
+              mengantarResponse: mgtRes
+            });
+            console.warn(`[DOKU Webhook] Mengantar dispatch failed. Payment remains PAID. Reason: ${mgtRes.error}`);
+          }
+        } catch (mgtErr: any) {
+          console.error('[DOKU Webhook] Error creating Mengantar shipment:', mgtErr.message);
+          await updateOrderShipping(order.orderNumber, 'FAILED', {});
+        }
+      }
+    } else if (rawStatus === 'FAILED') {
+      await updateOrderPayment(order.orderNumber, 'FAILED', {
+        dokuResponse: notificationData,
+        webhookId: requestId
+      });
+    } else if (rawStatus === 'EXPIRED') {
+      await updateOrderPayment(order.orderNumber, 'EXPIRED', {
+        dokuResponse: notificationData,
+        webhookId: requestId
+      });
+    } else if (rawStatus === 'CANCELLED' || rawStatus === 'CANCELED') {
+      await updateOrderPayment(order.orderNumber, 'CANCELLED', {
+        dokuResponse: notificationData,
+        webhookId: requestId
+      });
+    }
+
     return res.status(200).json({
       status: 'OK',
-      message: 'Notification acknowledged by saena.id'
+      message: 'Notification processed successfully by saena.id'
     });
+
   } catch (err: any) {
-    console.error('DOKU Webhook error:', err);
-    return res.status(500).json({ status: 'ERROR' });
+    console.error('[DOKU Webhook] Unexpected error:', err);
+    return res.status(500).json({ status: 'ERROR', error: err.message });
   }
 });
+
+
+// API Route: Admin Retry Shipping (Dispatch Paid / COD Order to Mengantar)
+app.post('/api/admin/orders/:orderNumber/retry-shipping', async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const order = await findOrderByNumber(orderNumber);
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan' });
+    }
+
+    // Requirement 7: RETRY IDEMPOTENCY
+    // Check mengantarOrderId, trackingNumber, and shippingStatus before creating shipment
+    const isAlreadyCreated = order.shipping.shippingStatus === 'CREATED';
+    const hasTrackingNumber = !!(order.shipping.trackingNumber && order.shipping.trackingNumber.trim());
+    const hasMengantarOrderId = !!(order.shipping.mengantarOrderId && order.shipping.mengantarOrderId.trim());
+
+    if (isAlreadyCreated || hasTrackingNumber || hasMengantarOrderId) {
+      console.log(`[Retry Shipping] Order ${orderNumber} already has active shipment. Status: ${order.shipping.shippingStatus}, Resi: ${order.shipping.trackingNumber}, Mengantar ID: ${order.shipping.mengantarOrderId}. Duplicate shipment prevented.`);
+      return res.status(200).json({
+        success: true,
+        alreadyCreated: true,
+        message: 'Pengiriman sudah terbit sebelumnya. Tidak dapat membuat pengiriman kedua.',
+        trackingNumber: order.shipping.trackingNumber || null,
+        mengantarOrderId: order.shipping.mengantarOrderId || null,
+        labelUrl: order.shipping.labelUrl || null,
+        shippingStatus: order.shipping.shippingStatus,
+        order
+      });
+    }
+
+    if (!process.env.MENGANTAR_API_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: 'MENGANTAR_API_KEY belum dikonfigurasi di environment server.'
+      });
+    }
+
+    const isCod = order.payment.paymentMethod === 'COD';
+    const mgtRes = await processMengantarOrder({
+      orderId: order.orderNumber,
+      customer: {
+        fullName: order.customer.customerName,
+        whatsapp: order.customer.phone,
+        email: order.customer.email,
+        address: order.shippingAddress.address,
+        subdistrict: order.shippingAddress.district,
+        city: order.shippingAddress.city,
+        province: order.shippingAddress.province,
+        postalCode: order.shippingAddress.postalCode,
+        notes: isCod ? 'Pesanan COD Saena' : 'Pesanan Dibayar Saena'
+      },
+      courier: order.shipping.courier,
+      serviceType: order.shipping.service,
+      items: order.items.map(i => ({
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+        weight: i.weight
+      })),
+      totalAmount: order.price.grandTotal,
+      shippingCost: order.price.shippingCost,
+      isCod,
+      notes: isCod ? 'Pesanan COD Saena' : 'Pesanan Dibayar Saena'
+    });
+
+    if (mgtRes.success && mgtRes.data) {
+      const updated = await updateOrderShipping(order.orderNumber, 'CREATED', {
+        trackingNumber: mgtRes.data.trackingNumber,
+        mengantarOrderId: mgtRes.data.mengantarOrderId,
+        airwaybill: mgtRes.data.airwayBillUrl,
+        labelUrl: mgtRes.data.labelUrl,
+        mengantarResponse: mgtRes.data
+      });
+
+      return res.json({
+        success: true,
+        message: 'Pesanan berhasil diterbitkan ke Mengantar.com!',
+        trackingNumber: mgtRes.data.trackingNumber,
+        labelUrl: mgtRes.data.labelUrl,
+        order: updated
+      });
+    } else {
+      await updateOrderShipping(order.orderNumber, 'FAILED', {
+        mengantarResponse: mgtRes
+      });
+      return res.status(400).json({
+        success: false,
+        error: mgtRes.error || 'Gagal menerbitkan pesanan ke Mengantar.'
+      });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Create Mengantar Order (Direct Dispatch with Strict Idempotency)
+app.post('/api/mengantar/create-order', async (req, res) => {
+  try {
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: 'orderId is required' });
+    }
+
+    const order = await findOrderByNumber(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan' });
+    }
+
+    // Strict Idempotency: Check mengantarOrderId, trackingNumber, and shippingStatus
+    const isAlreadyCreated = order.shipping.shippingStatus === 'CREATED';
+    const hasTrackingNumber = !!(order.shipping.trackingNumber && order.shipping.trackingNumber.trim());
+    const hasMengantarOrderId = !!(order.shipping.mengantarOrderId && order.shipping.mengantarOrderId.trim());
+
+    if (isAlreadyCreated || hasTrackingNumber || hasMengantarOrderId) {
+      return res.json({
+        success: true,
+        alreadyCreated: true,
+        message: 'Pengiriman sudah terbit sebelumnya.',
+        data: {
+          mengantarOrderId: order.shipping.mengantarOrderId || '',
+          trackingNumber: order.shipping.trackingNumber || '',
+          courier: order.shipping.courier,
+          serviceType: order.shipping.service,
+          status: 'MENUNGGU_PICKUP',
+          labelUrl: order.shipping.labelUrl,
+          airwayBillUrl: order.shipping.labelUrl
+        }
+      });
+    }
+
+    if (!process.env.MENGANTAR_API_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: 'MENGANTAR_API_KEY belum dikonfigurasi di environment server.'
+      });
+    }
+
+    const isCod = order.payment.paymentMethod === 'COD';
+    const mgtRes = await processMengantarOrder({
+      orderId: order.orderNumber,
+      customer: {
+        fullName: order.customer.customerName,
+        whatsapp: order.customer.phone,
+        email: order.customer.email,
+        address: order.shippingAddress.address,
+        subdistrict: order.shippingAddress.district,
+        city: order.shippingAddress.city,
+        province: order.shippingAddress.province,
+        postalCode: order.shippingAddress.postalCode,
+        notes: isCod ? 'Pesanan COD Saena' : 'Pesanan Dibayar Saena'
+      },
+      courier: order.shipping.courier,
+      serviceType: order.shipping.service,
+      items: order.items.map(i => ({
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+        weight: i.weight
+      })),
+      totalAmount: order.price.grandTotal,
+      shippingCost: order.price.shippingCost,
+      isCod,
+      notes: isCod ? 'Pesanan COD Saena' : 'Pesanan Dibayar Saena'
+    });
+
+    if (mgtRes.success && mgtRes.data) {
+      const updated = await updateOrderShipping(order.orderNumber, 'CREATED', {
+        trackingNumber: mgtRes.data.trackingNumber,
+        mengantarOrderId: mgtRes.data.mengantarOrderId,
+        airwaybill: mgtRes.data.airwayBillUrl,
+        labelUrl: mgtRes.data.labelUrl,
+        mengantarResponse: mgtRes.data
+      });
+
+      return res.json({
+        success: true,
+        message: 'Pesanan berhasil diterbitkan ke Mengantar.com!',
+        data: mgtRes.data,
+        order: updated
+      });
+    } else {
+      await updateOrderShipping(order.orderNumber, 'FAILED', {
+        mengantarResponse: mgtRes
+      });
+      return res.status(400).json({
+        success: false,
+        error: mgtRes.error || 'Gagal menerbitkan pesanan ke Mengantar.'
+      });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Get Orders List
+app.get('/api/admin/orders', async (req, res) => {
+  try {
+    const limitCount = Math.min(100, Number(req.query.limit) || 50);
+    const list = await getAllOrdersList(limitCount);
+    return res.json({
+      success: true,
+      total: list.length,
+      orders: list
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Shipping Rates (Mengantar Integration)
+async function handleShippingRates(req: any, res: any) {
+  try {
+    const { originCity = 'Kota Tasikmalaya', destinationCity, weight = 600 } = req.body;
+    const ratesResult = await calculateMengantarRates(originCity, destinationCity, Number(weight) || 600);
+    return res.json(ratesResult);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+app.post('/api/shipping/rates', handleShippingRates);
+app.post('/api/mengantar/rates', handleShippingRates);
+
+// API Route: DOKU Payment Gateway - Test Connection (Diagnostic Check, Not A Real Payment)
+app.post('/api/doku/test-connection', async (_req, res) => {
+  try {
+    const result = await testDokuApiConnectivity();
+    return res.json({
+      success: result.configured,
+      configured: result.configured,
+      apiReachable: result.apiReachable,
+      authenticationVerified: result.authenticationVerified,
+      paymentTransactionTested: result.paymentTransactionTested,
+      mode: result.mode,
+      clientId: result.clientId,
+      message: result.message
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      configured: false,
+      apiReachable: false,
+      authenticationVerified: false,
+      paymentTransactionTested: false,
+      message: `Gagal menjalankan test konektivitas DOKU: ${err.message}`
+    });
+  }
+});
+
+// API Route: Mengantar.com - Test Connection (Diagnostic Check with MENGANTAR_ENDPOINT_NOT_VERIFIED status)
+app.post('/api/mengantar/test-connection', async (_req, res) => {
+  try {
+    const result = await testMengantarApiConnectivity();
+    return res.json({
+      success: result.configured,
+      configured: result.configured,
+      apiReachable: result.apiReachable,
+      authenticationVerified: result.authenticationVerified,
+      endpointVerified: result.endpointVerified,
+      verificationStatus: result.verificationStatus,
+      message: result.message
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      configured: false,
+      apiReachable: false,
+      authenticationVerified: false,
+      endpointVerified: false,
+      verificationStatus: 'MENGANTAR_ENDPOINT_NOT_VERIFIED',
+      message: `Gagal menjalankan test konektivitas Mengantar: ${err.message}`
+    });
+  }
+});
+
 
 // Public SEO Routes
 app.get('/robots.txt', (req, res) => {

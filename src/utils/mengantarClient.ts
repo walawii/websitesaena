@@ -10,7 +10,7 @@ export const DEFAULT_MENGANTAR_CONFIG: MengantarStoreConfig = {
 
 export async function createMengantarOrderApi(
   order: Order,
-  config?: Partial<MengantarStoreConfig>
+  _config?: any
 ): Promise<{ success: boolean; data?: MengantarOrderData; message?: string }> {
   try {
     const payload = {
@@ -30,17 +30,9 @@ export async function createMengantarOrderApi(
       notes: order.notes || 'Busana Muslimah Butik saena.id'
     };
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    if (config?.apiKey) {
-      headers['x-mengantar-api-key'] = config.apiKey;
-    }
-
     const res = await fetch('/api/mengantar/create-order', {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
@@ -77,7 +69,7 @@ export async function createMengantarOrderApi(
     } else {
       return {
         success: false,
-        message: result.error || 'Gagal memproses pesanan ke Mengantar.com'
+        message: result?.error || result?.message || 'Gagal memproses pesanan ke Mengantar.com'
       };
     }
   } catch (err: any) {
@@ -89,12 +81,24 @@ export async function createMengantarOrderApi(
   }
 }
 
-export async function testMengantarConnectionApi(apiKey?: string, environment?: 'production' | 'sandbox') {
+export async function testMengantarConnectionApi(
+  _apiKeyOrConfig?: any,
+  _environment?: any
+): Promise<{
+  success: boolean;
+  configured: boolean;
+  apiReachable?: boolean;
+  authenticationVerified?: boolean;
+  endpointVerified?: boolean;
+  verificationStatus?: string;
+  verified: boolean;
+  connected?: boolean;
+  message: string;
+}> {
   try {
     const res = await fetch('/api/mengantar/test-connection', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey, environment })
+      headers: { 'Content-Type': 'application/json' }
     });
 
     const text = await res.text();
@@ -105,33 +109,43 @@ export async function testMengantarConnectionApi(apiKey?: string, environment?: 
       // ignore
     }
 
-    if (!json) {
-      return {
-        success: Boolean(apiKey && apiKey.length > 5),
-        connected: Boolean(apiKey && apiKey.length > 5),
-        message: apiKey ? 'Kredensial API Mengantar.com tersimpan dan siap digunakan.' : 'API Key Mengantar belum diisi.'
-      };
-    }
-
-    if (!res.ok || json.success === false) {
+    if (!res.ok || !json) {
       return {
         success: false,
-        message: json.error || json.message || `Gagal memverifikasi Mengantar (HTTP ${res.status})`
+        configured: false,
+        apiReachable: false,
+        authenticationVerified: false,
+        endpointVerified: false,
+        verificationStatus: 'MENGANTAR_ENDPOINT_NOT_VERIFIED',
+        verified: false,
+        connected: false,
+        message: json?.message || json?.error || `Gagal menghubungi server test Mengantar (HTTP ${res.status})`
       };
     }
 
-    return json;
+    return {
+      success: !!json.configured,
+      configured: !!json.configured,
+      apiReachable: !!json.apiReachable,
+      authenticationVerified: !!json.authenticationVerified,
+      endpointVerified: !!json.endpointVerified,
+      verificationStatus: json.verificationStatus || 'MENGANTAR_ENDPOINT_NOT_VERIFIED',
+      verified: !!json.authenticationVerified,
+      connected: !!json.authenticationVerified,
+      message: json.message || (json.authenticationVerified ? 'Kredensial Mengantar.com diterima server.' : 'Kredensial Mengantar belum terverifikasi.')
+    };
   } catch (err: any) {
-    if (apiKey && apiKey.length > 5) {
-      return {
-        success: true,
-        connected: true,
-        message: 'Kredensial API Mengantar.com siap memproses pengiriman.'
-      };
-    }
     return {
       success: false,
+      configured: false,
+      apiReachable: false,
+      authenticationVerified: false,
+      endpointVerified: false,
+      verificationStatus: 'MENGANTAR_ENDPOINT_NOT_VERIFIED',
+      verified: false,
+      connected: false,
       message: err.message || 'Gagal menghubungi server Mengantar'
     };
   }
 }
+

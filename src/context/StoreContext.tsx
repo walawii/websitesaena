@@ -407,7 +407,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setDokuConfig(prev => {
       const updated = { ...prev, ...cfg };
       try {
-        localStorage.setItem('saena_doku_config_v1', JSON.stringify(updated));
+        // Requirement 8: Never store secret keys in client localStorage
+        const safeForStorage = { ...updated, secretKey: '' };
+        localStorage.setItem('saena_doku_config_v1', JSON.stringify(safeForStorage));
       } catch (err) {
         console.warn('Save Doku config error:', err);
       }
@@ -430,42 +432,34 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('saena_products_v1', JSON.stringify(products));
   }, [products]);
 
-  // Automatically sync API credentials configured in server environment
+  // Synchronize server gateway configuration status (server-side only, no secrets exposed)
   useEffect(() => {
+    try {
+      localStorage.removeItem('saena_mengantar_config_v1');
+      localStorage.removeItem('saena_doku_config_v1');
+    } catch {}
+
     fetch('/api/system/gateway-config')
       .then(res => res.json())
       .then(data => {
-        if (data?.mengantar?.apiKey) {
-          setMengantarConfig(prev => {
-            if (!prev?.apiKey || prev.apiKey !== data.mengantar.apiKey) {
-              const updated = { ...prev, apiKey: data.mengantar.apiKey, environment: data.mengantar.environment || 'production' };
-              try {
-                localStorage.setItem('saena_mengantar_config_v1', JSON.stringify(updated));
-              } catch {
-                // ignore
-              }
-              return updated;
-            }
-            return prev;
-          });
+        if (data?.mengantar) {
+          setMengantarConfig(prev => ({
+            ...prev,
+            apiKey: '', // Never store API key on client
+            configured: !!data.mengantar.configured
+          }));
         }
-        if (data?.doku?.clientId) {
-          setDokuConfig(prev => {
-            if (!prev?.clientId || prev.clientId !== data.doku.clientId) {
-              const updated = { ...prev, clientId: data.doku.clientId, environment: data.doku.environment || 'sandbox' };
-              try {
-                localStorage.setItem('saena_doku_config_v1', JSON.stringify(updated));
-              } catch {
-                // ignore
-              }
-              return updated;
-            }
-            return prev;
-          });
+        if (data?.doku) {
+          setDokuConfig(prev => ({
+            ...prev,
+            clientId: '', // Never store client ID on client
+            secretKey: '',
+            configured: !!data.doku.configured
+          }));
         }
       })
       .catch(err => {
-        console.warn('Failed to auto-detect gateway config:', err);
+        console.warn('Sync gateway config notice:', err);
       });
   }, []);
 
@@ -608,45 +602,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       unsubOrders();
       unsubLandingPages();
     };
-  }, []);
-
-  // Synchronize server gateway credentials (DOKU & Mengantar from environment)
-  useEffect(() => {
-    fetch('/api/system/gateway-config')
-      .then(res => res.json())
-      .then(data => {
-        if (data?.doku?.clientId) {
-          setDokuConfig(prev => {
-            if (!prev.clientId || prev.clientId.startsWith('demo_') || prev.clientId.length < 5) {
-              const updated = {
-                ...prev,
-                clientId: data.doku.clientId,
-                environment: data.doku.environment || 'production'
-              };
-              try { localStorage.setItem('saena_doku_config_v1', JSON.stringify(updated)); } catch {}
-              return updated;
-            }
-            return prev;
-          });
-        }
-        if (data?.mengantar?.apiKey) {
-          setMengantarConfig(prev => {
-            if (!prev.apiKey || prev.apiKey.startsWith('demo_') || prev.apiKey.length < 5) {
-              const updated = {
-                ...prev,
-                apiKey: data.mengantar.apiKey,
-                environment: 'production'
-              };
-              try { localStorage.setItem('saena_mengantar_config_v1', JSON.stringify(updated)); } catch {}
-              return updated;
-            }
-            return prev;
-          });
-        }
-      })
-      .catch(err => {
-        console.warn('Sync gateway config notice:', err);
-      });
   }, []);
 
   const reseedDatabase = async () => {
@@ -1170,7 +1125,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
-  // Checkout & Order Placement
+  // Checkout & Order Placement (Authoritative Server Integration)
   const placeOrder = async (
     customer: CustomerDetails, 
     shipping: ShippingMethod, 
@@ -1179,19 +1134,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const shippingCost = shipping.cost;
     const finalTotal = Math.max(0, subtotal - couponDiscount + shippingCost);
-    const orderId = `SAENA-${Math.floor(10000 + Math.random() * 90000)}`;
-    
-    // Generate authentic tracking number based on selected courier
-    let trackingNo = `SAENA-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-    if (shipping.courier.includes('JNE')) {
-      trackingNo = `TJNE0${Math.floor(100000000 + Math.random() * 900000000)}`;
-    } else if (shipping.courier.includes('J&T')) {
-      trackingNo = `JP${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-    } else if (shipping.courier.includes('SiCepat')) {
-      trackingNo = `SCP-${Math.floor(10000000000 + Math.random() * 90000000000)}`;
-    } else if (shipping.courier.includes('DHL')) {
-      trackingNo = `DHL-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-    }
 
     const channelNames: Record<PaymentChannel, string> = {
       qris: 'QRIS Realtime Dynamic (DOKU Gateway)',
@@ -1222,35 +1164,66 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       cod: 'Cash on Delivery (Bayar di Tempat)'
     };
 
-    // Prepare DOKU transaction session if electronic payment
-    let dokuPaymentData: DokuPaymentData | undefined = undefined;
-    if (paymentChannel !== 'cod') {
-      try {
-        const dokuRes = await createDokuPaymentApi({
-          orderId,
-          invoiceNumber: `INV-DOKU-${orderId.replace('SAENA-', '')}`,
-          amount: finalTotal,
-          customer: {
-            fullName: customer.fullName,
-            email: customer.email,
-            whatsapp: customer.whatsapp,
-            address: `${customer.address}, ${customer.subdistrict}, ${customer.city}, ${customer.province} ${customer.postalCode}`
-          },
-          items: cart.map(item => ({
-            name: `${item.product.name} (${item.selectedSize} - ${item.selectedColor.name})`,
-            quantity: item.quantity,
-            price: item.price
-          })),
-          channel: paymentChannel
-        }, dokuConfig);
+    // 1. Invoke server-authoritative order creation endpoint
+    const orderPayload = {
+      customer: {
+        customerName: customer.fullName,
+        phone: customer.whatsapp,
+        email: customer.email,
+        address: customer.address,
+        city: customer.city,
+        province: customer.province,
+        district: customer.subdistrict,
+        postalCode: customer.postalCode
+      },
+      items: cart.map(item => ({
+        id: item.productId,
+        name: `${item.product.name} (${item.selectedSize} - ${item.selectedColor.name})`,
+        price: item.price,
+        quantity: item.quantity,
+        color: item.selectedColor.name,
+        size: item.selectedSize,
+        weight: item.product.weight || 600
+      })),
+      shipping: {
+        courier: shipping.courier,
+        service: shipping.service
+      },
+      paymentMethod: paymentChannel === 'cod' ? 'COD' : 'DOKU',
+      paymentChannel: paymentChannel,
+      notes: customer.notes
+    };
 
-        if (dokuRes.success && dokuRes.data) {
-          dokuPaymentData = dokuRes.data;
-        }
-      } catch (err) {
-        console.warn('DOKU payment session generation note:', err);
-      }
+    const res = await fetch('/api/orders/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderPayload)
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.success || !json.data) {
+      throw new Error(json.error || 'Gagal menerbitkan pesanan resmi.');
     }
+
+    const srvData = json.data;
+    const orderId = srvData.orderNumber;
+    const accessToken = srvData.accessToken;
+
+    if (accessToken) {
+      try {
+        sessionStorage.setItem(`order_token_${orderId}`, accessToken);
+      } catch {}
+    }
+
+    const dokuPaymentData: DokuPaymentData | undefined = (srvData.paymentUrl || srvData.vaNumber || srvData.qrisString) ? {
+      paymentUrl: srvData.paymentUrl || undefined,
+      invoiceNumber: srvData.invoiceNumber,
+      paymentMethodType: paymentChannel,
+      status: 'PENDING',
+      amount: srvData.grandTotal || finalTotal,
+      virtualAccountInfo: srvData.vaNumber ? { vaNumber: srvData.vaNumber, bank: srvData.bank || '' } : undefined,
+      qrisInfo: srvData.qrisString ? { qrString: srvData.qrisString, qrImage: srvData.qrisImage } : undefined
+    } : undefined;
 
     const newOrder: Order = {
       id: orderId,
@@ -1261,8 +1234,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       payment: {
         channel: paymentChannel,
         channelName: channelNames[paymentChannel] || 'DOKU Payment Gateway',
-        virtualAccount: dokuPaymentData?.virtualAccountInfo?.vaNumber || (paymentChannel.includes('va_') ? `88888${Math.floor(1000000000 + Math.random() * 9000000000)}` : undefined),
-        qrCodeUrl: dokuPaymentData?.qrisInfo?.qrImage || (paymentChannel.includes('qris') ? getSmartQrisForOrder({ orderId, amount: finalTotal, config: dokuConfig }).qrImageUrl : undefined),
+        virtualAccount: srvData.vaNumber || undefined,
+        qrCodeUrl: srvData.qrisImage || (srvData.qrisString ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(srvData.qrisString)}` : undefined),
         expiryMinutes: 60,
         paidAt: undefined,
         doku: dokuPaymentData
@@ -1271,15 +1244,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       discount: couponDiscount,
       couponCode: appliedCoupon || undefined,
       shippingCost,
-      total: finalTotal,
+      total: srvData.grandTotal || finalTotal,
       currency,
       currencyRate: CURRENCY_CONFIGS[currency].rateFromIDR,
       status: 'menunggu_pembayaran',
-      trackingNumber: trackingNo,
+      trackingNumber: undefined, // Real tracking number will be assigned when Mengantar creates the shipment
       trackingHistory: [
         {
           time: 'Baru saja',
-          location: 'Sistem Pembayaran Terpadu saena.id',
+          location: 'Sistem Terpadu saena.id',
           description: `Pesanan ${orderId} berhasil dibuat dan menunggu pembayaran via ${channelNames[paymentChannel]}.`
         },
         {
@@ -1290,6 +1263,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ],
       notes: customer.notes
     };
+
 
     // Decrement inventory stock automatically per color variant
     setProducts(prev => prev.map(p => {
@@ -1594,7 +1568,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMengantarConfig(prev => {
       const updated = { ...prev, ...newCfg };
       try {
-        localStorage.setItem('saena_mengantar_config_v1', JSON.stringify(updated));
+        // Requirement 8: Never store secret keys in client localStorage
+        const safeForStorage = { ...updated, apiKey: '' };
+        localStorage.setItem('saena_mengantar_config_v1', JSON.stringify(safeForStorage));
       } catch (e) {
         // ignore
       }
@@ -1606,11 +1582,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     orderId: string
   ): Promise<{ success: boolean; message: string; trackingNumber?: string; mengantarOrderId?: string }> => {
     const targetOrder = orders.find(o => o.id === orderId);
+
+    // 1. Try server-side secure admin retry endpoint first
+    try {
+      const srvRes = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/retry-shipping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const srvJson = await srvRes.json();
+      if (srvRes.ok && srvJson.success && srvJson.trackingNumber) {
+        return {
+          success: true,
+          message: srvJson.message || 'Resi berhasil diterbitkan via Mengantar.com!',
+          trackingNumber: srvJson.trackingNumber,
+          mengantarOrderId: srvJson.order?.shipping?.mengantarResponse?.mengantarOrderId
+        };
+      }
+    } catch (err) {
+      console.warn('Server retry-shipping notice:', err);
+    }
+
     if (!targetOrder) {
       return { success: false, message: 'Pesanan tidak ditemukan di sistem' };
     }
 
-    const apiRes = await createMengantarOrderApi(targetOrder, mengantarConfig);
+    const apiRes = await createMengantarOrderApi(targetOrder);
     if (!apiRes.success || !apiRes.data) {
       return { success: false, message: apiRes.message || 'Gagal menerbitkan pesanan ke Mengantar.com' };
     }

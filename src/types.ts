@@ -217,7 +217,7 @@ export interface Order {
   currency: string;
   currencyRate: number;
   status: OrderStatus;
-  trackingNumber: string;
+  trackingNumber?: string;
   trackingHistory: {
     time: string;
     location: string;

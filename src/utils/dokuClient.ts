@@ -1,7 +1,7 @@
 import { DokuStoreConfig, DokuPaymentData, PaymentChannel } from '../types';
 
 export const DEFAULT_DOKU_CONFIG: DokuStoreConfig = {
-  clientId: 'BRN-0286-1789185802157',
+  clientId: '',
   secretKey: '',
   environment: 'production',
   enabled: true,
@@ -41,20 +41,14 @@ export async function createDokuPaymentApi(
     }>;
     channel?: PaymentChannel;
     callbackUrl?: string;
-  },
-  config?: Partial<DokuStoreConfig>
+  }
 ): Promise<{ success: boolean; message: string; data?: DokuPaymentData }> {
   try {
     const res = await fetch('/api/doku/create-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        orderPayload,
-        config: {
-          clientId: config?.clientId,
-          secretKey: config?.secretKey,
-          environment: config?.environment
-        }
+        orderPayload
       })
     });
 
@@ -87,34 +81,25 @@ export async function createDokuPaymentApi(
 }
 
 export async function testDokuConnectionApi(
-  clientIdOrConfig?: string | Partial<DokuStoreConfig>,
-  secretKey?: string,
-  environment?: 'sandbox' | 'production'
+  _configOrClientId?: any,
+  _secretKey?: any,
+  _mode?: any
 ): Promise<{
   success: boolean;
+  configured: boolean;
+  apiReachable?: boolean;
+  authenticationVerified?: boolean;
+  paymentTransactionTested?: boolean;
+  verified: boolean;
   connected?: boolean;
   mode?: string;
   clientId?: string;
   message: string;
 }> {
-  const cId = typeof clientIdOrConfig === 'string' ? clientIdOrConfig : clientIdOrConfig?.clientId;
-  const sKey = typeof clientIdOrConfig === 'string' ? secretKey : clientIdOrConfig?.secretKey;
-  const env = typeof clientIdOrConfig === 'string' ? environment : clientIdOrConfig?.environment;
-
-  // Local sanity checks first
-  if (sKey && sKey.includes('*')) {
-    return {
-      success: false,
-      connected: false,
-      message: 'Secret Key masih disensor bintang (*). Klik "Reveal Key" di dashboard DOKU sebelum menyalin.'
-    };
-  }
-
   try {
     const res = await fetch('/api/doku/test-connection', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: cId, secretKey: sKey, environment: env })
+      headers: { 'Content-Type': 'application/json' }
     });
 
     const text = await res.text();
@@ -122,55 +107,48 @@ export async function testDokuConnectionApi(
     try {
       json = text ? JSON.parse(text) : null;
     } catch {
-      // Non-JSON or empty response from proxy
+      // Non-JSON
     }
 
-    if (!json) {
-      // Fallback response if endpoint momentarily busy
-      return {
-        success: Boolean(cId && sKey),
-        connected: Boolean(cId && sKey),
-        mode: env || 'production',
-        clientId: cId ? `${cId.substring(0, 8)}••••••••` : undefined,
-        message: (cId && sKey)
-          ? `Kredensial DOKU.com terverifikasi! Siap memproses transaksi (${(env || 'production').toUpperCase()} mode).`
-          : 'Kredensial DOKU belum lengkap. Silakan masukkan Client ID dan Secret Key.'
-      };
-    }
-
-    if (!res.ok || json.success === false) {
+    if (!res.ok || !json) {
       return {
         success: false,
+        configured: false,
+        apiReachable: false,
+        authenticationVerified: false,
+        paymentTransactionTested: false,
+        verified: false,
         connected: false,
-        message: json.error || json.message || `Gagal memverifikasi DOKU (HTTP ${res.status})`
+        message: json?.message || json?.error || `Gagal menghubungi server test DOKU (HTTP ${res.status})`
       };
     }
 
     return {
-      success: true,
-      connected: json.connected !== false,
-      mode: json.mode || env || 'production',
+      success: !!json.configured,
+      configured: !!json.configured,
+      apiReachable: !!json.apiReachable,
+      authenticationVerified: !!json.authenticationVerified,
+      paymentTransactionTested: !!json.paymentTransactionTested,
+      verified: !!json.authenticationVerified,
+      connected: !!json.authenticationVerified,
+      mode: json.mode || 'sandbox',
       clientId: json.clientId,
-      message: json.message || 'Koneksi DOKU Payment Gateway berhasil diverifikasi!'
+      message: json.message || (json.authenticationVerified ? 'API DOKU reachable & authentication verified.' : 'Kredensial DOKU belum terverifikasi.')
     };
   } catch (err: any) {
-    // If network connection glitch, validate credentials offline
-    if (cId && sKey && !sKey.includes('*')) {
-      return {
-        success: true,
-        connected: true,
-        mode: env || 'production',
-        clientId: `${cId.substring(0, 8)}••••••••`,
-        message: `Kredensial DOKU.com (${cId}) siap digunakan untuk transaksi pembayaran.`
-      };
-    }
     return {
       success: false,
+      configured: false,
+      apiReachable: false,
+      authenticationVerified: false,
+      paymentTransactionTested: false,
+      verified: false,
       connected: false,
-      message: err.message || 'Gagal menghubungi endpoint DOKU'
+      message: `Gagal menghubungi server DOKU: ${err.message}`
     };
   }
 }
+
 
 export function getDokuChannelLabel(channel: PaymentChannel): {
   title: string;
