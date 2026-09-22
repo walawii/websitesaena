@@ -1201,9 +1201,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       body: JSON.stringify(orderPayload)
     });
 
-    const json = await res.json();
-    if (!res.ok || !json.success || !json.data) {
-      throw new Error(json.error || 'Gagal menerbitkan pesanan resmi.');
+    const responseText = await res.text();
+    let json: any = null;
+    try {
+      json = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      throw new Error(
+        `Server checkout mengembalikan respons tidak valid (HTTP ${res.status}). Silakan coba lagi.`
+      );
+    }
+
+    if (!res.ok || !json?.success || !json?.data) {
+      throw new Error(json?.error || `Gagal menerbitkan pesanan resmi (HTTP ${res.status}).`);
     }
 
     const srvData = json.data;
