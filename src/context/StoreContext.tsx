@@ -1598,7 +1598,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const srvRes = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/retry-shipping`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionStorage.getItem('saena_admin_session_v1')
+            ? { Authorization: `Bearer ${sessionStorage.getItem('saena_admin_session_v1')}` }
+            : {})
+        }
       });
       const srvJson = await srvRes.json();
       if (srvRes.ok && srvJson.success && srvJson.trackingNumber) {
