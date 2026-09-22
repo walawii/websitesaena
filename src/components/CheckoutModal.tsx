@@ -119,8 +119,13 @@ export const CheckoutModal: React.FC = () => {
   const billableWeight = Math.max(1, Math.ceil(estimatedWeightKg));
   
   // Dynamic Shipping calculation - PROMO SEMUA GRATIS ONGKIR SE-INDONESIA (Rp 0)
-  const calculateShippingRate = (_method: ShippingMethod): number => {
-    return 0; // Gratis Ongkir untuk semua ekspedisi & wilayah
+  const calculateShippingRate = (method: ShippingMethod): number => {
+    const rates: Record<string, number> = {
+      'jne-reg': 15000, 'jne-yes': 25000, 'jne-oke': 12000,
+      'jnt-ez': 14000, 'jnt-super': 22000, 'sicepat-reg': 14000,
+      'dhl-intl': 150000
+    };
+    return rates[method.id] ?? 15000;
   };
 
   const dynamicShippingCost = calculateShippingRate(selectedShipping);
@@ -142,6 +147,21 @@ export const CheckoutModal: React.FC = () => {
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
+
+    setSubmitError(null);
+    const missing: string[] = [];
+    if (!customer.fullName.trim()) missing.push('Nama lengkap');
+    if (!customer.whatsapp.trim()) missing.push('Nomor WhatsApp');
+    if (!customer.email.trim()) missing.push('Email');
+    if (!customer.address.trim()) missing.push('Alamat');
+    if (!customer.province.trim()) missing.push('Provinsi');
+    if (!customer.city.trim()) missing.push('Kota/Kabupaten');
+    if (!customer.subdistrict.trim()) missing.push('Kecamatan');
+    if (!customer.postalCode.trim()) missing.push('Kode pos');
+    if (missing.length) {
+      setSubmitError('Mohon lengkapi: ' + missing.join(', ') + '.');
+      return;
+    }
 
     // Validasi Kelengkapan Alamat Pembeli (Nomor Rumah/Patokan & Kecamatan)
     const isMissingHouseNumber = !addressValidation.hasHouseNumber && !allowNoHouseNumber;
@@ -249,7 +269,7 @@ export const CheckoutModal: React.FC = () => {
           
           {/* STEP 1: FORM */}
           {step === 'form' && (
-            <form onSubmit={handleSubmitOrder} className="space-y-6">
+            <form noValidate onSubmit={handleSubmitOrder} className="space-y-6">
               
               {/* Section 1: Address Details */}
               <div className="space-y-3">
