@@ -311,16 +311,20 @@ export const AlisaLandingPage: React.FC<AlisaLandingPageProps> = ({ onNavigateHo
       // ignore
     }
 
-    const params = new URLSearchParams();
-    if (pkg) params.set('package', pkg);
-    if (col) params.set('color', col);
-    const qs = params.toString();
-    const targetUrl = qs ? `/order?${qs}` : '/order';
+    const targetUrl = 'https://order.saena.my.id/order';
+
+    try {
+      if (window.top && window.top !== window) {
+        window.top.location.href = targetUrl;
+      } else {
+        window.location.href = targetUrl;
+      }
+    } catch {
+      window.location.href = targetUrl;
+    }
 
     if (onNavigateOrder) {
       onNavigateOrder(pkg, col);
-    } else {
-      window.location.href = targetUrl;
     }
   };
 

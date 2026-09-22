@@ -185,7 +185,9 @@ const MainContent: React.FC = () => {
     (typeof window !== 'undefined' && (
       window.location.pathname.toLowerCase().startsWith('/alisa') ||
       new URLSearchParams(window.location.search).get('path') === 'alisa' ||
-      new URLSearchParams(window.location.search).get('page') === 'alisa'
+      new URLSearchParams(window.location.search).get('page') === 'alisa' ||
+      new URLSearchParams(window.location.search).has('alisa') ||
+      window.location.search.toLowerCase().includes('alisa')
     ));
 
   const isOrderPage = 
@@ -245,13 +247,11 @@ const MainContent: React.FC = () => {
     return (
       <>
         <AlisaPage 
-          onNavigateHome={() => navigateTo('/')} 
-          onNavigateOrder={(packageId, color) => {
-            const params = new URLSearchParams();
-            if (packageId) params.set('package', packageId);
-            if (color) params.set('color', color);
-            const qs = params.toString();
-            navigateTo(qs ? `/order?${qs}` : '/order');
+          onNavigateHome={() => {
+            window.location.href = 'https://order.saena.my.id/order';
+          }} 
+          onNavigateOrder={() => {
+            window.location.href = 'https://order.saena.my.id/order';
           }}
         />
         <DokuConfigModal
