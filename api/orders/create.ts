@@ -54,7 +54,9 @@ export default async function handler(req: any, res: any) {
       'jnt-super': 22000,
       'sicepat-reg': 14000,
       'dhl-intl': 150000
-    };\n    const shippingId = String(shipping?.id || '').toLowerCase();\n    const shippingCost = SHIPPING_RATES[shippingId] ?? 15000;
+    };
+    const shippingId = String(shipping?.id || '').toLowerCase();
+    const shippingCost = SHIPPING_RATES[shippingId] ?? 15000;
     const grandTotal = subtotal + shippingCost;
     const { orderNumber, invoiceNumber, accessToken } = generateOrderNumber();
 
