@@ -1,38 +1,46 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  query, 
-  where, 
-  getDocs, 
-  orderBy, 
-  limit, 
-  DocumentData 
-} from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Load firebase-applet-config.json
+// Firebase Web SDK is loaded lazily so Vercel can initialize the checkout
+// function without executing Firebase modules during serverless startup.
 let db: any = null;
+let dbInitPromise: Promise<any> | null = null;
 
-try {
-  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  if (fs.existsSync(configPath)) {
-    const raw = fs.readFileSync(configPath, 'utf8');
-    const firebaseConfig = JSON.parse(raw);
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-    console.log('[OrderRepository] Firebase Firestore initialized successfully for backend.');
-  } else {
-    console.warn('[OrderRepository] firebase-applet-config.json not found.');
-  }
-} catch (err: any) {
-  console.error('[OrderRepository] Error initializing Firestore in server:', err.message);
+async function ensureDb(): Promise<any> {
+  if (db) return db;
+  if (dbInitPromise) return dbInitPromise;
+
+  dbInitPromise = (async () => {
+    try {
+      const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+      if (!fs.existsSync(configPath)) {
+        console.warn('[OrderRepository] firebase-applet-config.json not found.');
+        return null;
+      }
+
+      const raw = fs.readFileSync(configPath, 'utf8');
+      const firebaseConfig = JSON.parse(raw);
+      const { initializeApp, getApps, getApp } = await import('firebase/app');
+      const { getFirestore } = await import('firebase/firestore');
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      console.log('[OrderRepository] Firebase Firestore initialized successfully for backend.');
+      return db;
+    } catch (err: any) {
+      console.error('[OrderRepository] Error initializing Firestore in server:', err?.message || err);
+      return null;
+    }
+  })();
+
+  return dbInitPromise;
+}
+
+async function getFirestoreApi() {
+  const {
+    collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit
+  } = await import('firebase/firestore');
+  return { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit };
 }
 
 export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
@@ -161,12 +169,14 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
   memoryOrders.set(order.orderNumber, order);
   memoryOrders.set(order.id, order);
 
+  await ensureDb();
   if (!db) {
     console.warn('[OrderRepository] Firestore DB not ready, stored in memory cache.');
     return order;
   }
 
   try {
+    const { doc, setDoc } = await getFirestoreApi();
     const docRef = doc(db, 'orders', order.id);
     const sanitized = sanitize({
       ...order,
@@ -217,6 +227,7 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
 
 export async function findOrderByNumber(identifier: string): Promise<StoredOrder | null> {
   if (!identifier) return null;
+  await ensureDb();
 
   // 1. Check in-memory cache first
   const cached = memoryOrders.get(identifier);
@@ -225,6 +236,7 @@ export async function findOrderByNumber(identifier: string): Promise<StoredOrder
   if (!db) return null;
 
   try {
+    const { collection, doc, getDoc, query, where, getDocs, limit } = await getFirestoreApi();
     // 2. Try doc get by id
     const docRef = doc(db, 'orders', identifier);
     const snap = await getDoc(docRef);
@@ -483,11 +495,13 @@ export async function updateOrderShipping(
 }
 
 export async function getAllOrdersList(limitCount = 50): Promise<StoredOrder[]> {
+  await ensureDb();
   if (!db) {
     return Array.from(memoryOrders.values()).slice(0, limitCount);
   }
 
   try {
+    const { collection, query, getDocs, orderBy, limit } = await getFirestoreApi();
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
     const list: StoredOrder[] = [];
