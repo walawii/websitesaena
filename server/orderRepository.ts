@@ -328,6 +328,7 @@ export async function findOrderByShipmentIdentity(
 
     if (db) {
       try {
+        const { collection, query, where, getDocs, limit } = await getFirestoreApi();
         const qMgt = query(collection(db, 'orders'), where('shipping.mengantarOrderId', '==', cleanOrderId), limit(1));
         const snapMgt = await getDocs(qMgt);
         if (!snapMgt.empty) {
@@ -346,6 +347,7 @@ export async function findOrderByShipmentIdentity(
   // 3. Lookup by cnoteNo (resi / waybill)
   if (cleanCnoteNo && db) {
     try {
+      const { collection, query, where, getDocs, limit } = await getFirestoreApi();
       const qTrack1 = query(collection(db, 'orders'), where('shipping.trackingNumber', '==', cleanCnoteNo), limit(1));
       const snapTrack1 = await getDocs(qTrack1);
       if (!snapTrack1.empty) {
