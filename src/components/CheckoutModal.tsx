@@ -144,8 +144,8 @@ export const CheckoutModal: React.FC = () => {
     }));
   };
 
-  const handleSubmitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmitOrder = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (cart.length === 0) return;
 
     setSubmitError(null);
