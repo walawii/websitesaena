@@ -1762,7 +1762,10 @@ Tuliskan dalam format JSON murni dengan struktur persis seperti berikut:
   }
 });
 
-// Start Express + Vite Server
+// Export the Express application so Vercel can run the API as a Function.
+// Static/Vite server startup is kept only for local development.
+export { app };
+
 async function startServer() {
   // Serve static files from public directory
   app.use(express.static(path.join(process.cwd(), 'public')));
@@ -1786,4 +1789,8 @@ async function startServer() {
   });
 }
 
-startServer();
+// Vercel imports this module as a Function, so never call app.listen there.
+// Local development keeps the existing Express + Vite server behavior.
+if (!process.env.VERCEL) {
+  startServer();
+}
