@@ -281,7 +281,7 @@ export async function processMengantarWebhook(
   const isCurrentlyDelivered = order.shipping.shippingStatus === 'DELIVERED';
 
   // Prevent regression: If already DELIVERED, ignore earlier transit statuses
-  if (isCurrentlyDelivered && mapped.rank < 5 && mapped.shippingStatus !== 'CANCELLED') {
+  if (isCurrentlyDelivered && mapped.rank < 5) {
     console.log(`[Mengantar Webhook] Ignoring out-of-order status "${statusCategory}" (rank ${mapped.rank}) because order ${order.orderNumber} is already DELIVERED.`);
     order.processedWebhookIds.push(eventKey);
     await saveOrder(order);
@@ -299,7 +299,7 @@ export async function processMengantarWebhook(
 
   // Prevent regression: If currently IN_TRANSIT or PICKED_UP and received PENDING PICKUP / ACTIVE / WAITING NEXT PROCESS
   const isEarlierPickupStatus = mapped.rank < currentRank && (currentRank >= 3);
-  if (isEarlierPickupStatus && mapped.shippingStatus !== 'CANCELLED') {
+  if (isEarlierPickupStatus) {
     console.log(`[Mengantar Webhook] Order ${order.orderNumber} is already at rank ${currentRank} (${order.shipping.shippingStatus}). Skipping earlier status "${statusCategory}".`);
     if (cnoteNo && !order.shipping.trackingNumber) {
       order.shipping.trackingNumber = cnoteNo;
