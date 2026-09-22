@@ -46,7 +46,15 @@ export default async function handler(req: any, res: any) {
     });
 
     const subtotal = catalogItems.reduce((sum, it) => sum + it.price * it.quantity, 0);
-    const SHIPPING_RATES: Record<string, number> = {\n      'jne-reg': 15000,\n      'jne-yes': 25000,\n      'jne-oke': 12000,\n      'jnt-ez': 14000,\n      'jnt-super': 22000,\n      'sicepat-reg': 14000,\n      'dhl-intl': 150000\n    };\n    const shippingId = String(shipping?.id || '').toLowerCase();\n    const shippingCost = SHIPPING_RATES[shippingId] ?? 15000;
+    const SHIPPING_RATES: Record<string, number> = {
+      'jne-reg': 15000,
+      'jne-yes': 25000,
+      'jne-oke': 12000,
+      'jnt-ez': 14000,
+      'jnt-super': 22000,
+      'sicepat-reg': 14000,
+      'dhl-intl': 150000
+    };\n    const shippingId = String(shipping?.id || '').toLowerCase();\n    const shippingCost = SHIPPING_RATES[shippingId] ?? 15000;
     const grandTotal = subtotal + shippingCost;
     const { orderNumber, invoiceNumber, accessToken } = generateOrderNumber();
 
