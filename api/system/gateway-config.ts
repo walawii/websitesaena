@@ -1,5 +1,3 @@
-import { META_DATASET_ID } from '../../server/metaCapiService';
-
 export default function handler(_req: any, res: any) {
   return res.status(200).json({
     doku: {
@@ -10,7 +8,7 @@ export default function handler(_req: any, res: any) {
     },
     meta: {
       configured: !!process.env.META_CAPI_ACCESS_TOKEN,
-      datasetId: META_DATASET_ID
+      datasetId: process.env.META_DATASET_ID || null
     }
   });
 }
