@@ -286,9 +286,6 @@ export async function restoreProductStock(items: OrderItem[]): Promise<void> {
 }
 
 export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
-  memoryOrders.set(order.orderNumber, order);
-  memoryOrders.set(order.id, order);
-
   if (!db) {
     throw new Error('Firestore tidak tersedia; pesanan tidak boleh dianggap tersimpan.');
   }
@@ -334,6 +331,8 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
     });
 
     await setDoc(docRef, sanitized, { merge: true });
+    memoryOrders.set(order.orderNumber, order);
+    memoryOrders.set(order.id, order);
     console.log(`[OrderRepository] Order saved to Firestore successfully: ${order.orderNumber} (ID: ${order.id})`);
 
   } catch (err: any) {
