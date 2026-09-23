@@ -550,6 +550,8 @@ export async function processOrderCreation(
         }
       }
 
+      await saveOrder(storedOrder);
+
       const codResponseData = {
         orderNumber,
         invoiceNumber,
