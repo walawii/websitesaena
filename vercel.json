@@ -8,6 +8,7 @@
     "sin1"
   ],
   "env": {
-    "VERCEL_ANALYZE_BUILD_OUTPUT": "1"
+    "VERCEL_ANALYZE_BUILD_OUTPUT": "1",
+    "VERCEL_SUPPORT_LARGE_FUNCTIONS": "1"
   }
 }
