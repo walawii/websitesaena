@@ -30,9 +30,16 @@ export async function createMengantarOrderApi(
       notes: order.notes || 'Busana Muslimah Butik saena.id'
     };
 
+    const adminToken = typeof localStorage !== 'undefined' ? localStorage.getItem('saena_admin_token_v1') : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (adminToken) {
+      headers['Authorization'] = `Bearer ${adminToken}`;
+      headers['x-admin-token'] = adminToken;
+    }
+
     const res = await fetch('/api/mengantar/create-order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload)
     });
 

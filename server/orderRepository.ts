@@ -1,46 +1,38 @@
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  getDocs, 
+  orderBy, 
+  limit, 
+  DocumentData 
+} from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Firebase Web SDK is loaded lazily so Vercel can initialize the checkout
-// function without executing Firebase modules during serverless startup.
+// Load firebase-applet-config.json
 let db: any = null;
-let dbInitPromise: Promise<any> | null = null;
 
-async function ensureDb(): Promise<any> {
-  if (db) return db;
-  if (dbInitPromise) return dbInitPromise;
-
-  dbInitPromise = (async () => {
-    try {
-      const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-      if (!fs.existsSync(configPath)) {
-        console.warn('[OrderRepository] firebase-applet-config.json not found.');
-        return null;
-      }
-
-      const raw = fs.readFileSync(configPath, 'utf8');
-      const firebaseConfig = JSON.parse(raw);
-      const { initializeApp, getApps, getApp } = await import('firebase/app');
-      const { getFirestore } = await import('firebase/firestore');
-      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-      db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-      console.log('[OrderRepository] Firebase Firestore initialized successfully for backend.');
-      return db;
-    } catch (err: any) {
-      console.error('[OrderRepository] Error initializing Firestore in server:', err?.message || err);
-      return null;
-    }
-  })();
-
-  return dbInitPromise;
-}
-
-async function getFirestoreApi() {
-  const {
-    collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit, runTransaction
-  } = await import('firebase/firestore');
-  return { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, orderBy, limit, runTransaction };
+try {
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const raw = fs.readFileSync(configPath, 'utf8');
+    const firebaseConfig = JSON.parse(raw);
+    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    console.log('[OrderRepository] Firebase Firestore initialized successfully for backend.');
+  } else {
+    console.warn('[OrderRepository] firebase-applet-config.json not found.');
+  }
+} catch (err: any) {
+  console.error('[OrderRepository] Error initializing Firestore in server:', err.message);
 }
 
 export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
@@ -165,17 +157,77 @@ function sanitize(obj: any): any {
   return JSON.parse(JSON.stringify(obj, (_, v) => (v === undefined ? null : v)));
 }
 
+export function getDb() {
+  return db;
+}
+
+/**
+ * Find dynamic product from Firestore 'products' collection if created by Admin
+ */
+export async function findProductByIdFromFirestore(productId: string): Promise<{ id: string; name: string; price: number; weight: number } | null> {
+  if (!productId || !db) return null;
+  try {
+    const docRef = doc(db, 'products', productId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        id: snap.id,
+        name: data.name || 'Produk Butik saena.id',
+        price: Number(data.price) || 0,
+        weight: Number(data.weight) || 600
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[OrderRepository] Query product "${productId}" from Firestore notice:`, err.message);
+  }
+  return null;
+}
+
+export async function decrementProductStockInFirestore(items: OrderItem[]): Promise<void> {
+  if (!db || !Array.isArray(items) || items.length === 0) return;
+  for (const item of items) {
+    if (!item.productId) continue;
+    try {
+      const docRef = doc(db, 'products', item.productId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const currentStock = { ...(data.stock || {}) };
+        const colorKey = item.color || item.variant || 'Standard';
+        if (currentStock[colorKey] !== undefined) {
+          currentStock[colorKey] = Math.max(0, (Number(currentStock[colorKey]) || 0) - (item.quantity || 1));
+        } else if (item.size && currentStock[item.size] !== undefined) {
+          currentStock[item.size] = Math.max(0, (Number(currentStock[item.size]) || 0) - (item.quantity || 1));
+        } else if (Object.keys(currentStock).length > 0) {
+          const firstKey = Object.keys(currentStock)[0];
+          currentStock[firstKey] = Math.max(0, (Number(currentStock[firstKey]) || 0) - (item.quantity || 1));
+        }
+        const updatedTotal = Object.values(currentStock).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+        await updateDoc(docRef, {
+          stock: currentStock,
+          totalStock: updatedTotal,
+          updatedAt: new Date().toISOString()
+        });
+        console.log(`[OrderRepository] Decremented stock for product "${item.productId}" variant "${colorKey}" by ${item.quantity}.`);
+      }
+    } catch (err: any) {
+      console.warn(`[OrderRepository] Decrement stock notice for "${item.productId}":`, err.message);
+    }
+  }
+}
+
 export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
   memoryOrders.set(order.orderNumber, order);
   memoryOrders.set(order.id, order);
 
-  await ensureDb();
   if (!db) {
-    throw new Error('Penyimpanan pesanan Firestore tidak tersedia. Pesanan tidak boleh dianggap tersimpan.');
+    const err = new Error('Database Firestore server belum diinisialisasi atau tidak terhubung.');
+    console.error('[OrderRepository] Persistence Failure:', err.message);
+    throw err;
   }
 
   try {
-    const { doc, setDoc } = await getFirestoreApi();
     const docRef = doc(db, 'orders', order.id);
     const sanitized = sanitize({
       ...order,
@@ -217,9 +269,14 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
 
     await setDoc(docRef, sanitized, { merge: true });
     console.log(`[OrderRepository] Order saved to Firestore successfully: ${order.orderNumber} (ID: ${order.id})`);
+
+    // Safely decrement inventory stock in background
+    decrementProductStockInFirestore(order.items).catch(err => {
+      console.warn('[OrderRepository] Stock decrement error:', err.message);
+    });
   } catch (err: any) {
     console.error(`[OrderRepository] Failed to save order to Firestore (${order.orderNumber}):`, err.message);
-    throw new Error(`Gagal menyimpan pesanan ke Firestore: ${err.message || 'database error'}`);
+    throw new Error(`Gagal menyimpan pesanan ke database Firestore: ${err.message}`);
   }
 
   return order;
@@ -227,7 +284,6 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
 
 export async function findOrderByNumber(identifier: string): Promise<StoredOrder | null> {
   if (!identifier) return null;
-  await ensureDb();
 
   // 1. Check in-memory cache first
   const cached = memoryOrders.get(identifier);
@@ -236,7 +292,6 @@ export async function findOrderByNumber(identifier: string): Promise<StoredOrder
   if (!db) return null;
 
   try {
-    const { collection, doc, getDoc, query, where, getDocs, limit } = await getFirestoreApi();
     // 2. Try doc get by id
     const docRef = doc(db, 'orders', identifier);
     const snap = await getDoc(docRef);
@@ -328,7 +383,6 @@ export async function findOrderByShipmentIdentity(
 
     if (db) {
       try {
-        const { collection, query, where, getDocs, limit } = await getFirestoreApi();
         const qMgt = query(collection(db, 'orders'), where('shipping.mengantarOrderId', '==', cleanOrderId), limit(1));
         const snapMgt = await getDocs(qMgt);
         if (!snapMgt.empty) {
@@ -347,7 +401,6 @@ export async function findOrderByShipmentIdentity(
   // 3. Lookup by cnoteNo (resi / waybill)
   if (cleanCnoteNo && db) {
     try {
-      const { collection, query, where, getDocs, limit } = await getFirestoreApi();
       const qTrack1 = query(collection(db, 'orders'), where('shipping.trackingNumber', '==', cleanCnoteNo), limit(1));
       const snapTrack1 = await getDocs(qTrack1);
       if (!snapTrack1.empty) {
@@ -400,6 +453,20 @@ export async function updateOrderPayment(
   const order = await findOrderByNumber(orderNumber);
   if (!order) return null;
 
+  // Protection against out-of-order webhook state downgrade
+  // Once an order is marked PAID, never downgrade to UNPAID, PENDING, FAILED, or EXPIRED
+  if (order.payment.paymentStatus === 'PAID' && paymentStatus !== 'PAID') {
+    console.warn(`[OrderRepository] Rejected payment status downgrade from PAID to ${paymentStatus} for order ${orderNumber}.`);
+    if (extra.webhookId) {
+      if (!order.processedWebhookIds) order.processedWebhookIds = [];
+      if (!order.processedWebhookIds.includes(extra.webhookId)) {
+        order.processedWebhookIds.push(extra.webhookId);
+        await saveOrder(order);
+      }
+    }
+    return order;
+  }
+
   order.payment.paymentStatus = paymentStatus;
   if (extra.paidAt) order.payment.paymentPaidAt = extra.paidAt;
   if (extra.dokuResponse) order.payment.dokuResponse = extra.dokuResponse;
@@ -417,9 +484,21 @@ export async function updateOrderPayment(
   order.updatedAt = new Date().toISOString();
 
   if (paymentStatus === 'PAID') {
-    order.status = 'dibayar';
-  } else if (paymentStatus === 'FAILED' || paymentStatus === 'EXPIRED') {
-    order.status = 'dibatalkan';
+    // Preserve progressive shipping stages if shipment already advanced
+    if (order.shipping.shippingStatus === 'DELIVERED') {
+      order.status = 'tiba_di_tujuan';
+    } else if (order.shipping.shippingStatus === 'IN_TRANSIT' || order.shipping.shippingStatus === 'PICKED_UP') {
+      order.status = 'dikirim';
+    } else if (order.shipping.shippingStatus === 'CREATED') {
+      order.status = 'sedang_dikemas';
+    } else {
+      order.status = 'dibayar';
+    }
+  } else if (paymentStatus === 'FAILED' || paymentStatus === 'EXPIRED' || paymentStatus === 'CANCELLED') {
+    // Only cancel if order has not yet been fulfilled, paid, or shipped
+    if (order.status === 'menunggu_pembayaran') {
+      order.status = 'dibatalkan';
+    }
   }
 
   return saveOrder(order);
@@ -434,38 +513,28 @@ const sentMetaPurchaseOrders = new Set<string>();
  * exactly one Purchase event is dispatched per order.
  */
 export async function claimOrderForMetaPurchase(orderNumber: string): Promise<boolean> {
-  if (!orderNumber || !(await ensureDb())) return false;
+  if (!orderNumber) return false;
 
+  // 1. Fast in-memory check
   if (sentMetaPurchaseOrders.has(orderNumber)) {
     return false;
   }
 
-  try {
-    const { doc, runTransaction } = await getFirestoreApi();
-    const orderRef = doc(db, 'orders', orderNumber);
+  // 2. Fetch order to verify persistence state
+  const order = await findOrderByNumber(orderNumber);
+  if (!order) return false;
 
-    const claimed = await runTransaction(db, async (transaction: any) => {
-      const snap = await transaction.get(orderRef);
-      if (!snap.exists()) return false;
-
-      const data = snap.data() as any;
-      if (data.metaCapiPurchaseSent) return false;
-
-      transaction.update(orderRef, {
-        metaCapiPurchaseSent: true,
-        updatedAt: new Date().toISOString()
-      });
-      return true;
-    });
-
-    if (claimed) {
-      sentMetaPurchaseOrders.add(orderNumber);
-    }
-    return claimed;
-  } catch (err: any) {
-    console.error(`[OrderRepository] Failed to atomically claim Meta Purchase for ${orderNumber}:`, err?.message || err);
+  // 3. Persistent flag check
+  if (order.metaCapiPurchaseSent) {
+    sentMetaPurchaseOrders.add(orderNumber);
     return false;
   }
+
+  // 4. Atomically claim & persist
+  sentMetaPurchaseOrders.add(orderNumber);
+  order.metaCapiPurchaseSent = true;
+  await saveOrder(order);
+  return true;
 }
 
 
@@ -507,13 +576,11 @@ export async function updateOrderShipping(
 }
 
 export async function getAllOrdersList(limitCount = 50): Promise<StoredOrder[]> {
-  await ensureDb();
   if (!db) {
     return Array.from(memoryOrders.values()).slice(0, limitCount);
   }
 
   try {
-    const { collection, query, getDocs, orderBy, limit } = await getFirestoreApi();
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
     const list: StoredOrder[] = [];
@@ -522,8 +589,8 @@ export async function getAllOrdersList(limitCount = 50): Promise<StoredOrder[]> 
     });
     return list;
   } catch (err: any) {
-    console.error('[OrderRepository] Failed to query all orders from Firestore:', err.message);
-    throw new Error(`Gagal mengambil daftar pesanan dari Firestore: ${err.message || 'database error'}`);
+    console.warn('[OrderRepository] Failed to query all orders, falling back to memory:', err.message);
+    return Array.from(memoryOrders.values()).slice(0, limitCount);
   }
 }
 

@@ -151,6 +151,7 @@ interface StoreContextType {
   setIsAdminLoginModalOpen: (open: boolean) => void;
   loginAsAdmin: (secret: string) => Promise<{ success: boolean; message: string }>;
   logoutAdmin: () => void;
+  refreshAdminOrders: (tokenOverride?: string) => Promise<void>;
   setSelectedProductForDetail: (p: Product | null) => void;
   setActiveWhatsAppOrder: (o: Order | null) => void;
   setActiveOrder: (o: Order | null) => void;
@@ -277,15 +278,42 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isOrderTrackingOpen, setIsOrderTrackingOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isPushPromptOpen, setIsPushPromptOpen] = useState(false);
-  const [isAuthenticatedAdmin, setIsAuthenticatedAdmin] = useState<boolean>(() => {
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('saena_admin_auth_v1') === 'true';
+      return localStorage.getItem('saena_admin_token_v1');
     } catch {
-      return false;
+      return null;
     }
   });
+  const [isAuthenticatedAdmin, setIsAuthenticatedAdmin] = useState<boolean>(false);
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
   const [isAdminMode, setIsAdminModeState] = useState(false);
+
+  // Verify stored session on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem('saena_admin_token_v1');
+    if (savedToken) {
+      fetch('/api/admin/verify-session', {
+        headers: { 'x-admin-token': savedToken }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.authenticated) {
+            setAdminToken(savedToken);
+            setIsAuthenticatedAdmin(true);
+            refreshAdminOrders(savedToken);
+          } else {
+            setAdminToken(null);
+            setIsAuthenticatedAdmin(false);
+            localStorage.removeItem('saena_admin_token_v1');
+            localStorage.removeItem('saena_admin_auth_v1');
+          }
+        })
+        .catch(() => {
+          // Keep offline state
+        });
+    }
+  }, []);
 
   const setIsAdminMode = (mode: boolean) => {
     if (mode && !isAuthenticatedAdmin) {
@@ -533,41 +561,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     );
 
-    // 2. Orders Real-time Listener
-    const ordersPath = 'orders';
-    const unsubOrders = onSnapshot(
-      collection(db, ordersPath),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteOrders: Order[] = [];
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data() as Order;
-            remoteOrders.push(data);
-          });
-          // Keep newest orders at top
-          remoteOrders.sort((a, b) => {
-            return (b.id || '').localeCompare(a.id || '');
-          });
-          if (isMounted) {
-            setOrders(remoteOrders);
-            setIsFirebaseConnected(true);
-            setFirebaseSyncStatus('connected');
-          }
-        }
-      },
-      (error) => {
-        try {
-          handleFirestoreError(error, OperationType.GET, ordersPath);
-        } catch (e) {
-          console.warn('Firestore orders listener fallback to local:', e);
-        }
-        if (isMounted) {
-          setFirebaseSyncStatus('offline');
-        }
-      }
-    );
-
-    // 3. Landing Pages Real-time Listener
+    // 2. Landing Pages Real-time Listener
     const landingPagesPath = 'landing_pages';
     const unsubLandingPages = onSnapshot(
       collection(db, landingPagesPath),
@@ -599,7 +593,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       isMounted = false;
       unsubProducts();
-      unsubOrders();
       unsubLandingPages();
     };
   }, []);
@@ -1186,14 +1179,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         weight: item.product.weight || 600
       })),
       shipping: {
-        id: shipping.id,
         courier: shipping.courier,
         service: shipping.service
       },
       paymentMethod: paymentChannel === 'cod' ? 'COD' : 'DOKU',
       paymentChannel: paymentChannel,
-      notes: customer.notes,
-      couponCode: appliedCoupon || undefined
+      notes: customer.notes
     };
 
     const res = await fetch('/api/orders/create', {
@@ -1202,18 +1193,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       body: JSON.stringify(orderPayload)
     });
 
-    const responseText = await res.text();
-    let json: any = null;
-    try {
-      json = responseText ? JSON.parse(responseText) : null;
-    } catch {
-      throw new Error(
-        `Server checkout mengembalikan respons tidak valid (HTTP ${res.status}). Silakan coba lagi.`
-      );
-    }
-
-    if (!res.ok || !json?.success || !json?.data) {
-      throw new Error(json?.error || `Gagal menerbitkan pesanan resmi (HTTP ${res.status}).`);
+    const json = await res.json();
+    if (!res.ok || !json.success || !json.data) {
+      throw new Error(json.error || 'Gagal menerbitkan pesanan resmi.');
     }
 
     const srvData = json.data;
@@ -1596,14 +1578,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // 1. Try server-side secure admin retry endpoint first
     try {
+      const srvHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      const currentToken = adminToken || localStorage.getItem('saena_admin_token_v1');
+      if (currentToken) {
+        srvHeaders['Authorization'] = `Bearer ${currentToken}`;
+        srvHeaders['x-admin-token'] = currentToken;
+      }
       const srvRes = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/retry-shipping`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(sessionStorage.getItem('saena_admin_session_v1')
-            ? { Authorization: `Bearer ${sessionStorage.getItem('saena_admin_session_v1')}` }
-            : {})
-        }
+        headers: srvHeaders
       });
       const srvJson = await srvRes.json();
       if (srvRes.ok && srvJson.success && srvJson.trackingNumber) {
@@ -1681,38 +1664,140 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   };
 
+  const refreshAdminOrders = async (tokenOverride?: string) => {
+    const token = tokenOverride || adminToken || localStorage.getItem('saena_admin_token_v1');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/admin/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-admin-token': token
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.orders)) {
+        const mappedOrders: Order[] = data.orders.map((o: any) => ({
+          id: o.orderNumber || o.id,
+          customer: {
+            fullName: o.customer?.customerName || '',
+            whatsapp: o.customer?.phone || '',
+            email: o.customer?.email || '',
+            address: o.shippingAddress?.address || '',
+            city: o.shippingAddress?.city || '',
+            province: o.shippingAddress?.province || '',
+            postalCode: o.shippingAddress?.postalCode || '',
+            notes: o.shipping?.notes || ''
+          },
+          shipping: {
+            id: o.shipping?.courier || 'JNE',
+            courier: o.shipping?.courier || 'JNE',
+            service: o.shipping?.service || 'REG',
+            name: `${o.shipping?.courier || 'JNE'} (${o.shipping?.service || 'REG'})`,
+            cost: o.price?.shippingCost || 0,
+            estimatedDays: o.shipping?.estimatedDelivery || '2-3 Hari',
+            logo: ''
+          },
+          items: (o.items || []).map((it: any) => ({
+            id: it.id || `it-${Math.random()}`,
+            productId: it.productId || 'saena-01',
+            product: {
+              id: it.productId || 'saena-01',
+              name: it.name || '',
+              price: it.price || 0,
+              weight: it.weight || 600
+            } as any,
+            selectedSize: it.size || 'All Size',
+            selectedColor: { name: it.color || 'Standard', hex: '#1C3B2B' },
+            quantity: it.quantity || 1,
+            price: it.price || 0
+          })),
+          subtotal: o.price?.subtotal || o.total || 0,
+          shippingCost: o.price?.shippingCost || 0,
+          discount: o.price?.discount || 0,
+          total: o.price?.grandTotal || o.total || 0,
+          payment: {
+            method: o.payment?.paymentMethod === 'COD' ? 'cod' : 'doku',
+            channel: o.payment?.paymentChannel || 'doku_checkout',
+            channelName: o.payment?.paymentMethod === 'COD' ? 'Bayar di Tempat (COD)' : 'DOKU Payment Gateway',
+            status: o.payment?.paymentStatus === 'PAID' ? 'PAID' : (o.payment?.paymentStatus || 'PENDING'),
+            paidAt: o.payment?.paymentPaidAt || undefined,
+            vaNumber: o.payment?.vaNumber,
+            bank: o.payment?.bank,
+            qrisString: o.payment?.qrisString,
+            paymentUrl: o.payment?.paymentUrl
+          },
+          status: o.status || 'menunggu_pembayaran',
+          trackingNumber: o.shipping?.trackingNumber || o.trackingNumber || '',
+          trackingHistory: [],
+          createdAt: o.createdAt || new Date().toISOString()
+        }));
+        setOrders(mappedOrders);
+      }
+    } catch (err) {
+      console.warn('[StoreContext] Failed to fetch admin orders:', err);
+    }
+  };
+
   const loginAsAdmin = async (secret: string): Promise<{ success: boolean; message: string }> => {
+    const trimmed = secret.trim();
+    if (!trimmed) {
+      return { success: false, message: 'Kunci akses pengelola tidak boleh kosong.' };
+    }
+
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret })
+        body: JSON.stringify({ key: trimmed })
       });
       const data = await res.json();
-      if (!res.ok || !data?.success || !data?.token) {
-        return { success: false, message: data?.error || 'Autentikasi admin gagal.' };
+      if (res.ok && data.success && data.token) {
+        setAdminToken(data.token);
+        setIsAuthenticatedAdmin(true);
+        setIsAdminModeState(true);
+        setIsAdminLoginModalOpen(false);
+        try {
+          localStorage.setItem('saena_admin_auth_v1', 'true');
+          localStorage.setItem('saena_admin_token_v1', data.token);
+        } catch (err) {
+          console.warn('LocalStorage admin auth warning:', err);
+        }
+        refreshAdminOrders(data.token);
+        sendPushNotification(
+          'Akses Pengelola Terbuka 👑',
+          'Panel Kontrol Butik & Gudang saena.id Tamansari Tasikmalaya aktif.',
+          'system'
+        );
+        return { success: true, message: 'Autentikasi berhasil! Mengalihkan ke Dashboard Pengelola...' };
       }
 
-      setIsAuthenticatedAdmin(true);
-      setIsAdminModeState(true);
-      setIsAdminLoginModalOpen(false);
-      sessionStorage.setItem('saena_admin_session_v1', data.token);
-      sendPushNotification(
-        'Akses Pengelola Terbuka 👑',
-        'Panel kontrol admin berhasil diautentikasi.',
-        'system'
-      );
-      return { success: true, message: 'Autentikasi berhasil.' };
-    } catch {
-      return { success: false, message: 'Server autentikasi admin tidak dapat dihubungi.' };
+      return { 
+        success: false, 
+        message: data.error || 'Kunci akses salah. Periksa konfigurasi admin server.' 
+      };
+    } catch (err: any) {
+      return { 
+        success: false, 
+        message: err.message || 'Gagal menghubungi server untuk autentikasi admin.' 
+      };
     }
   };
 
-  const logoutAdmin = () => {
+  const logoutAdmin = async () => {
+    if (adminToken) {
+      try {
+        await fetch('/api/admin/logout', {
+          method: 'POST',
+          headers: { 'x-admin-token': adminToken }
+        });
+      } catch {}
+    }
+    setAdminToken(null);
     setIsAuthenticatedAdmin(false);
     setIsAdminModeState(false);
     try {
       localStorage.removeItem('saena_admin_auth_v1');
+      localStorage.removeItem('saena_admin_token_v1');
     } catch (err) {
       console.warn('LocalStorage admin auth removal warning:', err);
     }
@@ -1747,6 +1832,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsAdminLoginModalOpen,
         loginAsAdmin,
         logoutAdmin,
+        refreshAdminOrders,
         selectedProductForDetail,
         activeWhatsAppOrder,
         mengantarConfig,
