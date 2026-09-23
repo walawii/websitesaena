@@ -10,5 +10,10 @@
   "env": {
     "VERCEL_ANALYZE_BUILD_OUTPUT": "1",
     "VERCEL_SUPPORT_LARGE_FUNCTIONS": "1"
+  },
+  "functions": {
+    "api/**/*.ts": {
+      "excludeFiles": "{public/**,src/components/**,src/context/**,src/lib/**,src/translations/**,scripts/**,.github/**,backend.ts,src/assets/**}"
+    }
   }
 }
