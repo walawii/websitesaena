@@ -118,7 +118,7 @@ export async function processMengantarOrder(
     notes: reqPayload.notes || 'Busana Muslimah Premium saena.id'
   };
 
-  const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\\/+$/, '');
+  const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\/+$/, '');
   const endpoint = `${baseUrl}/orders`;
 
   try {
@@ -209,7 +209,7 @@ export async function calculateMengantarRates(
   error?: string;
 }> {
   const apiKey = process.env.MENGANTAR_API_KEY?.trim() || '';
-  const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\\/+$/, '');
+  const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\/+$/, '');
 
   if (!apiKey) {
     return {
@@ -278,7 +278,7 @@ export interface MengantarConnectivityStatus {
 
 export async function testMengantarApiConnectivity(): Promise<MengantarConnectivityStatus> {
   const apiKey = process.env.MENGANTAR_API_KEY?.trim() || '';
-  const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\\/+$/, '');
+  const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\/+$/, '');
 
   if (!apiKey) {
     return {
