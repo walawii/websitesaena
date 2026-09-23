@@ -201,37 +201,54 @@ export async function findProductByIdFromFirestore(productId: string): Promise<{
   return null;
 }
 
-export async function decrementProductStockInFirestore(items: OrderItem[]): Promise<void> {
+export async function reserveProductStockInFirestore(items: OrderItem[]): Promise<void> {
   if (!db || !Array.isArray(items) || items.length === 0) return;
-  for (const item of items) {
-    if (!item.productId) continue;
-    try {
+
+  const { runTransaction } = await import('firebase/firestore');
+
+  await runTransaction(db, async (transaction: any) => {
+    const updates: Array<{ ref: any; stock: Record<string, number>; totalStock: number }> = [];
+
+    for (const item of items) {
+      if (!item.productId) continue;
+
       const docRef = doc(db, 'products', item.productId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        const currentStock = { ...(data.stock || {}) };
-        const colorKey = item.color || item.variant || 'Standard';
-        if (currentStock[colorKey] !== undefined) {
-          currentStock[colorKey] = Math.max(0, (Number(currentStock[colorKey]) || 0) - (item.quantity || 1));
-        } else if (item.size && currentStock[item.size] !== undefined) {
-          currentStock[item.size] = Math.max(0, (Number(currentStock[item.size]) || 0) - (item.quantity || 1));
-        } else if (Object.keys(currentStock).length > 0) {
-          const firstKey = Object.keys(currentStock)[0];
-          currentStock[firstKey] = Math.max(0, (Number(currentStock[firstKey]) || 0) - (item.quantity || 1));
-        }
-        const updatedTotal = Object.values(currentStock).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-        await updateDoc(docRef, {
-          stock: currentStock,
-          totalStock: updatedTotal,
-          updatedAt: new Date().toISOString()
-        });
-        console.log(`[OrderRepository] Decremented stock for product "${item.productId}" variant "${colorKey}" by ${item.quantity}.`);
+      const snap = await transaction.get(docRef);
+      if (!snap.exists()) continue;
+
+      const data = snap.data();
+      const currentStock = { ...(data.stock || {}) } as Record<string, number>;
+      const requestedKey = item.color || item.variant || 'Standard';
+      const quantity = Math.max(1, Number(item.quantity) || 1);
+
+      let stockKey = requestedKey;
+      if (currentStock[stockKey] === undefined && item.size && currentStock[item.size] !== undefined) {
+        stockKey = item.size;
       }
-    } catch (err: any) {
-      console.warn(`[OrderRepository] Decrement stock notice for "${item.productId}":`, err.message);
+      if (currentStock[stockKey] === undefined) {
+        const keys = Object.keys(currentStock);
+        if (keys.length === 0) continue;
+        stockKey = keys[0];
+      }
+
+      const available = Number(currentStock[stockKey]) || 0;
+      if (available < quantity) {
+        throw new Error(`Stok produk "${item.name}" tidak mencukupi untuk varian "${stockKey}". Tersedia ${available}, diminta ${quantity}.`);
+      }
+
+      currentStock[stockKey] = available - quantity;
+      const totalStock = Object.values(currentStock).reduce((sum: number, value: any) => sum + (Number(value) || 0), 0);
+      updates.push({ ref: docRef, stock: currentStock, totalStock });
     }
-  }
+
+    for (const update of updates) {
+      transaction.update(update.ref, {
+        stock: update.stock,
+        totalStock: update.totalStock,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  });
 }
 
 /**
@@ -275,8 +292,7 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
   memoryOrders.set(order.id, order);
 
   if (!db) {
-    console.warn('[OrderRepository] Firestore is not currently connected; order stored in authoritative memory cache:', order.orderNumber);
-    return order;
+    throw new Error('Firestore tidak tersedia; pesanan tidak boleh dianggap tersimpan.');
   }
 
   try {
@@ -322,13 +338,9 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
     await setDoc(docRef, sanitized, { merge: true });
     console.log(`[OrderRepository] Order saved to Firestore successfully: ${order.orderNumber} (ID: ${order.id})`);
 
-    // Safely decrement inventory stock in background
-    decrementProductStockInFirestore(order.items).catch(err => {
-      console.warn('[OrderRepository] Stock decrement error:', err.message);
-    });
   } catch (err: any) {
     console.error(`[OrderRepository] Failed to save order to Firestore (${order.orderNumber}):`, err.message);
-    // Keep in memory and return gracefully rather than hard crashing checkout
+    throw err;
   }
 
   return order;
