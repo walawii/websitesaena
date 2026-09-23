@@ -81,74 +81,32 @@ export async function testDokuApiConnectivity(): Promise<DokuConnectivityStatus>
     };
   }
 
-  const baseUrl = environment === 'production' 
-    ? 'https://api.doku.com' 
+  const baseUrl = environment === 'production'
+    ? 'https://api.doku.com'
     : 'https://api-sandbox.doku.com';
 
-  const requestTarget = '/checkout/v1/payment';
-  const requestId = `DIAG-${Date.now()}`;
-  const requestTimestamp = new Date().toISOString().slice(0, 19) + 'Z';
-
-  // Minimal diagnostic payload to test connectivity & HMAC credentials validation without triggering real payment charges
-  const testPayload = JSON.stringify({
-    order: {
-      amount: 10000,
-      invoice_number: `DIAG-${Date.now()}`,
-      currency: 'IDR'
-    }
-  });
-
-  const signature = generateDokuSignature(
-    clientId,
-    requestId,
-    requestTimestamp,
-    requestTarget,
-    testPayload,
-    secretKey
-  );
-
   try {
+    // Safe connectivity probe only. Do NOT POST /checkout/v1/payment here:
+    // that endpoint creates a payment session and is not a harmless authentication check.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const res = await fetch(`${baseUrl}${requestTarget}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Client-Id': clientId,
-        'Request-Id': requestId,
-        'Request-Timestamp': requestTimestamp,
-        'Signature': signature
-      },
-      body: testPayload,
+    const res = await fetch(baseUrl, {
+      method: 'GET',
+      headers: { 'User-Agent': 'saena.id-doku-connectivity-check' },
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
-    // DOKU authenticates signature and headers first.
-    // HTTP 401 / 403 indicates invalid Client-Id, invalid Secret Key, or bad HMAC signature.
-    if (res.status === 401 || res.status === 403) {
-      return {
-        configured: true,
-        apiReachable: true,
-        authenticationVerified: false,
-        paymentTransactionTested: false,
-        mode: environment,
-        clientId: `${clientId.substring(0, 6)}••••••••`,
-        message: `API DOKU reachable, namun kredensial/HMAC ditolak (${environment.toUpperCase()} mode): HTTP ${res.status} Unauthorized.`
-      };
-    }
-
-    // HTTP 200 or 400 (parameter validation error) confirms credentials & signature were accepted by DOKU
     return {
       configured: true,
       apiReachable: true,
-      authenticationVerified: true,
-      paymentTransactionTested: false, // Diagnostic check only - no real payment transaction executed
+      authenticationVerified: false,
+      paymentTransactionTested: false,
       mode: environment,
       clientId: `${clientId.substring(0, 6)}••••••••`,
-      message: `API DOKU reachable & authentication verified (${environment.toUpperCase()} mode). Diagnostik koneksi berhasil (bukan bukti transaksi pembayaran).`
+      message: `Server DOKU reachable (${environment.toUpperCase()} mode), tetapi kredensial/signature belum diuji karena pengujian POST Checkout dapat membuat sesi pembayaran. Gunakan checkout sandbox untuk verifikasi transaksi nyata.`
     };
   } catch (err: any) {
     return {
