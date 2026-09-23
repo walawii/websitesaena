@@ -1,4 +1,4 @@
-import { safeCompareKeys, createSignedAdminToken, registerAdminSession } from '../../server/adminAuth';
+import { safeCompareKeys, createSignedAdminToken, registerAdminSession } from '../../server/adminAuth.ts';
 
 export const config = {
   api: {

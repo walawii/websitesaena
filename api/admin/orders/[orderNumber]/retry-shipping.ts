@@ -1,6 +1,6 @@
-import { verifyAdminRequest } from '../../../../server/adminAuth';
-import { findOrderByNumber, updateOrderShipping } from '../../../../server/orderRepository';
-import { processMengantarOrder } from '../../../../server/mengantarService';
+import { verifyAdminRequest } from '../../../../server/adminAuth.ts';
+import { findOrderByNumber, updateOrderShipping } from '../../../../server/orderRepository.ts';
+import { processMengantarOrder } from '../../../../server/mengantarService.ts';
 
 export const config = {
   api: {

@@ -1,14 +1,13 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
-import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnectivity } from './server/mengantarService';
-import { verifyMengantarWebhookSignature, processMengantarWebhook } from './server/mengantarWebhook';
-import { processDokuPayment, verifyDokuWebhookSignature, testDokuApiConnectivity } from './server/dokuService';
-import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService';
-import { processOrderCreation } from './server/orderCreationService';
-import { sendMetaCapiEvent, sendMetaCapiPurchase, META_DATASET_ID } from './server/metaCapiService';
+import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnectivity } from './server/mengantarService.ts';
+import { verifyMengantarWebhookSignature, processMengantarWebhook } from './server/mengantarWebhook.ts';
+import { processDokuPayment, verifyDokuWebhookSignature, testDokuApiConnectivity } from './server/dokuService.ts';
+import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService.ts';
+import { processOrderCreation } from './server/orderCreationService.ts';
+import { sendMetaCapiEvent, sendMetaCapiPurchase, META_DATASET_ID } from './server/metaCapiService.ts';
 import {
   generateOrderNumber,
   saveOrder,
@@ -18,8 +17,8 @@ import {
   getAllOrdersList,
   claimOrderForMetaPurchase,
   findProductByIdFromFirestore,
-  StoredOrder
-} from './server/orderRepository';
+  type StoredOrder
+} from './server/orderRepository.ts';
 import crypto from 'crypto';
 
 dotenv.config();
@@ -1594,6 +1593,7 @@ async function startServer() {
   app.use(express.static(path.join(process.cwd(), 'public')));
 
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'

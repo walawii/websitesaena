@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { StoredOrder } from './orderRepository';
+import type { StoredOrder } from './orderRepository.ts';
 
 /**
  * Meta Conversions API (CAPI) Service for saena.my.id

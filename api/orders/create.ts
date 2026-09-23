@@ -1,4 +1,4 @@
-import { processOrderCreation } from '../../server/orderCreationService';
+import { processOrderCreation } from '../../server/orderCreationService.ts';
 
 export const config = {
   api: {

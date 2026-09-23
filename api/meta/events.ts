@@ -1,4 +1,4 @@
-import { sendMetaCapiEvent } from '../../server/metaCapiService';
+import { sendMetaCapiEvent } from '../../server/metaCapiService.ts';
 
 export const config = {
   api: {

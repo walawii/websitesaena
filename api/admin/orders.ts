@@ -1,5 +1,5 @@
-import { verifyAdminRequest } from '../../server/adminAuth';
-import { getAllOrdersList } from '../../server/orderRepository';
+import { verifyAdminRequest } from '../../server/adminAuth.ts';
+import { getAllOrdersList } from '../../server/orderRepository.ts';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Content-Type', 'application/json');

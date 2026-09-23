@@ -1,4 +1,4 @@
-import { Product, ShippingMethod, Order } from '../types';
+import type { Product, ShippingMethod, Order } from '../types.ts';
 
 export const DEFAULT_WHATSAPP_NUMBER = '+6285724023064';
 export const DEFAULT_WHATSAPP_CLEAN = '6285724023064';

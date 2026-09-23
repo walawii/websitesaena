@@ -1,4 +1,4 @@
-import { verifyAdminRequest } from '../../server/adminAuth';
+import { verifyAdminRequest } from '../../server/adminAuth.ts';
 
 export default function handler(req: any, res: any) {
   res.setHeader('Content-Type', 'application/json');

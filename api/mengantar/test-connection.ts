@@ -1,4 +1,4 @@
-import { testMengantarApiConnectivity } from '../../server/mengantarService';
+import { testMengantarApiConnectivity } from '../../server/mengantarService.ts';
 
 export const config = {
   api: {

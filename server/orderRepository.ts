@@ -10,8 +10,8 @@ import {
   where, 
   getDocs, 
   orderBy, 
-  limit, 
-  DocumentData 
+  limit,
+  runTransaction
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
@@ -203,8 +203,6 @@ export async function findProductByIdFromFirestore(productId: string): Promise<{
 
 export async function reserveProductStockInFirestore(items: OrderItem[]): Promise<void> {
   if (!db || !Array.isArray(items) || items.length === 0) return;
-
-  const { runTransaction } = await import('firebase/firestore');
 
   await runTransaction(db, async (transaction: any) => {
     const updates: Array<{ ref: any; stock: Record<string, number>; totalStock: number }> = [];

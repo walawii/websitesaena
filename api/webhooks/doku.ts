@@ -1,14 +1,14 @@
 import {
   verifyDokuWebhookSignature
-} from '../../server/dokuService';
+} from '../../server/dokuService.ts';
 import {
   findOrderByNumber,
   updateOrderPayment,
   updateOrderShipping,
   claimOrderForMetaPurchase
-} from '../../server/orderRepository';
-import { processMengantarOrder } from '../../server/mengantarService';
-import { sendMetaCapiPurchase } from '../../server/metaCapiService';
+} from '../../server/orderRepository.ts';
+import { processMengantarOrder } from '../../server/mengantarService.ts';
+import { sendMetaCapiPurchase } from '../../server/metaCapiService.ts';
 
 export const config = {
   api: {

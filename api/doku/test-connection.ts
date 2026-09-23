@@ -1,4 +1,4 @@
-import { testDokuApiConnectivity } from '../../server/dokuService';
+import { testDokuApiConnectivity } from '../../server/dokuService.ts';
 
 export const config = {
   api: {

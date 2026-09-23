@@ -3,10 +3,10 @@ import {
   findOrderByShipmentIdentity, 
   saveOrder, 
   claimOrderForMetaPurchase,
-  StoredOrder, 
-  ShippingStatus 
-} from './orderRepository';
-import { sendMetaCapiPurchase } from './metaCapiService';
+  type StoredOrder, 
+  type ShippingStatus 
+} from './orderRepository.ts';
+import { sendMetaCapiPurchase } from './metaCapiService.ts';
 
 export interface MengantarWebhookPayload {
   cnote_no?: string;

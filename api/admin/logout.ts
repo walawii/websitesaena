@@ -1,4 +1,4 @@
-import { removeAdminSession } from '../../server/adminAuth';
+import { removeAdminSession } from '../../server/adminAuth.ts';
 
 export const config = {
   api: {

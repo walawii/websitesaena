@@ -1,5 +1,5 @@
-import { findOrderByNumber } from '../../../server/orderRepository';
-import { verifyAdminRequest } from '../../../server/adminAuth';
+import { findOrderByNumber } from '../../../server/orderRepository.ts';
+import { verifyAdminRequest } from '../../../server/adminAuth.ts';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Content-Type', 'application/json');

@@ -1,4 +1,4 @@
-import { verifyMengantarWebhookSignature, processMengantarWebhook } from '../../server/mengantarWebhook';
+import { verifyMengantarWebhookSignature, processMengantarWebhook } from '../../server/mengantarWebhook.ts';
 
 export const config = {
   api: {

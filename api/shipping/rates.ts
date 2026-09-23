@@ -1,4 +1,4 @@
-import { calculateMengantarRates } from '../../server/mengantarService';
+import { calculateMengantarRates } from '../../server/mengantarService.ts';
 
 export const config = {
   api: {

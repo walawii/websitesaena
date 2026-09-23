@@ -1,14 +1,14 @@
-import { processDokuPayment } from './dokuService';
-import { processMengantarOrder } from './mengantarService';
+import { processDokuPayment } from './dokuService.ts';
+import { processMengantarOrder } from './mengantarService.ts';
 import {
   generateOrderNumber,
   saveOrder,
   reserveProductStockInFirestore,
   restoreProductStock,
   findProductByIdFromFirestore,
-  StoredOrder
-} from './orderRepository';
-import { INITIAL_PRODUCTS, AVAILABLE_COUPONS } from '../src/data/mockData';
+  type StoredOrder
+} from './orderRepository.ts';
+import { INITIAL_PRODUCTS, AVAILABLE_COUPONS } from '../src/data/mockData.ts';
 
 export interface OrderCreationResult {
   statusCode: number;
