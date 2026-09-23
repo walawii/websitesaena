@@ -1334,7 +1334,7 @@ app.post('/api/doku/test-connection', async (_req, res) => {
   try {
     const result = await testDokuApiConnectivity();
     return res.json({
-      success: result.configured,
+      success: result.configured && result.apiReachable,
       configured: result.configured,
       apiReachable: result.apiReachable,
       authenticationVerified: result.authenticationVerified,
