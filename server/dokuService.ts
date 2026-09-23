@@ -233,7 +233,7 @@ export async function processDokuPayment(
   }
 
   const normalizedPhone = reqPayload.customer.whatsapp.replace(/\\D/g, '').replace(/^0+/, '62');
-  const safePhone = normalizedPhone || '6285724023064';
+  const safePhone = (normalizedPhone || '6285724023064').slice(0, 16);
   const customerName = sanitizeDokuString(reqPayload.customer.fullName, 255) || 'Pelanggan Saena';
   const customerEmail = (reqPayload.customer.email || 'pelanggan@saena.my.id').trim();
 
