@@ -3,6 +3,8 @@ import { processMengantarOrder } from './mengantarService';
 import {
   generateOrderNumber,
   saveOrder,
+  reserveProductStockInFirestore,
+  restoreProductStock,
   findProductByIdFromFirestore,
   StoredOrder
 } from './orderRepository';
@@ -464,7 +466,36 @@ export async function processOrderCreation(
       }
     };
 
-    // Store in debounce cache
+    // Reserve inventory exactly once before any payment/shipping side effect.
+    // Firestore transaction prevents concurrent checkouts from overselling stock.
+    try {
+      await reserveProductStockInFirestore(storedOrder.items);
+    } catch (stockErr: any) {
+      return {
+        statusCode: 409,
+        body: {
+          success: false,
+          error: stockErr?.message || 'Stok produk berubah dan tidak lagi mencukupi. Silakan ulangi checkout.'
+        }
+      };
+    }
+
+    // Persist the pending order before calling external gateways.
+    // This guarantees webhooks can always find the order.
+    try {
+      await saveOrder(storedOrder);
+    } catch (persistErr: any) {
+      await restoreProductStock(storedOrder.items).catch(() => undefined);
+      return {
+        statusCode: 503,
+        body: {
+          success: false,
+          error: 'Pesanan belum dapat disimpan ke database. Pembayaran tidak dijalankan. Silakan coba lagi.'
+        }
+      };
+    }
+
+    // Store in debounce cache only after the authoritative order exists.
     recentCheckoutAttempts.set(idempotencyKey, { order: storedOrder, timestamp: Date.now() });
 
     // 8. Handle COD Flow
@@ -519,8 +550,6 @@ export async function processOrderCreation(
         }
       }
 
-      await saveOrder(storedOrder);
-
       const codResponseData = {
         orderNumber,
         invoiceNumber,
@@ -547,6 +576,7 @@ export async function processOrderCreation(
       storedOrder.payment.paymentStatus = 'FAILED';
       storedOrder.status = 'dibatalkan';
       await saveOrder(storedOrder);
+      await restoreProductStock(storedOrder.items).catch(() => undefined);
 
       return {
         statusCode: 503,
@@ -580,6 +610,7 @@ export async function processOrderCreation(
       storedOrder.payment.paymentStatus = 'FAILED';
       storedOrder.status = 'dibatalkan';
       await saveOrder(storedOrder);
+      await restoreProductStock(storedOrder.items).catch(() => undefined);
 
       return {
         statusCode: 502,
