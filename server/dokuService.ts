@@ -118,6 +118,8 @@ export async function testDokuApiConnectivity(): Promise<DokuConnectivityStatus>
         'Client-Id': clientId,
         'Request-Id': requestId,
         'Request-Timestamp': requestTimestamp,
+        'Request-Target': requestTarget,
+        'Digest': crypto.createHash('sha256').update(testPayload, 'utf8').digest('base64'),
         'Signature': signature
       },
       body: testPayload,
@@ -316,6 +318,8 @@ export async function processDokuPayment(
         'Client-Id': clientId,
         'Request-Id': requestId,
         'Request-Timestamp': requestTimestamp,
+        'Request-Target': requestTarget,
+        'Digest': crypto.createHash('sha256').update(bodyJson, 'utf8').digest('base64'),
         'Signature': signature
       },
       body: bodyJson,
