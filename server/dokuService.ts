@@ -118,8 +118,6 @@ export async function testDokuApiConnectivity(): Promise<DokuConnectivityStatus>
         'Client-Id': clientId,
         'Request-Id': requestId,
         'Request-Timestamp': requestTimestamp,
-        'Request-Target': requestTarget,
-        'Digest': crypto.createHash('sha256').update(testPayload, 'utf8').digest('base64'),
         'Signature': signature
       },
       body: testPayload,
@@ -276,7 +274,13 @@ export async function processDokuPayment(
     lineItems = undefined;
   }
 
-  // Jokul DOKU Checkout V1 Payload
+  const normalizedPhone = reqPayload.customer.whatsapp.replace(/\\D/g, '').replace(/^0+/, '62');
+  const safePhone = normalizedPhone || '6285724023064';
+  const customerName = sanitizeDokuString(reqPayload.customer.fullName, 255) || 'Pelanggan Saena';
+  const customerEmail = (reqPayload.customer.email || 'pelanggan@saena.my.id').trim();
+
+  // DOKU Checkout V1/Jokul documented request shape.
+  // Keep the payload JSON exactly as serialized below; its exact bytes are used for Digest.
   const bodyPayload: any = {
     order: {
       amount: targetAmount,
@@ -284,16 +288,26 @@ export async function processDokuPayment(
       currency: 'IDR',
       callback_url: defaultCallback,
       auto_redirect: false,
-      ...(lineItems ? { line_items: lineItems } : {})
+      ...(lineItems ? {
+        line_items: lineItems.map((item, index) => ({
+          id: `item-${index + 1}`,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      } : {})
     },
     payment: {
-      payment_due_date: 120 // in minutes (2 hours)
+      payment_due_date: 120,
+      type: 'SALE'
     },
     customer: {
-      name: sanitizeDokuString(reqPayload.customer.fullName, 50) || 'Pelanggan Saena',
-      email: (reqPayload.customer.email || 'pelanggan@saena.my.id').trim(),
-      phone: reqPayload.customer.whatsapp.replace(/[^0-9+]/g, '') || '085724023064',
-      address: sanitizeDokuString(reqPayload.customer.address, 100) || 'Indonesia'
+      id: `SNA-${reqPayload.orderId}`,
+      name: customerName,
+      phone: safePhone,
+      email: customerEmail,
+      address: sanitizeDokuString(reqPayload.customer.address, 400) || 'Indonesia',
+      country: 'ID'
     }
   };
 
@@ -318,8 +332,6 @@ export async function processDokuPayment(
         'Client-Id': clientId,
         'Request-Id': requestId,
         'Request-Timestamp': requestTimestamp,
-        'Request-Target': requestTarget,
-        'Digest': crypto.createHash('sha256').update(bodyJson, 'utf8').digest('base64'),
         'Signature': signature
       },
       body: bodyJson,
