@@ -3,7 +3,7 @@ import { DokuStoreConfig, DokuPaymentData, PaymentChannel } from '../types';
 export const DEFAULT_DOKU_CONFIG: DokuStoreConfig = {
   clientId: '',
   secretKey: '',
-  environment: 'production',
+  environment: 'sandbox',
   enabled: true,
   autoRedirectToPaymentUrl: false,
   activeChannels: {
