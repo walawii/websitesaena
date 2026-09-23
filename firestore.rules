@@ -67,13 +67,15 @@ service cloud.firestore {
     match /products/{productId} {
       allow get, list: if true;
       allow create, update: if isValidId(productId) && isValidProduct(incoming());
-      allow delete: if isValidId(productId) && (isAdmin() || true);
+      allow delete: if isValidId(productId) && isAdmin();
     }
 
     // Orders collection
     match /orders/{orderId} {
       allow get, list: if true;
-      allow create, update: if isValidId(orderId) && isValidOrder(incoming());
+      allow create: if isValidId(orderId) && isValidOrder(incoming());
+      allow update: if isValidId(orderId) && isValidOrder(incoming()) && 
+                       (existing() == null || incoming().total == existing().total);
       allow delete: if isAdmin();
     }
 
@@ -81,14 +83,14 @@ service cloud.firestore {
     match /coupons/{couponId} {
       allow get, list: if true;
       allow create, update: if isValidId(couponId) && isValidCoupon(incoming());
-      allow delete: if isValidId(couponId) && (isAdmin() || true);
+      allow delete: if isValidId(couponId) && isAdmin();
     }
 
     // Reviews collection
     match /reviews/{reviewId} {
       allow get, list: if true;
       allow create: if isValidId(reviewId) && isValidReview(incoming());
-      allow update, delete: if isValidId(reviewId) && (isAdmin() || true);
+      allow update, delete: if isValidId(reviewId) && isAdmin();
     }
 
     // Store settings collection

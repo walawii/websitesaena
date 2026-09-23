@@ -107,9 +107,9 @@ const SHIPPING_RATES: Record<string, number> = {
 
 export function calculateServerShipping(
   shipping: any,
-  isAlisaFreeShippingCampaign: boolean
+  freeShippingPromo = false
 ): number {
-  if (isAlisaFreeShippingCampaign) {
+  if (freeShippingPromo) {
     return 0;
   }
 
@@ -129,11 +129,7 @@ export function calculateServerShipping(
   if (id === 'sicepat-reg' || courier.includes('sicepat')) return 14000;
   if (id === 'jne-reg' || courier.includes('jne') || service.includes('reg')) return 15000;
 
-  // Fallback to validated positive cost or default standard rate
-  if (typeof shipping?.cost === 'number' && shipping.cost >= 0) {
-    return shipping.cost;
-  }
-
+  // Default authoritative standard rate
   return 15000;
 }
 
@@ -253,21 +249,21 @@ export async function processOrderCreation(
     let totalQuantity = 0;
     let totalWeightGrams = 0;
     const validatedItems: any[] = [];
-    let isOnlyAlisaPackage = true;
 
     for (let idx = 0; idx < items.length; idx++) {
       const it = items[idx];
       const rawKey = String(packageId || it.packageId || it.productId || it.id || '').toLowerCase().trim();
       let catalog = SERVER_PRODUCT_CATALOG[rawKey];
+      let firestoreProd: any = null;
 
       // Check Firestore if custom/dynamic product created in admin
       if (!catalog) {
-        const firestoreProd = await findProductByIdFromFirestore(rawKey);
+        firestoreProd = await findProductByIdFromFirestore(rawKey);
         if (firestoreProd) {
           catalog = {
             name: firestoreProd.name,
             price: firestoreProd.price,
-            weight: firestoreProd.weight,
+            weight: firestoreProd.weight || 600,
             qty: 1
           };
         }
@@ -284,16 +280,6 @@ export async function processOrderCreation(
         }
       }
 
-      // Fallback: If item has valid name and positive price from known product model
-      if (!catalog && it.name && typeof it.price === 'number' && it.price > 0) {
-        catalog = {
-          name: String(it.name),
-          price: Number(it.price),
-          weight: Number(it.weight) || 600,
-          qty: 1
-        };
-      }
-
       if (!catalog) {
         return {
           statusCode: 400,
@@ -304,11 +290,50 @@ export async function processOrderCreation(
         };
       }
 
-      if (!rawKey.includes('alisa') && !rawKey.includes('paket-')) {
-        isOnlyAlisaPackage = false;
+      const qty = Math.max(1, Number(it.quantity) || catalog.qty || 1);
+
+      // Inventory out-of-stock and negative stock prevention
+      let availableStock: number | null = null;
+      if (firestoreProd) {
+        if (typeof firestoreProd.totalStock === 'number') {
+          availableStock = firestoreProd.totalStock;
+        } else if (firestoreProd.stock && typeof firestoreProd.stock === 'object') {
+          const vKey = it.variant || it.color || 'Standard';
+          availableStock = firestoreProd.stock[vKey] ?? Object.values(firestoreProd.stock).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+        }
+      } else {
+        const mockProd = INITIAL_PRODUCTS.find(p => p.id === rawKey || p.slug === rawKey);
+        if (mockProd) {
+          if (typeof mockProd.totalStock === 'number') {
+            availableStock = mockProd.totalStock;
+          } else if (mockProd.stock && typeof mockProd.stock === 'object') {
+            const vKey = it.variant || it.color || 'Standard';
+            availableStock = (mockProd.stock as any)[vKey] ?? Object.values(mockProd.stock).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+          }
+        }
       }
 
-      const qty = Math.max(1, Number(it.quantity) || catalog.qty || 1);
+      if (availableStock !== null) {
+        if (availableStock <= 0) {
+          return {
+            statusCode: 400,
+            body: {
+              success: false,
+              error: `Stok produk "${catalog.name}" saat ini sedang habis.`
+            }
+          };
+        }
+        if (qty > availableStock) {
+          return {
+            statusCode: 400,
+            body: {
+              success: false,
+              error: `Jumlah pesanan (${qty} pcs) melebihi stok yang tersedia (${availableStock} pcs) untuk produk "${catalog.name}".`
+            }
+          };
+        }
+      }
+
       const unitPrice = catalog.price;
       const weight = catalog.weight;
 
@@ -332,6 +357,7 @@ export async function processOrderCreation(
 
     // 4. Server-Side Coupon & Discount Calculation
     let discount = 0;
+    let isFreeShippingCoupon = false;
     const cleanCoupon = String(couponCode || body?.appliedCoupon || '').trim().toUpperCase();
     if (cleanCoupon) {
       const validCoupon = SERVER_AVAILABLE_COUPONS[cleanCoupon];
@@ -349,16 +375,18 @@ export async function processOrderCreation(
         calculatedDiscount = validCoupon.maxDiscount;
       }
       discount = calculatedDiscount;
+      if (cleanCoupon === 'GRATISONGKIR') {
+        isFreeShippingCoupon = true;
+      }
     }
 
     // 5. Server-Side Shipping Cost Calculation
     const effectiveShipping = shipping || {
       id: body?.shippingId,
       courier: courier,
-      service: service,
-      cost: body?.shippingCost
+      service: service
     };
-    const calculatedShippingCost = calculateServerShipping(effectiveShipping, isOnlyAlisaPackage);
+    const calculatedShippingCost = calculateServerShipping(effectiveShipping, isFreeShippingCoupon);
     const grandTotal = Math.max(0, calculatedSubtotal + calculatedShippingCost - discount);
 
     // 6. Generate Order Identifiers & Crypto Security Token

@@ -133,7 +133,7 @@ export async function sendMetaCapiEvent(options: MetaCapiEventOptions): Promise<
       event_name: options.eventName,
       event_time: options.eventTime || Math.floor(Date.now() / 1000),
       event_id: options.eventId,
-      event_source_url: options.eventSourceUrl || 'https://saena.my.id/alisa',
+      event_source_url: options.eventSourceUrl || 'https://saena.my.id',
       action_source: options.actionSource || 'website',
       user_data: userDataPayload
     };
@@ -206,7 +206,7 @@ export async function sendMetaCapiPurchase(order: StoredOrder): Promise<{
     item_price: it.price
   }));
 
-  const mainItemName = order.items[0]?.name || 'Mukena Traveling 2in1 Laser Cut Alisa Premium';
+  const mainItemName = order.items[0]?.name || 'Madina Silk Abaya Set saena.id';
 
   return sendMetaCapiEvent({
     eventName: 'Purchase',

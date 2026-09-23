@@ -234,6 +234,42 @@ export async function decrementProductStockInFirestore(items: OrderItem[]): Prom
   }
 }
 
+/**
+ * Restore product stock in Firestore when order is cancelled or payment expired
+ */
+export async function restoreProductStock(items: OrderItem[]): Promise<void> {
+  if (!db || !Array.isArray(items) || items.length === 0) return;
+  for (const item of items) {
+    if (!item.productId) continue;
+    try {
+      const docRef = doc(db, 'products', item.productId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const currentStock = { ...(data.stock || {}) };
+        const colorKey = item.color || item.variant || 'Standard';
+        if (currentStock[colorKey] !== undefined) {
+          currentStock[colorKey] = (Number(currentStock[colorKey]) || 0) + (item.quantity || 1);
+        } else if (item.size && currentStock[item.size] !== undefined) {
+          currentStock[item.size] = (Number(currentStock[item.size]) || 0) + (item.quantity || 1);
+        } else if (Object.keys(currentStock).length > 0) {
+          const firstKey = Object.keys(currentStock)[0];
+          currentStock[firstKey] = (Number(currentStock[firstKey]) || 0) + (item.quantity || 1);
+        }
+        const updatedTotal = Object.values(currentStock).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+        await updateDoc(docRef, {
+          stock: currentStock,
+          totalStock: updatedTotal,
+          updatedAt: new Date().toISOString()
+        });
+        console.log(`[OrderRepository] Restored stock for product "${item.productId}" variant "${colorKey}" by ${item.quantity}.`);
+      }
+    } catch (err: any) {
+      console.warn(`[OrderRepository] Restore stock notice for "${item.productId}":`, err.message);
+    }
+  }
+}
+
 export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
   memoryOrders.set(order.orderNumber, order);
   memoryOrders.set(order.id, order);
@@ -514,6 +550,9 @@ export async function updateOrderPayment(
     // Only cancel if order has not yet been fulfilled, paid, or shipped
     if (order.status === 'menunggu_pembayaran') {
       order.status = 'dibatalkan';
+      restoreProductStock(order.items).catch(err => {
+        console.warn(`[OrderRepository] Restore stock notice for order ${order.orderNumber}:`, err.message);
+      });
     }
   }
 
