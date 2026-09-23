@@ -7,6 +7,7 @@ import { processMengantarOrder, calculateMengantarRates, testMengantarApiConnect
 import { verifyMengantarWebhookSignature, processMengantarWebhook } from './server/mengantarWebhook';
 import { processDokuPayment, verifyDokuWebhookSignature, testDokuApiConnectivity } from './server/dokuService';
 import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService';
+import { processOrderCreation } from './server/orderCreationService';
 import { sendMetaCapiEvent, sendMetaCapiPurchase, META_DATASET_ID } from './server/metaCapiService';
 import {
   generateOrderNumber,
@@ -49,6 +50,38 @@ export function safeCompareKeys(a?: string | null, b?: string | null): boolean {
   }
 }
 
+// Generate cryptographically secure stateless HMAC admin session token
+export function createSignedAdminToken(adminKey: string): string {
+  const expiresIn = 12 * 3600; // 12 hours in seconds
+  const payload = Buffer.from(JSON.stringify({
+    role: 'admin',
+    exp: Date.now() + (expiresIn * 1000),
+    nonce: crypto.randomBytes(8).toString('hex')
+  })).toString('base64url');
+  const signature = crypto.createHmac('sha256', adminKey).update(payload).digest('base64url');
+  return `st_${payload}.${signature}`;
+}
+
+// Verify stateless HMAC admin session token
+export function verifySignedAdminToken(token: string, adminKey: string): boolean {
+  if (!token || !token.startsWith('st_')) return false;
+  const raw = token.slice(3);
+  const [payload, signature] = raw.split('.');
+  if (!payload || !signature || !adminKey) return false;
+  try {
+    const expectedSig = crypto.createHmac('sha256', adminKey).update(payload).digest('base64url');
+    const bufA = Buffer.from(signature);
+    const bufB = Buffer.from(expectedSig);
+    if (bufA.length !== bufB.length || !crypto.timingSafeEqual(bufA, bufB)) {
+      return false;
+    }
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return Number(data.exp) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 // Check if request is authenticated as Admin
 export function verifyAdminRequest(req: any): boolean {
   const configuredAdminKey = process.env.SAENA_ADMIN_KEY?.trim();
@@ -65,12 +98,20 @@ export function verifyAdminRequest(req: any): boolean {
     token = String(req.headers['x-admin-token']).trim();
   }
 
-  if (token && adminSessions.has(token)) {
-    const session = adminSessions.get(token)!;
-    if (Date.now() < session.expiresAt) {
+  if (token) {
+    // A. Check signed stateless token (Works reliably across Vercel serverless cold starts & multiple instances)
+    if (verifySignedAdminToken(token, configuredAdminKey)) {
       return true;
-    } else {
-      adminSessions.delete(token); // expired
+    }
+
+    // B. Check in-memory map
+    if (adminSessions.has(token)) {
+      const session = adminSessions.get(token)!;
+      if (Date.now() < session.expiresAt) {
+        return true;
+      } else {
+        adminSessions.delete(token); // expired
+      }
     }
   }
 
@@ -122,7 +163,8 @@ app.get('/api/health', (req, res) => {
 
 // Admin Authentication Endpoints
 app.post('/api/admin/login', (req, res) => {
-  const { key } = req.body || {};
+  const { key, secret } = req.body || {};
+  const suppliedKey = String(key || secret || '').trim();
   const adminKey = process.env.SAENA_ADMIN_KEY?.trim();
 
   if (!adminKey) {
@@ -133,15 +175,15 @@ app.post('/api/admin/login', (req, res) => {
     });
   }
 
-  if (!key || typeof key !== 'string' || !safeCompareKeys(key.trim(), adminKey)) {
+  if (!suppliedKey || !safeCompareKeys(suppliedKey, adminKey)) {
     return res.status(401).json({
       success: false,
       error: 'Kunci akses pengelola (SAENA_ADMIN_KEY) tidak valid.'
     });
   }
 
-  // Generate cryptographically secure session token with 12-hour expiry
-  const sessionToken = crypto.randomBytes(32).toString('hex');
+  // Generate cryptographically secure stateless HMAC session token with 12-hour expiry
+  const sessionToken = createSignedAdminToken(adminKey);
   const expiresIn = 12 * 3600; // 12 hours in seconds
   adminSessions.set(sessionToken, {
     createdAt: Date.now(),
@@ -734,429 +776,15 @@ app.post('/api/meta/events', async (req, res) => {
   }
 });
 
-// In-memory debounce cache to prevent duplicate checkout submissions within 10 seconds
-const recentCheckoutAttempts = new Map<string, { order: StoredOrder; timestamp: number }>();
-
-// Server-Authoritative Product & Bundle Catalog
-const SERVER_PRODUCT_CATALOG: Record<string, { name: string; price: number; weight: number; qty?: number }> = {
-  // Alisa Mukena Bundles
-  'alisa-01': { name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Hemat 1 Pcs)', price: 79500, weight: 600, qty: 1 },
-  'alisa-02': { name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Bundling 2 Pcs)', price: 159000, weight: 1200, qty: 2 },
-  'alisa-03': { name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Best Seller 3 Pcs)', price: 238500, weight: 1800, qty: 3 },
-  'paket-1': { name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Hemat 1 Pcs)', price: 79500, weight: 600, qty: 1 },
-  'paket-2': { name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Bundling 2 Pcs)', price: 159000, weight: 1200, qty: 2 },
-  'paket-3': { name: 'Mukena Traveling 2in1 Laser Cut Alisa (Paket Best Seller 3 Pcs)', price: 238500, weight: 1800, qty: 3 },
-
-  // saena.id Central Boutique Catalog (Tamansari Tasikmalaya)
-  'saena-01': { name: 'Madina Silk Abaya Set with French Khimar', price: 685000, weight: 550, qty: 1 },
-  'saena-02': { name: 'Zafira Mulberry Silk Abaya Bordir Emas', price: 545000, weight: 500, qty: 1 },
-  'saena-03': { name: 'Aisyah Luxury Silk Dress Kaftan Bordir', price: 495000, weight: 550, qty: 1 },
-  'saena-04': { name: 'Safiyya French Khimar Two-Tone Silk', price: 325000, weight: 350, qty: 1 },
-  'saena-05': { name: 'Al-Quds Signature Silk Jacquard Gamis', price: 595000, weight: 600, qty: 1 },
-  'saena-06': { name: 'Maryam Silk Prayer Robe (Mukena Sutra)', price: 475000, weight: 700, qty: 1 },
-  'saena-07': { name: 'Rayyan Pure Linen Kurta & Koko Set', price: 385000, weight: 450, qty: 1 },
-  'saena-08': { name: 'Alisa 2in1 Laser Cut Traveling Mukena', price: 79500, weight: 600, qty: 1 },
-  'saena-09': { name: 'Noor Silk Pashmina & Hijab Square Syari', price: 185000, weight: 180, qty: 1 },
-  'saena-10': { name: 'Tasbih Mutiara Air Tawar & Bros Exclusive', price: 145000, weight: 120, qty: 1 }
-};
-
-// Server-Authoritative Coupons
-const SERVER_AVAILABLE_COUPONS: Record<string, { code: string; discountPercent: number; maxDiscount?: number }> = {
-  'SAENARAMADHAN': { code: 'SAENARAMADHAN', discountPercent: 15, maxDiscount: 150000 },
-  'WELCOME10': { code: 'WELCOME10', discountPercent: 10 },
-  'ELEGANT20': { code: 'ELEGANT20', discountPercent: 20, maxDiscount: 200000 }
-};
-
-// API Route: Create Order (Server-Side Total Calculation & Gateway Orchestration)
+// API Route: Create Order (Unified Server-Authoritative Gateway Orchestration)
 app.post('/api/orders/create', async (req, res) => {
-  try {
-    const {
-      customer,
-      shippingAddress,
-      shipping,
-      items,
-      courier,
-      service,
-      packageId,
-      couponCode,
-      paymentMethod, // 'DOKU' | 'COD'
-      paymentChannel, // e.g. 'doku_checkout'
-      notes,
-      metaTracking
-    } = req.body || {};
+  const clientIp = typeof req.headers['x-forwarded-for'] === 'string'
+    ? req.headers['x-forwarded-for'].split(',')[0].trim()
+    : req.socket.remoteAddress || '';
 
-    // 1. Validate Customer
-    if (!customer || !customer.customerName || !customer.phone) {
-      return res.status(400).json({
-        success: false,
-        error: 'Nama lengkap dan nomor WhatsApp pelanggan wajib diisi.'
-      });
-    }
-
-    const cleanPhone = String(customer.phone).replace(/[^0-9+]/g, '');
-    if (cleanPhone.replace(/\D/g, '').length < 10) {
-      return res.status(400).json({
-        success: false,
-        error: 'Nomor WhatsApp tidak valid (minimal 10 digit).'
-      });
-    }
-
-    const effectiveShippingAddress = shippingAddress || {
-      address: customer?.address || '',
-      province: customer?.province || '',
-      city: customer?.city || '',
-      district: customer?.district || customer?.subdistrict || '',
-      postalCode: customer?.postalCode || ''
-    };
-
-    // 2. Validate Address
-    if (!effectiveShippingAddress || !effectiveShippingAddress.address || !effectiveShippingAddress.city || !effectiveShippingAddress.province) {
-      return res.status(400).json({
-        success: false,
-        error: 'Alamat pengiriman lengkap (alamat, kota/kabupaten, dan provinsi) wajib diisi.'
-      });
-    }
-
-    // 3. Validate Items & Server-Side Price Calculation (Ignored client price)
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Keranjang belanja kosong.'
-      });
-    }
-
-    // Debounce check against rapid double-clicks
-    const idempotencyKey = `${cleanPhone}-${JSON.stringify(items.map((it: any) => ({ p: it.packageId || it.productId || it.id, q: it.quantity || 1 })))}`;
-    const recent = recentCheckoutAttempts.get(idempotencyKey);
-    if (recent && (Date.now() - recent.timestamp < 10000)) {
-      console.log(`[CreateOrder] Duplicate order submission suppressed within 10s for ${cleanPhone}. Returning existing order ${recent.order.orderNumber}.`);
-      return res.json({
-        success: true,
-        orderNumber: recent.order.orderNumber,
-        invoiceNumber: recent.order.invoiceNumber,
-        accessToken: recent.order.accessToken,
-        grandTotal: recent.order.price.grandTotal,
-        paymentMethod: recent.order.payment.paymentMethod,
-        paymentStatus: recent.order.payment.paymentStatus,
-        paymentUrl: recent.order.payment.paymentUrl,
-        vaNumber: recent.order.payment.vaNumber,
-        bank: recent.order.payment.bank,
-        qrisString: recent.order.payment.qrisString,
-        qrisImage: recent.order.payment.qrisImage,
-        message: 'Pesanan telah terbit sebelumnya (pencegahan duplikasi).'
-      });
-    }
-
-    let calculatedSubtotal = 0;
-    let totalQuantity = 0;
-    let totalWeightGrams = 0;
-    const validatedItems: any[] = [];
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const it = items[idx];
-      const rawKey = String(packageId || it.packageId || it.productId || it.id || '').toLowerCase().trim();
-      let catalog = SERVER_PRODUCT_CATALOG[rawKey];
-
-      // Check Firestore if dynamic custom product
-      if (!catalog) {
-        const firestoreProd = await findProductByIdFromFirestore(rawKey);
-        if (firestoreProd) {
-          catalog = {
-            name: firestoreProd.name,
-            price: firestoreProd.price,
-            weight: firestoreProd.weight,
-            qty: 1
-          };
-        }
-      }
-
-      // Check bundle aliases
-      if (!catalog) {
-        if (rawKey.includes('paket-3') || rawKey.includes('alisa-03') || it.name?.includes('3 Pcs')) {
-          catalog = SERVER_PRODUCT_CATALOG['alisa-03'];
-        } else if (rawKey.includes('paket-2') || rawKey.includes('alisa-02') || it.name?.includes('2 Pcs')) {
-          catalog = SERVER_PRODUCT_CATALOG['alisa-02'];
-        } else if (rawKey.includes('paket-1') || rawKey.includes('alisa-01') || it.name?.includes('1 Pcs')) {
-          catalog = SERVER_PRODUCT_CATALOG['alisa-01'];
-        }
-      }
-
-      // Strictly reject invalid or uncataloged product IDs
-      if (!catalog) {
-        return res.status(400).json({
-          success: false,
-          error: `Produk "${it.productId || it.id || it.name || 'Unknown'}" tidak valid atau tidak ditemukan di katalog saena.id.`
-        });
-      }
-
-      const qty = Math.max(1, Number(it.quantity) || catalog.qty || 1);
-      const unitPrice = catalog.price;
-      const weight = catalog.weight;
-
-      calculatedSubtotal += unitPrice * (catalog.qty ? 1 : qty);
-      totalQuantity += qty;
-      totalWeightGrams += weight * (catalog.qty ? 1 : qty);
-
-      validatedItems.push({
-        id: `item-${Date.now()}-${idx}`,
-        productId: rawKey || 'alisa-01',
-        name: catalog.name,
-        variant: it.variant || it.color || 'Standard',
-        color: it.color || 'Standard',
-        size: it.size || 'All Size',
-        price: unitPrice,
-        quantity: qty,
-        weight,
-        image: it.image
-      });
-    }
-
-    // 4. Server-Side Coupon & Discount Calculation
-    let discount = 0;
-    if (couponCode && typeof couponCode === 'string') {
-      const cleanCoupon = couponCode.trim().toUpperCase();
-      const validCoupon = SERVER_AVAILABLE_COUPONS[cleanCoupon];
-      if (!validCoupon) {
-        return res.status(400).json({
-          success: false,
-          error: `Kupon promo "${cleanCoupon}" tidak valid atau sudah kedaluwarsa.`
-        });
-      }
-      let calculatedDiscount = Math.round((calculatedSubtotal * validCoupon.discountPercent) / 100);
-      if (validCoupon.maxDiscount && calculatedDiscount > validCoupon.maxDiscount) {
-        calculatedDiscount = validCoupon.maxDiscount;
-      }
-      discount = calculatedDiscount;
-    }
-
-    // 5. Server-Side Shipping Cost Calculation
-    const calculatedShippingCost = 0;
-    const grandTotal = Math.max(0, calculatedSubtotal + calculatedShippingCost - discount);
-
-    // 6. Generate Order Identifiers & Crypto Security Token
-    const { orderNumber, invoiceNumber, accessToken } = generateOrderNumber();
-    const isCod = paymentMethod === 'COD';
-
-    // 7. Build Stored Order Model
-    const storedOrder: StoredOrder = {
-      id: orderNumber,
-      orderNumber,
-      invoiceNumber,
-      accessToken,
-      processedWebhookIds: [],
-      customer: {
-        customerName: customer.customerName.trim(),
-        phone: cleanPhone,
-        email: customer.email?.trim() || ''
-      },
-      shippingAddress: {
-        address: effectiveShippingAddress.address.trim(),
-        province: effectiveShippingAddress.province.trim(),
-        city: effectiveShippingAddress.city.trim(),
-        district: effectiveShippingAddress.district?.trim() || '',
-        postalCode: effectiveShippingAddress.postalCode?.trim() || ''
-      },
-      items: validatedItems,
-      quantity: totalQuantity,
-      weight: totalWeightGrams,
-      price: {
-        subtotal: calculatedSubtotal,
-        discount,
-        shippingCost: calculatedShippingCost,
-        grandTotal
-      },
-      payment: {
-        paymentMethod: isCod ? 'COD' : 'DOKU',
-        paymentProvider: isCod ? 'COD' : 'DOKU',
-        paymentChannel: isCod ? 'cod' : (paymentChannel || 'doku_checkout'),
-        paymentStatus: 'PENDING',
-        paymentReference: invoiceNumber,
-        paymentAmount: grandTotal,
-        paymentCreatedAt: new Date().toISOString(),
-        paymentPaidAt: null,
-        paymentUrl: null,
-        vaNumber: null,
-        bank: null,
-        qrisString: null,
-        qrisImage: null
-      },
-      shipping: {
-        shippingProvider: 'Mengantar',
-        courier: courier || shipping?.courier || 'JNE',
-        service: service || shipping?.service || 'REG',
-        shippingStatus: isCod ? 'PENDING' : 'NOT_CREATED',
-        mengantarOrderId: null,
-        trackingNumber: null,
-        airwaybill: null,
-        labelUrl: null,
-        shippingCreatedAt: null,
-        shippingUpdatedAt: null,
-        estimatedDelivery: '2 - 3 Hari Kerja',
-        notes: notes || ''
-      },
-      total: grandTotal,
-      status: 'menunggu_pembayaran',
-      trackingNumber: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      metaTracking: {
-        fbp: metaTracking?.fbp,
-        fbc: metaTracking?.fbc,
-        clientIp: typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.socket.remoteAddress || '',
-        clientUserAgent: (req.headers['user-agent'] as string) || '',
-        eventSourceUrl: metaTracking?.eventSourceUrl || 'https://saena.my.id/alisa'
-      }
-    };
-
-    // 7. Handle COD Flow
-    if (isCod) {
-      storedOrder.payment.paymentStatus = 'UNPAID';
-      storedOrder.status = 'sedang_dikemas';
-
-      // Call Mengantar directly for COD orders if configured
-      if (process.env.MENGANTAR_API_KEY) {
-        try {
-          const mgtRes = await processMengantarOrder({
-            orderId: orderNumber,
-            customer: {
-              fullName: storedOrder.customer.customerName,
-              whatsapp: storedOrder.customer.phone,
-              email: storedOrder.customer.email,
-              address: storedOrder.shippingAddress.address,
-              subdistrict: storedOrder.shippingAddress.district,
-              city: storedOrder.shippingAddress.city,
-              province: storedOrder.shippingAddress.province,
-              postalCode: storedOrder.shippingAddress.postalCode,
-              notes: notes || 'Pesanan COD Saena Butik'
-            },
-            courier: storedOrder.shipping.courier,
-            serviceType: storedOrder.shipping.service,
-            items: storedOrder.items.map(i => ({
-              name: i.name,
-              quantity: i.quantity,
-              price: i.price,
-              weight: i.weight
-            })),
-            totalAmount: grandTotal,
-            shippingCost: calculatedShippingCost,
-            isCod: true,
-            notes: notes || 'Pesanan COD Saena Butik'
-          });
-
-          if (mgtRes.success && mgtRes.data) {
-            storedOrder.shipping.shippingStatus = 'CREATED';
-            storedOrder.shipping.trackingNumber = mgtRes.data.trackingNumber;
-            storedOrder.shipping.mengantarOrderId = mgtRes.data.mengantarOrderId;
-            storedOrder.shipping.labelUrl = mgtRes.data.labelUrl;
-            storedOrder.shipping.airwaybill = mgtRes.data.airwayBillUrl;
-            storedOrder.shipping.shippingCreatedAt = new Date().toISOString();
-            storedOrder.trackingNumber = mgtRes.data.trackingNumber;
-            storedOrder.shipping.mengantarResponse = mgtRes.data;
-          } else {
-            storedOrder.shipping.shippingStatus = 'FAILED';
-          }
-        } catch (mgtErr: any) {
-          console.warn('[CreateOrder] Mengantar COD dispatch error:', mgtErr.message);
-          storedOrder.shipping.shippingStatus = 'FAILED';
-        }
-      }
-
-      await saveOrder(storedOrder);
-      recentCheckoutAttempts.set(idempotencyKey, { order: storedOrder, timestamp: Date.now() });
-
-      return res.json({
-        success: true,
-        orderNumber,
-        invoiceNumber,
-        accessToken,
-        grandTotal,
-        paymentMethod: 'COD',
-        paymentStatus: storedOrder.payment.paymentStatus,
-        shippingStatus: storedOrder.shipping.shippingStatus,
-        trackingNumber: storedOrder.shipping.trackingNumber || null
-      });
-    }
-
-    // 8. Handle DOKU Flow (Online Payment Gateway)
-    if (!process.env.DOKU_CLIENT_ID || !process.env.DOKU_SECRET_KEY) {
-      storedOrder.payment.paymentStatus = 'FAILED';
-      storedOrder.status = 'dibatalkan';
-      await saveOrder(storedOrder);
-
-      return res.status(503).json({
-        success: false,
-        error: 'Layanan pembayaran DOKU belum dikonfigurasi di server environment (DOKU_CLIENT_ID & DOKU_SECRET_KEY wajib diisi).',
-        orderNumber
-      });
-    }
-
-    const dokuRes = await processDokuPayment({
-      orderId: orderNumber,
-      invoiceNumber,
-      amount: grandTotal,
-      customer: {
-        fullName: storedOrder.customer.customerName,
-        whatsapp: storedOrder.customer.phone,
-        email: storedOrder.customer.email,
-        address: storedOrder.shippingAddress.address
-      },
-      items: storedOrder.items.map(i => ({
-        name: i.name,
-        quantity: i.quantity,
-        price: i.price
-      })),
-      channel: paymentChannel || 'doku_checkout'
-    });
-
-    if (!dokuRes.success || !dokuRes.data) {
-      // DOKU payment session failed: DO NOT pretend success, do NOT generate fake URLs/VA/QRIS
-      storedOrder.payment.paymentStatus = 'FAILED';
-      storedOrder.status = 'dibatalkan';
-      await saveOrder(storedOrder);
-
-      return res.status(502).json({
-        success: false,
-        error: `Gagal membuat sesi pembayaran DOKU: ${dokuRes.error || 'Server pembayaran DOKU tidak dapat merespons.'}`,
-        orderNumber
-      });
-    }
-
-    // DOKU request succeeded with real payment data
-    const dokuData = dokuRes.data;
-    storedOrder.payment.paymentUrl = dokuData.paymentUrl || null;
-    storedOrder.payment.vaNumber = dokuData.virtualAccountInfo?.vaNumber || null;
-    storedOrder.payment.bank = dokuData.virtualAccountInfo?.bank || null;
-    storedOrder.payment.qrisString = dokuData.qrisInfo?.qrString || null;
-    storedOrder.payment.qrisImage = dokuData.qrisInfo?.qrImage || null;
-    storedOrder.payment.dokuResponse = dokuData;
-
-    await saveOrder(storedOrder);
-    recentCheckoutAttempts.set(idempotencyKey, { order: storedOrder, timestamp: Date.now() });
-
-    return res.json({
-      success: true,
-      orderNumber,
-      invoiceNumber,
-      accessToken,
-      grandTotal,
-      paymentMethod: 'DOKU',
-      paymentStatus: storedOrder.payment.paymentStatus,
-      paymentUrl: storedOrder.payment.paymentUrl,
-      vaNumber: storedOrder.payment.vaNumber,
-      bank: storedOrder.payment.bank,
-      qrisString: storedOrder.payment.qrisString,
-      qrisImage: storedOrder.payment.qrisImage
-    });
-
-  } catch (error: any) {
-    console.error('[CreateOrder] Error creating order:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Terjadi kesalahan sistem saat membuat pesanan.'
-    });
-  }
+  const result = await processOrderCreation(req.body, req.headers, clientIp);
+  return res.status(result.statusCode).json(result.body);
 });
-
 
 // API Route: Get Order Details (Secure & Sanitized - Requires Token or Authorization)
 app.get('/api/orders/:orderNumber', async (req, res) => {

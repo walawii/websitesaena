@@ -1179,9 +1179,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         weight: item.product.weight || 600
       })),
       shipping: {
+        id: shipping.id,
         courier: shipping.courier,
-        service: shipping.service
+        service: shipping.service,
+        cost: shipping.cost
       },
+      couponCode: appliedCoupon || undefined,
       paymentMethod: paymentChannel === 'cod' ? 'COD' : 'DOKU',
       paymentChannel: paymentChannel,
       notes: customer.notes
@@ -1193,12 +1196,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       body: JSON.stringify(orderPayload)
     });
 
-    const json = await res.json();
-    if (!res.ok || !json.success || !json.data) {
-      throw new Error(json.error || 'Gagal menerbitkan pesanan resmi.');
+    let json: any = null;
+    try {
+      json = await res.json();
+    } catch {
+      // response was not JSON
     }
 
-    const srvData = json.data;
+    if (!res.ok || !json || !json.success) {
+      const errorMsg = json?.error || (res.status === 500
+        ? 'Server checkout mengalami gangguan internal (HTTP 500). Silakan coba sesaat lagi.'
+        : `Gagal menerbitkan pesanan (HTTP ${res.status}). Silakan coba lagi.`);
+      throw new Error(errorMsg);
+    }
+
+    const srvData = json.data || json;
     const orderId = srvData.orderNumber;
     const accessToken = srvData.accessToken;
 

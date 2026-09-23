@@ -6,7 +6,7 @@ export const config = {
 
 export default async function handler(req: any, res: any) {
   try {
-    const { app } = await import('../backend');
+    const { app } = await import('../server');
     return app(req, res);
   } catch (error: any) {
     console.error('[Vercel API] Backend initialization failed:', error);

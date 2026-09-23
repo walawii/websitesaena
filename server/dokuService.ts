@@ -215,6 +215,14 @@ export function verifyDokuWebhookSignature(
   }
 }
 
+function sanitizeDokuString(str: any, maxLen = 100): string {
+  return String(str || '')
+    .replace(/[^a-zA-Z0-9.\-\/+ ,=_:'@%()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
 export async function processDokuPayment(
   reqPayload: DokuOrderRequest
 ): Promise<DokuPaymentResult> {
@@ -231,7 +239,7 @@ export async function processDokuPayment(
     };
   }
 
-  const invoiceNumber = reqPayload.invoiceNumber || `INV-${reqPayload.orderId}`;
+  const invoiceNumber = sanitizeDokuString(reqPayload.invoiceNumber || `INV-${reqPayload.orderId}`, 64);
   const baseUrl = environment === 'production' 
     ? 'https://api.doku.com' 
     : 'https://api-sandbox.doku.com';
@@ -243,28 +251,47 @@ export async function processDokuPayment(
   const defaultCallback = reqPayload.callbackUrl || 
     `${process.env.APP_URL || 'https://saena.my.id'}/thank-you?order=${reqPayload.orderId}`;
 
+  // Calculate items sum and adjust line_items to match amount strictly
+  const targetAmount = Math.round(reqPayload.amount);
+  const itemsSum = reqPayload.items.reduce((acc, it) => acc + (Math.round(it.price) * it.quantity), 0);
+  const diff = targetAmount - itemsSum;
+  let lineItems: Array<{ name: string; price: number; quantity: number }> | undefined = reqPayload.items.map(it => ({
+    name: sanitizeDokuString(it.name, 50),
+    price: Math.round(it.price),
+    quantity: Math.max(1, Math.round(it.quantity))
+  }));
+
+  if (diff > 0) {
+    lineItems.push({
+      name: 'Ongkos Kirim Layanan',
+      price: diff,
+      quantity: 1
+    });
+  } else if (diff < 0) {
+    // In DOKU Jokul Checkout V1 API, line_items is optional. When coupon discount makes
+    // total less than items sum, omitting line_items prevents invalid negative price errors
+    // while still charging the exact authoritative order.amount.
+    lineItems = undefined;
+  }
+
   // Jokul DOKU Checkout V1 Payload
-  const bodyPayload = {
+  const bodyPayload: any = {
     order: {
-      amount: Math.round(reqPayload.amount),
+      amount: targetAmount,
       invoice_number: invoiceNumber,
       currency: 'IDR',
       callback_url: defaultCallback,
       auto_redirect: false,
-      line_items: reqPayload.items.map(it => ({
-        name: it.name.slice(0, 50),
-        price: Math.round(it.price),
-        quantity: it.quantity
-      }))
+      ...(lineItems ? { line_items: lineItems } : {})
     },
     payment: {
       payment_due_date: 120 // in minutes (2 hours)
     },
     customer: {
-      name: reqPayload.customer.fullName.slice(0, 50),
-      email: reqPayload.customer.email || 'pelanggan@saena.my.id',
-      phone: reqPayload.customer.whatsapp.replace(/[^0-9+]/g, ''),
-      address: reqPayload.customer.address.slice(0, 100)
+      name: sanitizeDokuString(reqPayload.customer.fullName, 50) || 'Pelanggan Saena',
+      email: (reqPayload.customer.email || 'pelanggan@saena.my.id').trim(),
+      phone: reqPayload.customer.whatsapp.replace(/[^0-9+]/g, '') || '085724023064',
+      address: sanitizeDokuString(reqPayload.customer.address, 100) || 'Indonesia'
     }
   };
 
