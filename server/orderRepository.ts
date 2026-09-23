@@ -17,27 +17,39 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-import firebaseConfig from '../firebase-applet-config.json';
+const DEFAULT_FIREBASE_CONFIG = {
+  projectId: "gen-lang-client-0928298497",
+  appId: "1:104229383669:web:162f0f6b76dc18492904bc",
+  apiKey: "AIzaSyDgePFPgCVQhUxVxV362Z4gvVtuivyaB6A",
+  authDomain: "gen-lang-client-0928298497.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-saenaidbusanamus-37b1774c-092f-4d11-899c-3a7926323a33",
+  storageBucket: "gen-lang-client-0928298497.firebasestorage.app",
+  messagingSenderId: "104229383669",
+  measurementId: "",
+  oAuthClientId: "104229383669-n1f4vj3r991sm4935966k719a9nflau0.apps.googleusercontent.com",
+  recaptchaSiteKey: ""
+};
 
-// Initialize Firestore with static bundled config
+let loadedFirebaseConfig = DEFAULT_FIREBASE_CONFIG;
+try {
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const raw = fs.readFileSync(configPath, 'utf8');
+    loadedFirebaseConfig = JSON.parse(raw);
+  }
+} catch (e: any) {
+  console.warn('[OrderRepository] Using embedded default Firebase configuration:', e.message);
+}
+
+// Initialize Firestore
 let db: any = null;
 
 try {
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  const app = getApps().length === 0 ? initializeApp(loadedFirebaseConfig) : getApp();
+  db = getFirestore(app, loadedFirebaseConfig.firestoreDatabaseId);
   console.log('[OrderRepository] Firebase Firestore initialized successfully for backend.');
 } catch (err: any) {
   console.error('[OrderRepository] Error initializing Firestore in server:', err.message);
-  // Fallback attempt with process.cwd config if dynamic
-  try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      const raw = fs.readFileSync(configPath, 'utf8');
-      const parsedConfig = JSON.parse(raw);
-      const app = getApps().length === 0 ? initializeApp(parsedConfig) : getApp();
-      db = getFirestore(app, parsedConfig.firestoreDatabaseId);
-    }
-  } catch {}
 }
 
 export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';

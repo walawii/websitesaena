@@ -613,11 +613,11 @@ export const CheckoutModal: React.FC = () => {
                         </div>
 
                         <div className="text-right whitespace-nowrap pl-2">
-                          <span className="text-xs font-bold text-emerald-700 block">
-                            GRATIS (Rp 0)
+                          <span className={`text-xs font-bold block ${dynamicCost === 0 ? 'text-emerald-700' : 'text-[#1C3B2B]'}`}>
+                            {dynamicCost === 0 ? 'GRATIS (Rp 0)' : formatPrice(dynamicCost)}
                           </span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
-                            Bebas Ongkir
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${dynamicCost === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-[#EAE4D9] text-[#1C3B2B]'}`}>
+                            {dynamicCost === 0 ? 'Bebas Ongkir' : (shipping.courier.includes('JNE') ? 'Kurir Resmi' : 'Reguler')}
                           </span>
                         </div>
                       </div>
@@ -822,7 +822,9 @@ export const CheckoutModal: React.FC = () => {
 
                 <div className="flex justify-between text-[#5C5549]">
                   <span>Ongkos Kirim ({selectedShipping.courier} - {selectedShipping.service})</span>
-                  <span className="font-bold text-emerald-700">GRATIS (Rp 0)</span>
+                  <span className={dynamicShippingCost === 0 ? "font-bold text-emerald-700" : "font-semibold text-[#1F2421]"}>
+                    {dynamicShippingCost === 0 ? 'GRATIS (Rp 0)' : formatPrice(dynamicShippingCost)}
+                  </span>
                 </div>
 
                 <div className="flex justify-between text-base font-bold text-[#1C3B2B] pt-2 border-t border-[#E5DDD2]">

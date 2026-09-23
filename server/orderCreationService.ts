@@ -219,7 +219,9 @@ export async function processOrderCreation(
     }
 
     // Debounce check against rapid double-clicks (within 10 seconds)
-    const idempotencyKey = `${cleanPhone}-${JSON.stringify(items.map((it: any) => ({ p: it.packageId || it.productId || it.id, q: it.quantity || 1 })))}`;
+    const shippingKey = String(shipping?.id || body?.shippingId || courier || '').trim().toLowerCase();
+    const paymentKey = String(paymentMethod || paymentChannel || '').trim().toLowerCase();
+    const idempotencyKey = `${cleanPhone}-${shippingKey}-${paymentKey}-${JSON.stringify(items.map((it: any) => ({ p: it.packageId || it.productId || it.id, q: it.quantity || 1 })))}`;
     const recent = recentCheckoutAttempts.get(idempotencyKey);
     if (recent && (Date.now() - recent.timestamp < 10000)) {
       const recentOrder = recent.order;

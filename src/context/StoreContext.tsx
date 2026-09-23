@@ -1198,7 +1198,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     let json: any = null;
     try {
-      json = await res.json();
+      const resText = await res.text();
+      json = JSON.parse(resText);
     } catch {
       // response was not JSON
     }
