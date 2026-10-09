@@ -548,5 +548,9 @@ export const AVAILABLE_COUPONS: Record<string, { discountPercent: number; maxDis
     discountPercent: 20,
     maxDiscount: 200000,
     description: 'Potongan Eksklusif 20% Koleksi Abaya & Silk'
+  },
+  'GRATISONGKIR': {
+    discountPercent: 0,
+    description: 'Voucher Bebas Ongkos Kirim Se-Indonesia'
   }
 };

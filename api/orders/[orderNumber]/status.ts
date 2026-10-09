@@ -14,23 +14,55 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ success: false, error: 'Nomor pesanan wajib disertakan.' });
     }
 
-    const token = (req.query?.token as string) || (req.headers?.['x-order-token'] as string);
+    let token = '';
+    const authHeader = (req.headers?.['authorization'] as string) || '';
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    } else if (req.headers?.['x-order-token']) {
+      token = String(req.headers['x-order-token']).trim();
+    } else if (req.headers?.cookie) {
+      const cookies = String(req.headers.cookie).split(';');
+      for (const c of cookies) {
+        const [k, v] = c.trim().split('=');
+        if (k === `saena_order_token_${orderNumber}` || k === 'saena_order_token') {
+          token = decodeURIComponent(v || '').trim();
+          break;
+        }
+      }
+    }
+
+    const isAdmin = verifyAdminRequest(req);
+    if (!token && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses status pesanan ditolak. Diperlukan accessToken yang valid.',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
     const order = await findOrderByNumber(orderNumber);
 
     if (!order) {
-      return res.status(404).json({
+      if (isAdmin) {
+        return res.status(404).json({
+          success: false,
+          error: 'Pesanan tidak ditemukan'
+        });
+      }
+      return res.status(403).json({
         success: false,
-        error: 'Pesanan tidak ditemukan'
+        error: 'Akses status pesanan ditolak. Token tidak valid atau pesanan tidak ditemukan.',
+        code: 'ACCESS_DENIED'
       });
     }
 
     const isTokenMatch = !!(order.accessToken && token && token === order.accessToken);
-    const isAdmin = verifyAdminRequest(req);
 
     if (!isTokenMatch && !isAdmin) {
       return res.status(403).json({
         success: false,
-        error: 'Akses status pesanan ditolak. Diperlukan accessToken yang valid.'
+        error: 'Akses status pesanan ditolak. Diperlukan accessToken yang valid.',
+        code: 'ACCESS_DENIED'
       });
     }
 

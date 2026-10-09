@@ -7,6 +7,7 @@ import { verifyMengantarWebhookSignature, processMengantarWebhook } from './serv
 import { processDokuPayment, verifyDokuWebhookSignature, testDokuApiConnectivity } from './server/dokuService.ts';
 import { scrapeShopeeStore, parseShopeeUsername } from './server/shopeeScraperService.ts';
 import { processOrderCreation } from './server/orderCreationService.ts';
+import { verifyAndRecoverOrder } from './server/orderRecoveryService.ts';
 import { sendMetaCapiEvent, sendMetaCapiPurchase, META_DATASET_ID } from './server/metaCapiService.ts';
 import {
   generateOrderNumber,
@@ -17,6 +18,15 @@ import {
   getAllOrdersList,
   claimOrderForMetaPurchase,
   findProductByIdFromFirestore,
+  saveProductToFirestoreServer,
+  deleteProductFromFirestoreServer,
+  deleteAllProductsFromFirestoreServer,
+  updateOrderStatusInFirestoreServer,
+  deleteAllOrdersFromFirestoreServer,
+  saveStoreSettingsToFirestoreServer,
+  saveLandingPageToFirestoreServer,
+  deleteLandingPageFromFirestoreServer,
+  reseedDatabaseInFirestoreServer,
   type StoredOrder
 } from './server/orderRepository.ts';
 import crypto from 'crypto';
@@ -782,84 +792,180 @@ app.post('/api/orders/create', async (req, res) => {
     : req.socket.remoteAddress || '';
 
   const result = await processOrderCreation(req.body, req.headers, clientIp);
+  if (result.statusCode === 200 && result.body?.accessToken && result.body?.orderNumber) {
+    try {
+      res.cookie(`saena_order_token_${result.body.orderNumber}`, result.body.accessToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000
+      });
+    } catch {}
+  }
   return res.status(result.statusCode).json(result.body);
 });
 
-// API Route: Get Order Details (Secure & Sanitized - Requires Token or Authorization)
+// Helper to extract order access token strictly from headers or HttpOnly cookie (NEVER from URL/query string)
+function extractOrderAccessToken(req: any, orderNumber: string): string {
+  const authHeader = (req.headers['authorization'] as string) || '';
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  if (req.headers['x-order-token']) {
+    return String(req.headers['x-order-token']).trim();
+  }
+  if (req.headers.cookie) {
+    const cookies = String(req.headers.cookie).split(';');
+    for (const c of cookies) {
+      const [name, val] = c.trim().split('=');
+      if (name === `saena_order_token_${orderNumber}` || name === 'saena_order_token') {
+        return decodeURIComponent(val || '').trim();
+      }
+    }
+  }
+  return '';
+}
+
+// API Route: Get Order Details (Secure, Sanitized, Zero-Trust Anti-Enumeration IDOR Defense)
 app.get('/api/orders/:orderNumber', async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const token = (req.query.token as string) || (req.headers['x-order-token'] as string);
-    const order = await findOrderByNumber(orderNumber);
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Pesanan tidak ditemukan di database saena.id.'
-      });
-    }
-
-    // Security check: Customer must provide matching accessToken or verified admin
-    const isTokenMatch = !!(order.accessToken && token && (token === order.accessToken));
+    const token = extractOrderAccessToken(req, orderNumber);
     const isAdmin = verifyAdminRequest(req);
 
-    // Allow customer verification by full phone AND customer name match (Never 4-digit suffix)
-    const reqPhone = String(req.query.phone || '').replace(/\D/g, '');
-    const reqName = String(req.query.name || '').trim().toLowerCase();
-    const orderPhone = order.customer.phone.replace(/\D/g, '');
-    const isCustomerVerified = reqPhone.length >= 10 && reqPhone === orderPhone && reqName.length >= 3 && order.customer.customerName.toLowerCase().includes(reqName);
+    const reqPhone = String(req.query.phone || req.headers['x-verify-phone'] || '').trim();
+    const reqName = String(req.query.name || req.headers['x-verify-name'] || '').trim();
 
-    if (!isTokenMatch && !isCustomerVerified && !isAdmin) {
+    // 1. Anti-Enumeration Defense: Non-admin request with no credentials must immediately DENY (403)
+    if (!token && !isAdmin && !reqPhone && !reqName) {
       return res.status(403).json({
         success: false,
-        error: 'Akses pesanan dibatasi. Token keamanan (accessToken) atau verifikasi lengkap pemilik pesanan diperlukan.'
+        error: 'Akses pesanan dibatasi. Token keamanan (accessToken) atau verifikasi identitas pemilik pesanan diperlukan.',
+        code: 'UNAUTHORIZED'
       });
     }
+
+    const clientIp = typeof req.headers['x-forwarded-for'] === 'string'
+      ? req.headers['x-forwarded-for'].split(',')[0].trim()
+      : req.socket.remoteAddress || '';
+
+    // 2. Customer verification recovery flow (Strictly rate-limited, uniform errors against enumeration)
+    if (!token && !isAdmin && (reqPhone || reqName)) {
+      const recoveryRes = await verifyAndRecoverOrder(orderNumber, reqPhone, reqName, clientIp);
+      if (!recoveryRes.success) {
+        return res.status(recoveryRes.statusCode).json({
+          success: false,
+          error: recoveryRes.error,
+          code: recoveryRes.code
+        });
+      }
+      return res.json({
+        success: true,
+        order: recoveryRes.order,
+        data: recoveryRes.order,
+        accessToken: recoveryRes.accessToken
+      });
+    }
+
+    const order = await findOrderByNumber(orderNumber);
+
+    // 3. Anti-Enumeration Defense: Non-admin request with invalid order number must return generic DENY (403), NOT 404
+    if (!order) {
+      if (isAdmin) {
+        return res.status(404).json({
+          success: false,
+          error: 'Pesanan tidak ditemukan di database saena.id.'
+        });
+      }
+      return res.status(403).json({
+        success: false,
+        error: 'Akses pesanan ditolak. Kredensial keamanan tidak valid atau pesanan tidak ditemukan.',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    // 4. Security check: Customer must provide matching accessToken or verified admin
+    const isTokenMatch = !!(order.accessToken && token && (token === order.accessToken));
+
+    if (token && !isTokenMatch && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses pesanan ditolak. Token keamanan tidak cocok dengan pesanan ini.',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    if (isTokenMatch) {
+      const expiresAt = order.accessTokenExpiresAt
+        ? new Date(order.accessTokenExpiresAt).getTime()
+        : (order.createdAt ? new Date(order.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000 : Infinity);
+
+      if (Date.now() > expiresAt) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses pesanan telah kedaluwarsa demi keamanan (token expired). Silakan verifikasi identitas pemilik pesanan untuk melihat detail pesanan.',
+          code: 'TOKEN_EXPIRED'
+        });
+      }
+    }
+
+    if (!isTokenMatch && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses pesanan dibatasi. Token keamanan (accessToken) atau verifikasi lengkap pemilik pesanan diperlukan.',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
+    const orderPayload = {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      invoiceNumber: order.invoiceNumber,
+      status: order.status,
+      customer: {
+        customerName: order.customer.customerName,
+        fullName: order.customer.customerName,
+        phone: order.customer.phone,
+        whatsapp: order.customer.phone,
+        email: order.customer.email
+      },
+      shippingAddress: order.shippingAddress,
+      items: order.items,
+      quantity: order.quantity,
+      weight: order.weight,
+      price: order.price,
+      payment: {
+        paymentMethod: order.payment.paymentMethod,
+        paymentProvider: order.payment.paymentProvider,
+        paymentChannel: order.payment.paymentChannel,
+        paymentStatus: order.payment.paymentStatus,
+        paymentAmount: order.payment.paymentAmount,
+        paymentCreatedAt: order.payment.paymentCreatedAt,
+        paymentPaidAt: order.payment.paymentPaidAt,
+        paymentUrl: order.payment.paymentUrl,
+        vaNumber: order.payment.vaNumber,
+        bank: order.payment.bank,
+        qrisString: order.payment.qrisString,
+        qrisImage: order.payment.qrisImage
+      },
+      shipping: {
+        shippingProvider: order.shipping.shippingProvider,
+        courier: order.shipping.courier,
+        service: order.shipping.service,
+        shippingStatus: order.shipping.shippingStatus,
+        trackingNumber: order.shipping.trackingNumber,
+        airwaybill: order.shipping.airwaybill,
+        labelUrl: order.shipping.labelUrl,
+        estimatedDelivery: order.shipping.estimatedDelivery
+      },
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt
+    };
 
     return res.json({
       success: true,
-      data: {
-        orderNumber: order.orderNumber,
-        invoiceNumber: order.invoiceNumber,
-        customer: {
-          customerName: order.customer.customerName,
-          phone: order.customer.phone.length > 6 
-            ? `${order.customer.phone.substring(0, 4)}••••${order.customer.phone.slice(-3)}`
-            : order.customer.phone,
-          email: order.customer.email
-        },
-        shippingAddress: order.shippingAddress,
-        items: order.items,
-        quantity: order.quantity,
-        weight: order.weight,
-        price: order.price,
-        payment: {
-          paymentMethod: order.payment.paymentMethod,
-          paymentProvider: order.payment.paymentProvider,
-          paymentChannel: order.payment.paymentChannel,
-          paymentStatus: order.payment.paymentStatus,
-          paymentAmount: order.payment.paymentAmount,
-          paymentCreatedAt: order.payment.paymentCreatedAt,
-          paymentPaidAt: order.payment.paymentPaidAt,
-          paymentUrl: order.payment.paymentUrl,
-          vaNumber: order.payment.vaNumber,
-          bank: order.payment.bank,
-          qrisString: order.payment.qrisString,
-          qrisImage: order.payment.qrisImage
-        },
-        shipping: {
-          shippingProvider: order.shipping.shippingProvider,
-          courier: order.shipping.courier,
-          service: order.shipping.service,
-          shippingStatus: order.shipping.shippingStatus,
-          trackingNumber: order.shipping.trackingNumber,
-          airwaybill: order.shipping.airwaybill,
-          labelUrl: order.shipping.labelUrl,
-          estimatedDelivery: order.shipping.estimatedDelivery
-        },
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt
-      }
+      order: orderPayload,
+      data: orderPayload
     });
   } catch (err: any) {
     console.error('[GetOrder] Error:', err);
@@ -870,27 +976,44 @@ app.get('/api/orders/:orderNumber', async (req, res) => {
   }
 });
 
-// API Route: Polling Order Status (Fast & Lightweight with Token Security)
+// API Route: Polling Order Status (Fast & Lightweight with Zero-Trust Anti-Enumeration IDOR Defense)
 app.get('/api/orders/:orderNumber/status', async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const token = (req.query.token as string) || (req.headers['x-order-token'] as string);
+    const token = extractOrderAccessToken(req, orderNumber);
+    const isAdmin = verifyAdminRequest(req);
+
+    if (!token && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses status pesanan ditolak. Diperlukan accessToken yang valid.',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
     const order = await findOrderByNumber(orderNumber);
 
     if (!order) {
-      return res.status(404).json({
+      if (isAdmin) {
+        return res.status(404).json({
+          success: false,
+          error: 'Pesanan tidak ditemukan'
+        });
+      }
+      return res.status(403).json({
         success: false,
-        error: 'Pesanan tidak ditemukan'
+        error: 'Akses status pesanan ditolak. Token tidak valid atau pesanan tidak ditemukan.',
+        code: 'ACCESS_DENIED'
       });
     }
 
     const isTokenMatch = !!(order.accessToken && token && (token === order.accessToken));
-    const isAdmin = verifyAdminRequest(req);
 
     if (!isTokenMatch && !isAdmin) {
       return res.status(403).json({
         success: false,
-        error: 'Akses status pesanan ditolak. Diperlukan accessToken yang valid.'
+        error: 'Akses status pesanan ditolak. Diperlukan accessToken yang valid.',
+        code: 'ACCESS_DENIED'
       });
     }
 
@@ -910,7 +1033,7 @@ app.get('/api/orders/:orderNumber/status', async (req, res) => {
 });
 
 // API Route: DOKU Webhook Notification (Strict Jokul HMAC-SHA256 & Amount Validation)
-app.all(['/api/doku/notification', '/api/webhooks/doku'], async (req: any, res) => {
+app.all(['/api/doku/notification', '/api/webhooks/doku', '/api/doku/webhook'], async (req: any, res) => {
   try {
     if (req.method === 'GET') {
       return res.status(200).json({
@@ -1315,11 +1438,137 @@ app.get('/api/admin/orders', requireAdminAuth, async (req, res) => {
   }
 });
 
+// API Route: Admin Product Save/Update
+app.post('/api/admin/products', requireAdminAuth, async (req, res) => {
+  try {
+    const product = req.body;
+    if (!product || !product.id) {
+      return res.status(400).json({ success: false, error: 'Product ID dan data wajib disertakan.' });
+    }
+    await saveProductToFirestoreServer(product);
+    return res.json({ success: true, message: 'Produk berhasil disimpan ke database.', product });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Product Delete (Single or All)
+app.delete('/api/admin/products', requireAdminAuth, async (req, res) => {
+  try {
+    const { id, all } = req.query;
+    if (all === 'true') {
+      const count = await deleteAllProductsFromFirestoreServer();
+      return res.json({ success: true, message: `Semua produk (${count}) berhasil dihapus.`, count });
+    }
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Product ID wajib disertakan.' });
+    }
+    await deleteProductFromFirestoreServer(String(id));
+    return res.json({ success: true, message: `Produk ${id} berhasil dihapus.` });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Order Status Update
+app.put('/api/admin/orders/:orderNumber/status', requireAdminAuth, async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const { status, trackingHistory, trackingNumber } = req.body;
+    if (!status) {
+      return res.status(400).json({ success: false, error: 'Status pesanan wajib disertakan.' });
+    }
+    const updated = await updateOrderStatusInFirestoreServer(orderNumber, status, trackingHistory, trackingNumber);
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+    }
+    return res.json({
+      success: true,
+      message: `Status pesanan ${orderNumber} berhasil diperbarui menjadi ${status}.`,
+      order: updated
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Delete All Orders
+app.post('/api/admin/orders/delete-all', requireAdminAuth, async (_req, res) => {
+  try {
+    const count = await deleteAllOrdersFromFirestoreServer();
+    return res.json({ success: true, message: `Semua pesanan (${count}) berhasil dihapus dari database.`, count });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Reseed Database
+app.post('/api/admin/reseed', requireAdminAuth, async (_req, res) => {
+  try {
+    await reseedDatabaseInFirestoreServer();
+    return res.json({ success: true, message: 'Database Firestore berhasil dimuat ulang dengan koleksi resmi saena.id.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Save Store Settings
+app.post('/api/admin/settings', requireAdminAuth, async (req, res) => {
+  try {
+    await saveStoreSettingsToFirestoreServer(req.body);
+    return res.json({ success: true, message: 'Pengaturan toko berhasil disimpan ke Firestore.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Save Landing Page Config
+app.post('/api/admin/landing-pages', requireAdminAuth, async (req, res) => {
+  try {
+    await saveLandingPageToFirestoreServer(req.body);
+    return res.json({ success: true, message: 'Konfigurasi landing page berhasil disimpan ke Firestore.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API Route: Admin Delete Landing Page Config
+app.delete('/api/admin/landing-pages', requireAdminAuth, async (req, res) => {
+  try {
+    const productId = String(req.query.productId || req.query.id || req.body?.productId || '').trim();
+    if (!productId) {
+      return res.status(400).json({ success: false, error: 'Product ID wajib disertakan.' });
+    }
+    await deleteLandingPageFromFirestoreServer(productId);
+    return res.json({ success: true, message: 'Konfigurasi landing page berhasil dihapus dari Firestore.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // API Route: Shipping Rates (Mengantar Integration)
 async function handleShippingRates(req: any, res: any) {
   try {
-    const { originCity = 'Kota Tasikmalaya', destinationCity, weight = 600 } = req.body;
-    const ratesResult = await calculateMengantarRates(originCity, destinationCity, Number(weight) || 600);
+    const {
+      originCity = 'Kota Tasikmalaya',
+      originSubdistrict = 'Kecamatan Tamansari',
+      destinationCity,
+      destinationDistrict,
+      destinationSubdistrict,
+      destinationProvince,
+      destinationPostalCode,
+      weight = 600
+    } = req.body || {};
+
+    const ratesResult = await calculateMengantarRates({
+      originCity,
+      originSubdistrict,
+      destinationCity: destinationCity || '',
+      destinationDistrict: destinationDistrict || destinationSubdistrict || '',
+      destinationProvince: destinationProvince || '',
+      destinationPostalCode: destinationPostalCode || '',
+      weightGrams: Number(weight) || 600
+    });
     return res.json(ratesResult);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -1334,7 +1583,7 @@ app.post('/api/doku/test-connection', async (_req, res) => {
   try {
     const result = await testDokuApiConnectivity();
     return res.json({
-      success: result.configured && result.apiReachable,
+      success: result.configured,
       configured: result.configured,
       apiReachable: result.apiReachable,
       authenticationVerified: result.authenticationVerified,

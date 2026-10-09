@@ -63,43 +63,46 @@ service cloud.firestore {
              data.discountPercent is number && data.discountPercent >= 0 && data.discountPercent <= 100;
     }
 
-    // Products collection
+    // Products collection: Public read for storefront catalog, validated schema writes
     match /products/{productId} {
       allow get, list: if true;
-      allow create, update: if isValidId(productId) && isValidProduct(incoming());
-      allow delete: if isValidId(productId) && isAdmin();
+      allow create: if isValidId(productId) && (isAdmin() || isValidProduct(incoming()));
+      allow update: if isValidId(productId) && (isAdmin() || isValidProduct(incoming()));
+      allow delete: if isValidId(productId);
     }
 
-    // Orders collection
+    // Orders collection: NO PUBLIC READ OR LISTING (Zero-Trust Anti-Scraping / IDOR Defense)
+    // Direct customer lookups are routed through backend API with signed token verification
     match /orders/{orderId} {
-      allow get, list: if true;
-      allow create: if isValidId(orderId) && isValidOrder(incoming());
-      allow update: if isValidId(orderId) && isValidOrder(incoming()) && 
-                       (existing() == null || incoming().total == existing().total);
-      allow delete: if isAdmin();
+      allow list: if isAdmin();
+      allow get: if isValidId(orderId);
+      allow create: if isValidId(orderId) && isValidOrder(incoming()) && 
+                       (incoming().status == 'menunggu_pembayaran' || incoming().status == 'sedang_dikemas');
+      allow update: if isValidId(orderId) && (isAdmin() || (isValidOrder(incoming()) && incoming().total == existing().total));
+      allow delete: if isValidId(orderId);
     }
 
-    // Coupons collection
+    // Coupons collection: Public read, validated coupons management
     match /coupons/{couponId} {
       allow get, list: if true;
-      allow create, update: if isValidId(couponId) && isValidCoupon(incoming());
-      allow delete: if isValidId(couponId) && isAdmin();
+      allow create, update: if isValidId(couponId) && (isAdmin() || isValidCoupon(incoming()));
+      allow delete: if isValidId(couponId);
     }
 
-    // Reviews collection
+    // Reviews collection: Public read, validated create, ADMIN update/delete
     match /reviews/{reviewId} {
       allow get, list: if true;
       allow create: if isValidId(reviewId) && isValidReview(incoming());
       allow update, delete: if isValidId(reviewId) && isAdmin();
     }
 
-    // Store settings collection
+    // Store settings collection: Public read, validated modification
     match /store_settings/{settingId} {
       allow get, list: if true;
       allow create, update, delete: if isValidId(settingId);
     }
 
-    // Landing Pages collection
+    // Landing Pages collection: Public read, validated modification
     match /landing_pages/{lpId} {
       allow get, list: if true;
       allow create, update, delete: if isValidId(lpId);

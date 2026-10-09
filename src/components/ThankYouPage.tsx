@@ -76,37 +76,61 @@ interface OrderDetail {
 }
 
 interface ThankYouPageProps {
+  orderNumber?: string;
   onNavigateHome?: () => void;
   onNavigateOrder?: () => void;
 }
 
-export const ThankYouPage: React.FC<ThankYouPageProps> = ({ onNavigateHome, onNavigateOrder }) => {
-  const [orderNumber, setOrderNumber] = useState<string>('');
+export const ThankYouPage: React.FC<ThankYouPageProps> = ({ 
+  orderNumber: propOrderNumber,
+  onNavigateHome, 
+  onNavigateOrder 
+}) => {
+  const [orderNumber, setOrderNumber] = useState<string>(propOrderNumber || '');
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthRestricted, setIsAuthRestricted] = useState(false);
+  const [verifyPhone, setVerifyPhone] = useState('');
+  const [verifyName, setVerifyName] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [copiedVa, setCopiedVa] = useState(false);
   const [copiedOrderNo, setCopiedOrderNo] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Extract order identifier & token from URL (?order=SNA-...&token=...)
+  // Extract order identifier & token from URL (?order=SNA-... or pathname /order/SNA-...)
   useEffect(() => {
+    if (propOrderNumber) {
+      setOrderNumber(propOrderNumber);
+      return;
+    }
     try {
       const sp = new URLSearchParams(window.location.search);
-      const oNum = sp.get('order') || sp.get('orderId') || sp.get('orderNumber') || '';
+      let oNum = sp.get('order') || sp.get('orderId') || sp.get('orderNumber') || '';
+
+      if (!oNum) {
+        const path = window.location.pathname;
+        const match = path.match(/\/(?:order|thank-you)\/([^/?#]+)/i);
+        if (match && match[1]) {
+          oNum = decodeURIComponent(match[1]);
+        }
+      }
       setOrderNumber(oNum);
     } catch {
       // fallback
     }
-  }, []);
+  }, [propOrderNumber]);
 
   const getOrderAccessToken = (ordNo: string): string => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const urlToken = sp.get('token');
       if (urlToken) return urlToken;
-      const stored = sessionStorage.getItem(`order_token_${ordNo}`);
-      if (stored) return stored;
+      const sessionTok = sessionStorage.getItem(`order_token_${ordNo}`);
+      if (sessionTok) return sessionTok;
+      const localTok = localStorage.getItem(`order_token_${ordNo}`);
+      if (localTok) return localTok;
     } catch {}
     return '';
   };
@@ -116,31 +140,94 @@ export const ThankYouPage: React.FC<ThankYouPageProps> = ({ onNavigateHome, onNa
     if (!ordNo) {
       setLoading(false);
       setError('Nomor pesanan tidak ditemukan di URL.');
+      setIsAuthRestricted(false);
       return;
     }
 
     if (showSpinner) setLoading(true);
     setError(null);
+    setIsAuthRestricted(false);
 
     try {
       const token = getOrderAccessToken(ordNo);
-      const queryParams = new URLSearchParams();
-      if (token) queryParams.set('token', token);
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        headers['x-order-token'] = token;
+      }
 
-      const url = `/api/orders/${encodeURIComponent(ordNo)}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      const res = await fetch(url);
+      const url = `/api/orders/${encodeURIComponent(ordNo)}`;
+      const res = await fetch(url, { headers });
       const json = await res.json();
 
-      if (res.ok && json.success && json.data) {
-        setOrder(json.data);
+      const orderData = json.order || json.data;
+      if (res.ok && json.success && orderData) {
+        setOrder(orderData);
+        setIsAuthRestricted(false);
+        const resolvedToken = json.accessToken || orderData.accessToken || token;
+        if (resolvedToken) {
+          try {
+            sessionStorage.setItem(`order_token_${ordNo}`, resolvedToken);
+            localStorage.setItem(`order_token_${ordNo}`, resolvedToken);
+          } catch {}
+        }
       } else {
-        setError(json.error || 'Pesanan tidak ditemukan di sistem.');
+        if (res.status === 403) {
+          setIsAuthRestricted(true);
+          const isExpired = json.code === 'TOKEN_EXPIRED' || (json.error && json.error.toLowerCase().includes('kedaluwarsa'));
+          setError(
+            isExpired
+              ? 'Akses pesanan telah kedaluwarsa demi keamanan (token expired). Silakan verifikasi identitas pemilik pesanan untuk melihat detail pesanan.'
+              : (json.error || 'Akses pesanan dibatasi. Token akses keamanan diperlukan atau silakan verifikasi identitas pemilik pesanan.')
+          );
+        } else {
+          setIsAuthRestricted(false);
+          setError(json.error || 'Pesanan tidak ditemukan di database saena.id.');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Gagal memuat status pesanan.');
     } finally {
       setLoading(false);
       setIsRefreshing(false);
+    }
+  };
+
+  const handleVerifyCustomerIdentity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orderNumber || !verifyPhone || !verifyName) {
+      setVerifyError('Mohon isi Nomor WhatsApp dan Nama Lengkap Anda.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerifyError(null);
+
+    try {
+      const cleanPhone = verifyPhone.replace(/\D/g, '');
+      const url = `/api/orders/${encodeURIComponent(orderNumber)}?phone=${encodeURIComponent(cleanPhone)}&name=${encodeURIComponent(verifyName.trim())}`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      const orderData = json.order || json.data;
+      if (res.ok && json.success && orderData) {
+        setOrder(orderData);
+        setIsAuthRestricted(false);
+        setError(null);
+        const resolvedToken = json.accessToken || orderData.accessToken;
+        if (resolvedToken) {
+          try {
+            sessionStorage.setItem(`order_token_${orderNumber}`, resolvedToken);
+            localStorage.setItem(`order_token_${orderNumber}`, resolvedToken);
+          } catch {}
+        }
+      } else {
+        setVerifyError(json.error || 'Verifikasi identitas tidak cocok dengan data pesanan ini.');
+      }
+    } catch (err: any) {
+      setVerifyError(err.message || 'Gagal melakukan verifikasi identitas.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -158,11 +245,14 @@ export const ThankYouPage: React.FC<ThankYouPageProps> = ({ onNavigateHome, onNa
     const interval = setInterval(async () => {
       try {
         const token = getOrderAccessToken(orderNumber);
-        const queryParams = new URLSearchParams();
-        if (token) queryParams.set('token', token);
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+          headers['x-order-token'] = token;
+        }
 
-        const url = `/api/orders/${encodeURIComponent(orderNumber)}/status${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-        const res = await fetch(url);
+        const url = `/api/orders/${encodeURIComponent(orderNumber)}/status`;
+        const res = await fetch(url, { headers });
         if (res.ok) {
           const st = await res.json();
           if (st.success && st.paymentStatus === 'PAID') {
@@ -210,6 +300,77 @@ export const ThankYouPage: React.FC<ThankYouPageProps> = ({ onNavigateHome, onNa
   }
 
   if (error || !order) {
+    if (isAuthRestricted) {
+      return (
+        <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-4">
+          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E8DFC8] shadow-lg max-w-md w-full text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h2 className="font-serif text-xl font-bold text-[#1C3B2B]">
+              Akses Pesanan Terbatas
+            </h2>
+            <p className="text-xs sm:text-sm text-[#615446] leading-relaxed">
+              Demi melindungi privasi transaksi dan alamat Anda, token akses telah berakhir atau tautan dibuka di perangkat berbeda. Masukkan data pemilik pesanan untuk verifikasi:
+            </p>
+
+            <form onSubmit={handleVerifyCustomerIdentity} className="space-y-3 text-left pt-2">
+              <div>
+                <label className="block text-[11px] font-bold text-[#1C3B2B] uppercase mb-1">
+                  Nomor WhatsApp Terdaftar
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Contoh: 081234567890"
+                  value={verifyPhone}
+                  onChange={(e) => setVerifyPhone(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#1C3B2B] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#1C3B2B] uppercase mb-1">
+                  Nama Lengkap Pemesan
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nama sesuai pemesanan"
+                  value={verifyName}
+                  onChange={(e) => setVerifyName(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#1C3B2B] outline-none"
+                />
+              </div>
+
+              {verifyError && (
+                <p className="text-xs text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-200">
+                  {verifyError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isVerifying}
+                className="w-full py-2.5 px-4 bg-[#1C3B2B] hover:bg-[#2A4D3B] text-white font-bold text-xs rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isVerifying ? 'Memverifikasi...' : 'Verifikasi & Tampilkan Pesanan'}
+              </button>
+            </form>
+
+            <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
+              <button
+                onClick={() => onNavigateOrder ? onNavigateOrder() : (window.location.href = '/order')}
+                className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-[#1C3B2B] font-medium text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Buat Pesanan Baru
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-4">
         <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E8DFC8] shadow-lg max-w-md w-full text-center space-y-4">
