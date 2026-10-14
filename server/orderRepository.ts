@@ -11,8 +11,11 @@ import {
   getDocs, 
   orderBy, 
   limit,
-  runTransaction
+  runTransaction,
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
+import { INITIAL_PRODUCTS, AVAILABLE_COUPONS, SHIPPING_ORIGIN, DEFAULT_WHATSAPP_NUMBER } from '../src/data/mockData.ts';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -127,6 +130,7 @@ export interface StoredOrder {
   orderNumber: string; // SNA-YYYYMMDD-XXXX
   invoiceNumber: string; // INV-SNA-YYYYMMDD-XXXX
   accessToken: string; // Secure token for customer order verification
+  accessTokenExpiresAt?: string; // Expiration timestamp for scoped access token
   processedWebhookIds?: string[]; // Tracking IDs of processed webhooks (idempotency)
   customer: CustomerData;
   shippingAddress: ShippingAddressData;
@@ -155,8 +159,8 @@ export interface StoredOrder {
 // In-memory fallback cache if Firestore is temporarily offline
 const memoryOrders = new Map<string, StoredOrder>();
 
-// Generate secure order number: SNA-YYYYMMDD-XXXX and crypto accessToken
-export function generateOrderNumber(): { orderNumber: string; invoiceNumber: string; accessToken: string } {
+// Generate secure order number: SNA-YYYYMMDD-XXXX and crypto accessToken with expiration
+export function generateOrderNumber(): { orderNumber: string; invoiceNumber: string; accessToken: string; accessTokenExpiresAt: string } {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -165,7 +169,9 @@ export function generateOrderNumber(): { orderNumber: string; invoiceNumber: str
   const orderNumber = `SNA-${yyyy}${mm}${dd}-${rand}`;
   const invoiceNumber = `INV-${orderNumber}`;
   const accessToken = crypto.randomBytes(16).toString('hex');
-  return { orderNumber, invoiceNumber, accessToken };
+  // Scoped access token expires after 30 days
+  const accessTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  return { orderNumber, invoiceNumber, accessToken, accessTokenExpiresAt };
 }
 
 
@@ -286,6 +292,9 @@ export async function restoreProductStock(items: OrderItem[]): Promise<void> {
 }
 
 export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
+  memoryOrders.set(order.orderNumber, order);
+  memoryOrders.set(order.id, order);
+
   if (!db) {
     throw new Error('Firestore tidak tersedia; pesanan tidak boleh dianggap tersimpan.');
   }
@@ -331,8 +340,6 @@ export async function saveOrder(order: StoredOrder): Promise<StoredOrder> {
     });
 
     await setDoc(docRef, sanitized, { merge: true });
-    memoryOrders.set(order.orderNumber, order);
-    memoryOrders.set(order.id, order);
     console.log(`[OrderRepository] Order saved to Firestore successfully: ${order.orderNumber} (ID: ${order.id})`);
 
   } catch (err: any) {
@@ -685,6 +692,7 @@ function mapFirestoreDataToStoredOrder(data: any, id: string): StoredOrder {
     orderNumber,
     invoiceNumber,
     accessToken: data.accessToken || data.token || id,
+    accessTokenExpiresAt: data.accessTokenExpiresAt || (data.createdAt ? new Date(new Date(data.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined),
     processedWebhookIds: Array.isArray(data.processedWebhookIds) ? data.processedWebhookIds : [],
     customer: {
       customerName,
@@ -758,3 +766,169 @@ function mapFirestoreDataToStoredOrder(data: any, id: string): StoredOrder {
     metaCapiPurchaseSent: Boolean(data.metaCapiPurchaseSent)
   };
 }
+
+/**
+ * Admin Product Management (Server-Side)
+ */
+export async function saveProductToFirestoreServer(product: any): Promise<void> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+  if (!product || !product.id) throw new Error('Product ID wajib ada.');
+
+  const productRef = doc(db, 'products', product.id);
+  const sanitized = sanitize({
+    ...product,
+    updatedAt: new Date().toISOString(),
+    createdAt: product.createdAt || new Date().toISOString()
+  });
+  await setDoc(productRef, sanitized, { merge: true });
+}
+
+export async function deleteProductFromFirestoreServer(productId: string): Promise<void> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+  if (!productId) throw new Error('Product ID wajib ada.');
+
+  const productRef = doc(db, 'products', productId);
+  await deleteDoc(productRef);
+}
+
+export async function deleteAllProductsFromFirestoreServer(): Promise<number> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+  let totalDeleted = 0;
+  while (true) {
+    const productsRef = collection(db, 'products');
+    const snapshot = await getDocs(productsRef);
+    if (snapshot.empty) break;
+
+    const docsToDelete = snapshot.docs.slice(0, 450);
+    const batch = writeBatch(db);
+    for (const docSnap of docsToDelete) {
+      batch.delete(doc(db, 'products', docSnap.id));
+    }
+    await batch.commit();
+    totalDeleted += docsToDelete.length;
+    if (snapshot.docs.length <= docsToDelete.length) break;
+  }
+  return totalDeleted;
+}
+
+/**
+ * Admin Order Status Update (Server-Side)
+ */
+export async function updateOrderStatusInFirestoreServer(
+  orderNumber: string,
+  newStatus: string,
+  trackingHistory?: any[],
+  trackingNumber?: string
+): Promise<StoredOrder | null> {
+  const order = await findOrderByNumber(orderNumber);
+  if (!order) return null;
+
+  order.status = newStatus;
+  if (trackingNumber) {
+    order.shipping.trackingNumber = trackingNumber;
+    order.trackingNumber = trackingNumber;
+  }
+  if (newStatus === 'dibayar') {
+    order.payment.paymentStatus = 'PAID';
+    order.payment.paymentPaidAt = order.payment.paymentPaidAt || new Date().toISOString();
+  } else if (newStatus === 'dibatalkan') {
+    order.payment.paymentStatus = 'CANCELLED';
+  }
+
+  if (Array.isArray(trackingHistory) && trackingHistory.length > 0) {
+    (order as any).trackingHistory = trackingHistory;
+  }
+
+  order.updatedAt = new Date().toISOString();
+  await saveOrder(order);
+  return order;
+}
+
+export async function deleteAllOrdersFromFirestoreServer(): Promise<number> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+  const ordersRef = collection(db, 'orders');
+  const snapshot = await getDocs(ordersRef);
+  let totalDeleted = 0;
+  if (!snapshot.empty) {
+    const batch = writeBatch(db);
+    for (const docSnap of snapshot.docs) {
+      batch.delete(doc(db, 'orders', docSnap.id));
+    }
+    await batch.commit();
+    totalDeleted = snapshot.docs.length;
+  }
+  memoryOrders.clear();
+  return totalDeleted;
+}
+
+/**
+ * Admin Store Settings & Landing Pages
+ */
+export async function saveStoreSettingsToFirestoreServer(settings: any): Promise<void> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+  const docId = settings?.id || 'central_warehouse';
+  const settingsRef = doc(db, 'store_settings', docId);
+  await setDoc(settingsRef, sanitize({
+    ...settings,
+    id: docId,
+    updatedAt: new Date().toISOString()
+  }), { merge: true });
+}
+
+export async function saveLandingPageToFirestoreServer(config: any): Promise<void> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+  const docId = config?.productId || config?.id;
+  if (!docId) throw new Error('Product ID atau Config ID wajib ada.');
+  const lpRef = doc(db, 'landing_pages', docId);
+  await setDoc(lpRef, sanitize({
+    ...config,
+    id: docId,
+    updatedAt: new Date().toISOString()
+  }), { merge: true });
+}
+
+export async function deleteLandingPageFromFirestoreServer(productId: string): Promise<void> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+  if (!productId) throw new Error('Product ID wajib diisi untuk menghapus landing page.');
+  const lpRef = doc(db, 'landing_pages', productId);
+  await deleteDoc(lpRef);
+}
+
+/**
+ * Admin Reseed Full Database
+ */
+export async function reseedDatabaseInFirestoreServer(): Promise<void> {
+  if (!db) throw new Error('Firestore backend tidak terhubung.');
+
+  for (const prod of INITIAL_PRODUCTS) {
+    await saveProductToFirestoreServer(prod);
+  }
+
+  for (const [code, coup] of Object.entries(AVAILABLE_COUPONS)) {
+    const couponRef = doc(db, 'coupons', code);
+    await setDoc(couponRef, sanitize({
+      id: code,
+      code,
+      discountPercent: coup.discountPercent,
+      maxDiscount: coup.maxDiscount,
+      minSpend: 0,
+      description: coup.description,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    }), { merge: true });
+  }
+
+  await saveStoreSettingsToFirestoreServer({
+    id: 'central_warehouse',
+    storeName: 'saena.id - Busana Muslimah Eksklusif',
+    originSubdistrict: SHIPPING_ORIGIN.subdistrict,
+    originCity: SHIPPING_ORIGIN.city,
+    originProvince: SHIPPING_ORIGIN.province,
+    originPostalCode: SHIPPING_ORIGIN.postalCode,
+    warehouseName: SHIPPING_ORIGIN.warehouseName,
+    address: SHIPPING_ORIGIN.address,
+    contactWhatsApp: DEFAULT_WHATSAPP_NUMBER,
+    createdAt: new Date().toISOString()
+  });
+}
+

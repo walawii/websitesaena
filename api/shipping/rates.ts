@@ -21,8 +21,26 @@ export default async function handler(req: any, res: any) {
       } catch {}
     }
 
-    const { originCity = 'Kota Tasikmalaya', destinationCity, weight = 600 } = body || {};
-    const ratesResult = await calculateMengantarRates(originCity, destinationCity, Number(weight) || 600);
+    const {
+      originCity = 'Kota Tasikmalaya',
+      originSubdistrict = 'Kecamatan Tamansari',
+      destinationCity,
+      destinationDistrict,
+      destinationSubdistrict,
+      destinationProvince,
+      destinationPostalCode,
+      weight = 600
+    } = body || {};
+
+    const ratesResult = await calculateMengantarRates({
+      originCity,
+      originSubdistrict,
+      destinationCity: destinationCity || '',
+      destinationDistrict: destinationDistrict || destinationSubdistrict || '',
+      destinationProvince: destinationProvince || '',
+      destinationPostalCode: destinationPostalCode || '',
+      weightGrams: Number(weight) || 600
+    });
     return res.status(200).json(ratesResult);
   } catch (err: any) {
     console.error('[Shipping Rates Exception]:', err);

@@ -39,7 +39,7 @@ import {
   handleFirestoreError,
   OperationType
 } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { isBannedDummyImage, sanitizeProductImageList, FALLBACK_PRODUCT_IMAGE } from '../utils/imageHelper';
 
 const cleanProductFromBannedImages = (p: Product): Product => {
@@ -404,10 +404,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     try {
-      const docRef = doc(db, 'landing_pages', config.productId);
-      await setDoc(docRef, config);
+      const token = localStorage.getItem('saena_admin_token_v1') || '';
+      await fetch('/api/admin/landing-pages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-admin-token': token
+        },
+        body: JSON.stringify(config)
+      });
     } catch (err) {
-      console.warn('Firestore write notice for landing page:', err);
+      console.warn('Backend write notice for landing page:', err);
     }
   };
 
@@ -424,10 +432,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     try {
-      const docRef = doc(db, 'landing_pages', productId);
-      await deleteDoc(docRef);
+      const token = localStorage.getItem('saena_admin_token_v1') || '';
+      await fetch(`/api/admin/landing-pages?productId=${encodeURIComponent(productId)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-admin-token': token
+        }
+      });
     } catch (err) {
-      console.warn('Firestore delete notice for landing page:', err);
+      console.warn('Backend delete notice for landing page:', err);
     }
   };
 
@@ -541,8 +555,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setProducts(remoteProducts);
           } else if (INITIAL_PRODUCTS.length > 0) {
             setProducts(INITIAL_PRODUCTS);
-            // Auto seed to Firestore if remote collection is empty
-            INITIAL_PRODUCTS.forEach(p => syncProductToFirestore(p).catch(() => {}));
           }
           setIsFirebaseConnected(true);
           setFirebaseSyncStatus('connected');
@@ -1218,6 +1230,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (accessToken) {
       try {
         sessionStorage.setItem(`order_token_${orderId}`, accessToken);
+        localStorage.setItem(`order_token_${orderId}`, accessToken);
       } catch {}
     }
 
@@ -1301,11 +1314,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         totalStock: updatedTotal
       };
 
-      // Sync updated stock to Firestore
-      syncProductToFirestore(updatedProduct).catch(err => {
-        console.warn('Update stock post-order in Firestore error:', err);
-      });
-
       return updatedProduct;
     }));
 
@@ -1316,11 +1324,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Clear cart
     clearCart();
-
-    // Persist order to Cloud Firestore
-    syncOrderToFirestore(newOrder).catch(err => {
-      console.warn('Sync order to Firestore warning:', err);
-    });
 
     // Send push notification about order creation
     sendPushNotification(

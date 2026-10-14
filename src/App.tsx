@@ -105,45 +105,75 @@ const MainContent: React.FC = () => {
     return 0; // featured default
   });
 
-  // Current path detection for routing (e.g. /alisa, /order, /payment, /)
-  const [currentPath, setCurrentPath] = useState(() => {
-    try {
-      // 1. Check query parameters first (e.g. ?path=order, ?page=payment)
-      const sp = new URLSearchParams(window.location.search);
-      const queryRoute = sp.get('path') || sp.get('page');
-      if (queryRoute) {
-        const clean = queryRoute.toLowerCase().replace(/^\//, '');
-        if (clean === 'home' || clean === '') return '/';
-        return `/${clean}`;
-      }
-      
-      // 2. Check window.location.pathname directly
-      const path = (window.location.pathname || '').toLowerCase();
-      if (path === '/order' || path.startsWith('/order/') || path === '/order.html') return '/order';
-      if (path === '/payment' || path.startsWith('/payment/') || path === '/payment.html') return '/payment';
-      if (path === '/alisa' || path.startsWith('/alisa/') || path === '/alisa.html') return '/alisa';
-      if (path === '/' || path === '') {
-        // If explicitly root path, return '/'
-        return '/';
-      }
+interface AppRouteState {
+  type: 'home' | 'alisa' | 'order_form' | 'order_detail' | 'payment';
+  orderNumber?: string;
+  rawPath: string;
+}
 
-      // 3. Check if stored route exists
-      const saved = localStorage.getItem('saena_active_route');
-      if (saved && (saved === '/order' || saved === '/payment' || saved === '/alisa' || saved === '/')) {
-        return saved;
-      }
+function parseAppRoute(pathname: string, search: string): AppRouteState {
+  const p = (pathname || '').trim();
+  const sp = new URLSearchParams(search || '');
 
-      return path || '/';
-    } catch {
-      return '/';
+  // 1. Explicit check: /order/:orderNumber (matches SNA-XXXX, SAENA-XXXX, or any valid order number)
+  const orderNumberMatch = p.match(/^\/order\/([A-Za-z0-9_-]+)/i);
+  if (orderNumberMatch && orderNumberMatch[1]) {
+    const rawNo = orderNumberMatch[1].trim();
+    if (rawNo && rawNo.toLowerCase() !== 'index.html') {
+      return { type: 'order_detail', orderNumber: decodeURIComponent(rawNo), rawPath: p };
     }
+  }
+
+  // 2. Explicit check: /thank-you or /thank-you/:orderNumber
+  const thankYouMatch = p.match(/^\/thank-you(?:\/([A-Za-z0-9_-]+))?/i);
+  if (thankYouMatch) {
+    const rawNo = thankYouMatch[1] || sp.get('order') || sp.get('orderId') || sp.get('orderNumber');
+    return { type: 'order_detail', orderNumber: rawNo ? decodeURIComponent(rawNo) : undefined, rawPath: p };
+  }
+
+  // 3. Explicit check: /order (order form)
+  if (p === '/order' || p === '/order/' || p === '/order.html' || sp.get('path') === 'order' || sp.get('page') === 'order') {
+    return { type: 'order_form', rawPath: '/order' };
+  }
+
+  // 4. Explicit check: /payment
+  if (p === '/payment' || p === '/payment/' || p === '/payment.html' || sp.get('path') === 'payment' || sp.get('page') === 'payment') {
+    return { type: 'payment', rawPath: '/payment' };
+  }
+
+  // 5. Explicit check: /alisa
+  if (p === '/alisa' || p === '/alisa/' || p === '/alisa.html' || sp.get('path') === 'alisa' || sp.get('page') === 'alisa' || sp.has('alisa')) {
+    return { type: 'alisa', rawPath: '/alisa' };
+  }
+
+  // 6. Query route check fallback
+  const qRoute = sp.get('path') || sp.get('page');
+  if (qRoute) {
+    const cleanQ = qRoute.toLowerCase().replace(/^\//, '');
+    if (cleanQ === 'order') return { type: 'order_form', rawPath: '/order' };
+    if (cleanQ === 'thank-you') return { type: 'order_detail', orderNumber: sp.get('order') || undefined, rawPath: '/thank-you' };
+    if (cleanQ === 'payment') return { type: 'payment', rawPath: '/payment' };
+    if (cleanQ === 'alisa') return { type: 'alisa', rawPath: '/alisa' };
+  }
+
+  return { type: 'home', rawPath: p || '/' };
+}
+
+  // Current explicit path and route state for routing
+  const [routeState, setRouteState] = useState<AppRouteState>(() => {
+    return parseAppRoute(
+      typeof window !== 'undefined' ? window.location.pathname : '/',
+      typeof window !== 'undefined' ? window.location.search : ''
+    );
   });
 
+  const currentPath = routeState.rawPath;
+
   const navigateTo = (path: string) => {
-    setCurrentPath(path);
     try {
-      localStorage.setItem('saena_active_route', path);
       window.history.pushState({}, '', path);
+      const url = new URL(path, window.location.origin);
+      setRouteState(parseAppRoute(url.pathname, url.search));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       // fallback
@@ -152,70 +182,16 @@ const MainContent: React.FC = () => {
 
   useEffect(() => {
     const handleLocationChange = () => {
-      try {
-        const sp = new URLSearchParams(window.location.search);
-        const queryRoute = sp.get('path') || sp.get('page');
-        if (queryRoute) {
-          const clean = queryRoute.toLowerCase().replace(/^\//, '');
-          setCurrentPath(clean === 'home' || clean === '' ? '/' : `/${clean}`);
-          return;
-        }
-
-        const path = (window.location.pathname || '').toLowerCase();
-        if (path === '/order' || path.startsWith('/order/')) {
-          setCurrentPath('/order');
-        } else if (path === '/payment' || path.startsWith('/payment/')) {
-          setCurrentPath('/payment');
-        } else if (path === '/alisa' || path.startsWith('/alisa/')) {
-          setCurrentPath('/alisa');
-        } else {
-          setCurrentPath(path || '/');
-        }
-      } catch {
-        // fallback
-      }
+      setRouteState(parseAppRoute(window.location.pathname, window.location.search));
     };
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
-  const isAlisaPage = 
-    currentPath === '/alisa' || 
-    currentPath.startsWith('/alisa') ||
-    (typeof window !== 'undefined' && (
-      window.location.pathname.toLowerCase().startsWith('/alisa') ||
-      new URLSearchParams(window.location.search).get('path') === 'alisa' ||
-      new URLSearchParams(window.location.search).get('page') === 'alisa' ||
-      new URLSearchParams(window.location.search).has('alisa') ||
-      window.location.search.toLowerCase().includes('alisa')
-    ));
-
-  const isOrderPage = 
-    currentPath === '/order' || 
-    currentPath.startsWith('/order') ||
-    (typeof window !== 'undefined' && (
-      window.location.pathname.toLowerCase().startsWith('/order') ||
-      new URLSearchParams(window.location.search).get('path') === 'order' ||
-      new URLSearchParams(window.location.search).get('page') === 'order'
-    ));
-
-  const isThankYouPage = 
-    currentPath === '/thank-you' || 
-    currentPath.startsWith('/thank-you') ||
-    (typeof window !== 'undefined' && (
-      window.location.pathname.toLowerCase().startsWith('/thank-you') ||
-      new URLSearchParams(window.location.search).get('path') === 'thank-you' ||
-      new URLSearchParams(window.location.search).get('page') === 'thank-you'
-    ));
-
-  const isPaymentPage = 
-    currentPath === '/payment' || 
-    currentPath.startsWith('/payment') ||
-    (typeof window !== 'undefined' && (
-      window.location.pathname.toLowerCase().startsWith('/payment') ||
-      new URLSearchParams(window.location.search).get('path') === 'payment' ||
-      new URLSearchParams(window.location.search).get('page') === 'payment'
-    ));
+  const isAlisaPage = routeState.type === 'alisa';
+  const isOrderPage = routeState.type === 'order_form';
+  const isThankYouPage = routeState.type === 'order_detail';
+  const isPaymentPage = routeState.type === 'payment';
 
   // If in Admin Mode and authenticated, show Admin Dashboard regardless of route
   if (isAdminMode && isAuthenticatedAdmin) {
@@ -277,8 +253,8 @@ const MainContent: React.FC = () => {
       <>
         <OrderPage 
           onNavigateHome={() => navigateTo('/')}
-          onNavigateToThankYou={(orderNo) => navigateTo(`/thank-you?order=${encodeURIComponent(orderNo)}`)}
-          onNavigateToPayment={(orderId) => navigateTo(`/thank-you?order=${encodeURIComponent(orderId)}`)}
+          onNavigateToThankYou={(orderNo) => navigateTo(`/order/${encodeURIComponent(orderNo)}`)}
+          onNavigateToPayment={(orderId) => navigateTo(`/order/${encodeURIComponent(orderId)}`)}
         />
         <DokuConfigModal
           isOpen={isDokuConfigModalOpen}
@@ -297,11 +273,12 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // If path is /thank-you, render ThankYouPage
+  // If path is /thank-you or /order/:orderNumber, render ThankYouPage (Order Detail)
   if (isThankYouPage) {
     return (
       <>
         <ThankYouPage 
+          orderNumber={routeState.orderNumber}
           onNavigateHome={() => navigateTo('/')}
           onNavigateOrder={() => navigateTo('/order')}
         />

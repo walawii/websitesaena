@@ -23,13 +23,13 @@ export interface MengantarOrderRequest {
     province?: string;
     postalCode?: string;
   };
-  courier: string;
-  serviceType?: string;
+  courier: string; // e.g. "JNE", "J&T Express", "SiCepat", "Anteraja"
+  serviceType?: string; // "REG", "EZ", "GOKIL", etc.
   items: Array<{
     name: string;
     quantity: number;
     price: number;
-    weight?: number;
+    weight?: number; // in grams
   }>;
   totalAmount: number;
   shippingCost: number;
@@ -75,6 +75,7 @@ export async function processMengantarOrder(
   const courier = reqPayload.courier || 'JNE';
   const serviceType = reqPayload.serviceType || 'REG';
 
+  // Default Central Boutique Warehouse Tamansari Tasikmalaya
   const senderInfo = {
     name: reqPayload.sender?.name || 'saena.id (Central Boutique Warehouse)',
     phone: reqPayload.sender?.phone || '+6285724023064',
@@ -118,6 +119,7 @@ export async function processMengantarOrder(
     notes: reqPayload.notes || 'Busana Muslimah Premium saena.id'
   };
 
+  // Official Mengantar API Base URL
   const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\/+$/, '');
   const endpoint = `${baseUrl}/orders`;
 
@@ -143,12 +145,17 @@ export async function processMengantarOrder(
     let json: any = null;
     try {
       json = JSON.parse(resText);
-    } catch {}
+    } catch {
+      // not json
+    }
 
     if (res.ok && json) {
       const orderId = json.order_id || json.id || json.data?.id || json.data?.order_id || json.data?.orderId;
       const tracking = json.airwaybill || json.tracking_number || json.data?.tracking_number || json.data?.airwaybill || json.data?.waybill;
       const labelUrl = json.label_url || json.data?.label_url || json.data?.pdf_url;
+
+      // Requirement 5: Ensure response contains a valid non-empty shipment identifier
+      // Order ID / shipment ID and tracking number if provided. Never fake tracking numbers.
       const validOrderId = orderId ? String(orderId).trim() : '';
       const validTracking = tracking ? String(tracking).trim() : '';
 
@@ -174,13 +181,13 @@ export async function processMengantarOrder(
             rawResponse: json
           }
         };
+      } else {
+        console.warn('[Mengantar Service] HTTP 200 OK received but payload lacks required shipment identifier:', json);
+        return {
+          success: false,
+          error: 'Mengantar API merespons HTTP 200 OK namun tidak menyertakan identifier pengiriman yang valid (order ID atau tracking number tidak ditemukan).'
+        };
       }
-
-      console.warn('[Mengantar Service] HTTP 200 OK received but payload lacks required shipment identifier:', json);
-      return {
-        success: false,
-        error: 'Mengantar API merespons HTTP 200 OK namun tidak menyertakan identifier pengiriman yang valid (order ID atau tracking number tidak ditemukan).'
-      };
     }
 
     const errDetail = json?.message || json?.error || resText || `HTTP ${res.status}`;
@@ -196,10 +203,23 @@ export async function processMengantarOrder(
   }
 }
 
+export interface MengantarRatesOptions {
+  originCity?: string;
+  originSubdistrict?: string;
+  destinationCity: string;
+  destinationDistrict?: string;
+  destinationProvince?: string;
+  destinationPostalCode?: string;
+  weightGrams?: number;
+}
+
 export async function calculateMengantarRates(
-  originCity: string = 'Kota Tasikmalaya',
-  destinationCity: string,
-  weightGrams: number = 600
+  originOrOptions: string | MengantarRatesOptions = 'Kota Tasikmalaya',
+  destinationCityParam?: string,
+  weightGramsParam: number = 600,
+  destinationDistrictParam?: string,
+  destinationProvinceParam?: string,
+  destinationPostalCodeParam?: string
 ): Promise<{
   success: boolean;
   origin?: string;
@@ -208,56 +228,90 @@ export async function calculateMengantarRates(
   rates?: Array<{ courier: string; service: string; name: string; cost: number; etd?: string }>;
   error?: string;
 }> {
+  const isObj = typeof originOrOptions === 'object' && originOrOptions !== null;
+  const originCity: string = isObj ? (originOrOptions.originCity || 'Kota Tasikmalaya') : (typeof originOrOptions === 'string' ? originOrOptions : 'Kota Tasikmalaya');
+  const originSubdistrict: string = isObj ? (originOrOptions.originSubdistrict || 'Kecamatan Tamansari') : 'Kecamatan Tamansari';
+  const destinationCity = isObj ? originOrOptions.destinationCity : (destinationCityParam || '');
+  const destinationDistrict = isObj ? (originOrOptions.destinationDistrict || '') : (destinationDistrictParam || '');
+  const destinationProvince = isObj ? (originOrOptions.destinationProvince || '') : (destinationProvinceParam || '');
+  const destinationPostalCode = isObj ? (originOrOptions.destinationPostalCode || '') : (destinationPostalCodeParam || '');
+  const weightGrams = isObj ? (originOrOptions.weightGrams || 600) : (weightGramsParam || 600);
+
+  if (!destinationCity && !destinationDistrict) {
+    return {
+      success: false,
+      error: 'Kota/Kabupaten atau Kecamatan tujuan pengiriman wajib diisi untuk menghitung ongkos kirim.'
+    };
+  }
+
   const apiKey = process.env.MENGANTAR_API_KEY?.trim() || '';
   const baseUrl = (process.env.MENGANTAR_BASE_URL?.trim() || 'https://api.mengantar.com').replace(/\/+$/, '');
 
   if (!apiKey) {
     return {
       success: false,
-      error: 'MENGANTAR_API_KEY belum dikonfigurasi di environment server.'
+      error: 'MENGANTAR_API_KEY belum dikonfigurasi di environment server. Layanan perhitungan ongkir resmi Mengantar.com memerlukan API key.'
     };
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+    const mgtPayload = {
+      origin: originCity,
+      origin_city: originCity,
+      origin_subdistrict: originSubdistrict,
+      destination: destinationDistrict ? `${destinationDistrict}, ${destinationCity}` : destinationCity,
+      destination_city: destinationCity,
+      destination_subdistrict: destinationDistrict,
+      destination_province: destinationProvince,
+      postal_code: destinationPostalCode,
+      weight: weightGrams
+    };
 
     const res = await fetch(`${baseUrl}/rates`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'x-api-key': apiKey
+        'x-api-key': apiKey,
+        'User-Agent': 'saena.id-mengantar-rates'
       },
-      body: JSON.stringify({
-        origin: originCity,
-        destination: destinationCity,
-        weight: weightGrams
-      }),
+      body: JSON.stringify(mgtPayload),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
-    const resText = await res.text();
-    let data: any = null;
-    try {
-      data = JSON.parse(resText);
-    } catch {}
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      const rawRates = data?.rates || data?.data?.rates || data?.data;
+      if (Array.isArray(rawRates) && rawRates.length > 0) {
+        const rates = rawRates.map((r: any) => ({
+          courier: String(r.courier || r.courier_name || r.name || 'JNE').trim(),
+          service: String(r.service || r.service_name || r.code || 'REG').trim(),
+          name: `${r.courier || 'Kurir'} ${r.service || 'REG'}`,
+          cost: Number(r.cost || r.price || r.tariff || r.fee) || 0,
+          etd: r.etd || r.estimated || r.duration || '2-3 Hari'
+        })).filter((r: any) => r.cost > 0);
 
-    if (res.ok && data && Array.isArray(data.rates) && data.rates.length > 0) {
-      return {
-        success: true,
-        origin: originCity,
-        destination: destinationCity,
-        weightGrams,
-        rates: data.rates
-      };
+        if (rates.length > 0) {
+          return {
+            success: true,
+            origin: originCity,
+            destination: destinationCity,
+            weightGrams,
+            rates
+          };
+        }
+      }
     }
 
+    const resText = await res.text().catch(() => '');
     return {
       success: false,
-      error: `Mengantar.com tidak dapat mengembalikan tarif (HTTP ${res.status}): ${resText.slice(0, 100)}`
+      error: `Mengantar.com tidak dapat mengembalikan tarif ongkir (HTTP ${res.status}): ${resText.slice(0, 150) || 'Format data rute tidak dikenali.'}`
     };
   } catch (err: any) {
     return {
@@ -295,6 +349,7 @@ export async function testMengantarApiConnectivity(): Promise<MengantarConnectiv
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
+    // Diagnostic check to Mengantar Base URL
     const res = await fetch(`${baseUrl}/orders?limit=1`, {
       method: 'GET',
       headers: {
@@ -323,7 +378,7 @@ export async function testMengantarApiConnectivity(): Promise<MengantarConnectiv
         configured: true,
         apiReachable: true,
         authenticationVerified: true,
-        endpointVerified: false,
+        endpointVerified: false, // Ditandai false karena dokumentasi resmi API Mengantar belum diverifikasi dari akun
         verificationStatus: MENGANTAR_ENDPOINT_STATUS,
         message: 'API Mengantar reachable & request diagnostik diterima (HTTP 200). Status integrasi: MENGANTAR_ENDPOINT_NOT_VERIFIED (menunggu verifikasi spesifikasi resmi Mengantar).'
       };
@@ -348,3 +403,4 @@ export async function testMengantarApiConnectivity(): Promise<MengantarConnectiv
     };
   }
 }
+

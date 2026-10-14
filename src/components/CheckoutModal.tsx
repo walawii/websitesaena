@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { SHIPPING_SERVICES, SHIPPING_ORIGIN, DEFAULT_WHATSAPP_LOCAL, DEFAULT_WHATSAPP_DISPLAY } from '../data/mockData';
 import { 
@@ -84,6 +84,11 @@ export const CheckoutModal: React.FC = () => {
   const [selectedShipping, setSelectedShipping] = useState<ShippingMethod>(SHIPPING_SERVICES[0]);
   const [selectedPayment, setSelectedPayment] = useState<PaymentChannel>('qris');
 
+  // Real Mengantar shipping rates state (no hardcoded fallback)
+  const [liveShippingRates, setLiveShippingRates] = useState<Record<string, number>>({});
+  const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
+  const [shippingRatesError, setShippingRatesError] = useState<string | null>(null);
+
   // Address completeness validation states
   const [addressValidationAttempted, setAddressValidationAttempted] = useState(false);
   const [allowNoHouseNumber, setAllowNoHouseNumber] = useState(false);
@@ -98,8 +103,6 @@ export const CheckoutModal: React.FC = () => {
       customer.postalCode
     );
   }, [customer.address, customer.subdistrict, customer.city, customer.postalCode]);
-
-  if (!isCheckoutOpen) return null;
 
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
@@ -118,15 +121,90 @@ export const CheckoutModal: React.FC = () => {
 
   // Standard courier rule: minimum billable weight is 1 kg, rounded up
   const billableWeight = Math.max(1, Math.ceil(estimatedWeightKg));
+
+  // Fetch authoritative rates from Mengantar endpoint
+  const fetchLiveShippingRates = async () => {
+    if (!customer.city && !customer.subdistrict) {
+      setLiveShippingRates({});
+      setShippingRatesError(null);
+      return;
+    }
+
+    setShippingRatesLoading(true);
+    setShippingRatesError(null);
+
+    try {
+      const res = await fetch('/api/shipping/rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originCity: SHIPPING_ORIGIN.city,
+          originSubdistrict: SHIPPING_ORIGIN.subdistrict,
+          destinationCity: customer.city,
+          destinationDistrict: customer.subdistrict,
+          destinationProvince: customer.province,
+          destinationPostalCode: customer.postalCode,
+          weight: Math.round(billableWeight * 1000)
+        })
+      });
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.rates) && data.rates.length > 0) {
+        const mappedRates: Record<string, number> = {};
+        data.rates.forEach((r: any) => {
+          const cName = String(r.courier || '').toLowerCase();
+          const sName = String(r.service || '').toLowerCase();
+          const cost = Number(r.cost) || 0;
+          if (cost > 0) {
+            if (cName.includes('jne')) {
+              if (sName.includes('yes')) mappedRates['jne-yes'] = cost;
+              else if (sName.includes('oke')) mappedRates['jne-oke'] = cost;
+              else mappedRates['jne-reg'] = cost;
+            } else if (cName.includes('j&t') || cName.includes('jnt')) {
+              if (sName.includes('super')) mappedRates['jnt-super'] = cost;
+              else mappedRates['jnt-ez'] = cost;
+            } else if (cName.includes('sicepat')) {
+              mappedRates['sicepat-reg'] = cost;
+            }
+            mappedRates[cName] = cost;
+            mappedRates[`${cName}-${sName}`] = cost;
+          }
+        });
+
+        if (Object.keys(mappedRates).length > 0) {
+          setLiveShippingRates(mappedRates);
+          setShippingRatesError(null);
+        } else {
+          setLiveShippingRates({});
+          setShippingRatesError('Gagal menghitung ongkir. Silakan periksa alamat atau coba lagi.');
+        }
+      } else {
+        setLiveShippingRates({});
+        setShippingRatesError(data?.error || 'Gagal menghitung ongkir. Silakan periksa alamat atau coba lagi.');
+      }
+    } catch {
+      setLiveShippingRates({});
+      setShippingRatesError('Gagal menghubungi server ongkir Mengantar. Silakan periksa alamat atau coba lagi.');
+    } finally {
+      setShippingRatesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+    if (isCheckoutOpen && (customer.city || customer.subdistrict)) {
+      fetchLiveShippingRates();
+    }
+    return () => { isCancelled = true; };
+  }, [isCheckoutOpen, customer.city, customer.subdistrict, customer.province, customer.postalCode, billableWeight]);
   
-  // Dynamic Shipping calculation - PROMO SEMUA GRATIS ONGKIR SE-INDONESIA (Rp 0)
+  // Real Shipping calculation - Authoritative Mengantar quote (No Fake 15000 fallback)
   const calculateShippingRate = (method: ShippingMethod): number => {
-    const rates: Record<string, number> = {
-      'jne-reg': 15000, 'jne-yes': 25000, 'jne-oke': 12000,
-      'jnt-ez': 14000, 'jnt-super': 22000, 'sicepat-reg': 14000,
-      'dhl-intl': 150000
-    };
-    return rates[method.id] ?? 15000;
+    if (appliedCoupon === 'GRATISONGKIR') {
+      return 0;
+    }
+    const cKey = method.courier.toLowerCase();
+    const rate = liveShippingRates[method.id] ?? liveShippingRates[cKey] ?? 0;
+    return rate;
   };
 
   const dynamicShippingCost = calculateShippingRate(selectedShipping);
@@ -173,6 +251,18 @@ export const CheckoutModal: React.FC = () => {
       setAddressValidationAttempted(true);
       setShowIncompleteAddressModal(true);
       return;
+    }
+
+    // Authoritative Shipping validation - No fake zero or missing shipping rates
+    if (appliedCoupon !== 'GRATISONGKIR') {
+      if (shippingRatesLoading) {
+        setSubmitError('Sedang menghitung tarif ongkir resmi Mengantar. Mohon tunggu...');
+        return;
+      }
+      if (shippingRatesError || dynamicShippingCost <= 0) {
+        setSubmitError(shippingRatesError || 'Gagal menghitung ongkir resmi Mengantar. Silakan periksa alamat atau coba lagi.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -246,6 +336,8 @@ export const CheckoutModal: React.FC = () => {
     setStep('form');
     setCreatedOrder(null);
   };
+
+  if (!isCheckoutOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
@@ -395,7 +487,17 @@ export const CheckoutModal: React.FC = () => {
                       type="text"
                       required
                       value={customer.province}
-                      onChange={(e) => setCustomer({ ...customer, province: e.target.value })}
+                      onChange={(e) => {
+                        const newProv = e.target.value;
+                        setCustomer(prev => ({
+                          ...prev,
+                          province: newProv,
+                          city: '',
+                          subdistrict: '',
+                          postalCode: ''
+                        }));
+                        setLiveShippingRates({});
+                      }}
                       placeholder="Contoh: Jawa Barat, DKI Jakarta"
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
                     />
@@ -409,7 +511,16 @@ export const CheckoutModal: React.FC = () => {
                       type="text"
                       required
                       value={customer.city}
-                      onChange={(e) => setCustomer({ ...customer, city: e.target.value })}
+                      onChange={(e) => {
+                        const newCity = e.target.value;
+                        setCustomer(prev => ({
+                          ...prev,
+                          city: newCity,
+                          subdistrict: '',
+                          postalCode: ''
+                        }));
+                        setLiveShippingRates({});
+                      }}
                       placeholder="Contoh: Kota Tasikmalaya, Bandung, Jakarta"
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
                     />
@@ -431,7 +542,14 @@ export const CheckoutModal: React.FC = () => {
                       required
                       id="checkout-subdistrict-input"
                       value={customer.subdistrict}
-                      onChange={(e) => setCustomer({ ...customer, subdistrict: e.target.value })}
+                      onChange={(e) => {
+                        const newSub = e.target.value;
+                        setCustomer(prev => ({
+                          ...prev,
+                          subdistrict: newSub
+                        }));
+                        setLiveShippingRates({});
+                      }}
                       placeholder="Contoh: Kecamatan Tamansari"
                       className={`w-full px-3 py-2 text-xs bg-[#FAF8F5] border rounded-lg focus:outline-none transition-all ${
                         addressValidationAttempted && !addressValidation.hasSubdistrict
@@ -449,7 +567,14 @@ export const CheckoutModal: React.FC = () => {
                       type="text"
                       required
                       value={customer.postalCode}
-                      onChange={(e) => setCustomer({ ...customer, postalCode: e.target.value })}
+                      onChange={(e) => {
+                        const newPostal = e.target.value;
+                        setCustomer(prev => ({
+                          ...prev,
+                          postalCode: newPostal
+                        }));
+                        setLiveShippingRates({});
+                      }}
                       placeholder="Contoh: 46196"
                       className="w-full px-3 py-2 text-xs bg-[#FAF8F5] border border-[#D5C9B8] rounded-lg focus:outline-none focus:border-[#1C3B2B]"
                     />
@@ -569,6 +694,29 @@ export const CheckoutModal: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {shippingRatesLoading && (
+                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
+                    <span>Menghubungi API Mengantar untuk kalkulasi tarif ongkir resmi rute Anda...</span>
+                  </div>
+                )}
+
+                {shippingRatesError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{shippingRatesError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fetchLiveShippingRates()}
+                      className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition-colors"
+                    >
+                      Coba Lagi
+                    </button>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {SHIPPING_SERVICES.filter(service => {

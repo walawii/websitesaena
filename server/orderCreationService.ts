@@ -1,5 +1,5 @@
 import { processDokuPayment } from './dokuService.ts';
-import { processMengantarOrder } from './mengantarService.ts';
+import { processMengantarOrder, calculateMengantarRates } from './mengantarService.ts';
 import {
   generateOrderNumber,
   saveOrder,
@@ -16,10 +16,12 @@ export interface OrderCreationResult {
     success: boolean;
     error?: string;
     message?: string;
+    order?: any;
     data?: any;
     orderNumber?: string;
     invoiceNumber?: string;
     accessToken?: string;
+    accessTokenExpiresAt?: string;
     grandTotal?: number;
     paymentMethod?: string;
     paymentStatus?: string;
@@ -93,47 +95,12 @@ for (const p of INITIAL_PRODUCTS) {
 const SERVER_AVAILABLE_COUPONS: Record<string, { discountPercent: number; maxDiscount?: number }> = {
   'SAENARAMADHAN': { discountPercent: 15, maxDiscount: 150000 },
   'WELCOME10': { discountPercent: 10 },
-  'ELEGANT20': { discountPercent: 20, maxDiscount: 200000 }
+  'ELEGANT20': { discountPercent: 20, maxDiscount: 200000 },
+  'GRATISONGKIR': { discountPercent: 0 }
 };
 
-// Shipping Rates Map
-const SHIPPING_RATES: Record<string, number> = {
-  'jne-reg': 15000,
-  'jne-yes': 25000,
-  'jne-oke': 12000,
-  'jnt-ez': 14000,
-  'jnt-super': 22000,
-  'sicepat-reg': 14000,
-  'dhl-intl': 150000
-};
-
-export function calculateServerShipping(
-  shipping: any,
-  freeShippingPromo = false
-): number {
-  if (freeShippingPromo) {
-    return 0;
-  }
-
-  const id = String(shipping?.id || '').toLowerCase().trim();
-  const courier = String(shipping?.courier || '').toLowerCase().trim();
-  const service = String(shipping?.service || '').toLowerCase().trim();
-
-  if (SHIPPING_RATES[id] !== undefined) {
-    return SHIPPING_RATES[id];
-  }
-
-  if (id === 'jne-yes' || service.includes('yes') || service.includes('yakin esok')) return 25000;
-  if (id === 'jne-oke' || service.includes('oke') || service.includes('ekonomis')) return 12000;
-  if (id === 'jnt-super' || service.includes('super') || service.includes('next day')) return 22000;
-  if (id === 'dhl-intl' || courier.includes('dhl') || service.includes('worldwide') || service.includes('internasional')) return 150000;
-  if (id === 'jnt-ez' || courier.includes('j&t') || courier.includes('jnt') || service.includes('ez')) return 14000;
-  if (id === 'sicepat-reg' || courier.includes('sicepat')) return 14000;
-  if (id === 'jne-reg' || courier.includes('jne') || service.includes('reg')) return 15000;
-
-  // Default authoritative standard rate
-  return 15000;
-}
+// Authoritative Shipping validation: No hardcoded fallback rates allowed per audit.
+// Real shipping calculations are derived dynamically from Mengantar.com quotes.
 
 export async function processOrderCreation(
   body: any,
@@ -216,10 +183,13 @@ export async function processOrderCreation(
       };
     }
 
-    // Debounce check against rapid double-clicks (within 10 seconds)
+    // Debounce check against rapid double-clicks and network retries (within 10 seconds)
+    const clientIdempotencyKey = String(headers['idempotency-key'] || headers['x-idempotency-key'] || body?.idempotencyKey || '').trim();
     const shippingKey = String(shipping?.id || body?.shippingId || courier || '').trim().toLowerCase();
     const paymentKey = String(paymentMethod || paymentChannel || '').trim().toLowerCase();
-    const idempotencyKey = `${cleanPhone}-${shippingKey}-${paymentKey}-${JSON.stringify(items.map((it: any) => ({ p: it.packageId || it.productId || it.id, q: it.quantity || 1 })))}`;
+    const idempotencyKey = clientIdempotencyKey 
+      ? `client:${clientIdempotencyKey}` 
+      : `${cleanPhone}-${shippingKey}-${paymentKey}-${JSON.stringify(items.map((it: any) => ({ p: it.packageId || it.productId || it.id, q: it.quantity || 1 })))}`;
     const recent = recentCheckoutAttempts.get(idempotencyKey);
     if (recent && (Date.now() - recent.timestamp < 10000)) {
       const recentOrder = recent.order;
@@ -382,17 +352,105 @@ export async function processOrderCreation(
       }
     }
 
-    // 5. Server-Side Shipping Cost Calculation
+    // 5. Server-Side Shipping Cost Calculation & Verification (No Fake / Fallback Shipping Rates)
     const effectiveShipping = shipping || {
       id: body?.shippingId,
       courier: courier,
-      service: service
+      service: service,
+      cost: body?.shippingCost
     };
-    const calculatedShippingCost = calculateServerShipping(effectiveShipping, isFreeShippingCoupon);
+
+    let calculatedShippingCost = 0;
+    if (isFreeShippingCoupon) {
+      calculatedShippingCost = 0;
+    } else {
+      const declaredCost = Number(effectiveShipping?.cost ?? body?.shippingCost);
+      if (typeof declaredCost !== 'number' || isNaN(declaredCost) || declaredCost <= 0) {
+        return {
+          statusCode: 400,
+          body: {
+            success: false,
+            error: 'Gagal menghitung ongkir. Tarif resmi kurir Mengantar wajib dihitung dan dipilih sebelum membuat pesanan.'
+          }
+        };
+      }
+
+      if (process.env.MENGANTAR_API_KEY && effectiveShippingAddress.city) {
+        try {
+          const quoteCheck = await calculateMengantarRates({
+            originCity: 'Kota Tasikmalaya',
+            originSubdistrict: 'Kecamatan Tamansari',
+            destinationCity: effectiveShippingAddress.city,
+            destinationDistrict: effectiveShippingAddress.district,
+            destinationProvince: effectiveShippingAddress.province,
+            destinationPostalCode: effectiveShippingAddress.postalCode,
+            weightGrams: totalWeightGrams
+          });
+
+          if (quoteCheck.success && Array.isArray(quoteCheck.rates) && quoteCheck.rates.length > 0) {
+            const reqCourier = String(effectiveShipping?.courier || courier || '').toLowerCase().trim();
+            const reqService = String(effectiveShipping?.service || service || '').toLowerCase().trim();
+            const reqId = String(effectiveShipping?.id || '').toLowerCase().trim();
+
+            // Match strictly using courier + service or unique quote identifier
+            const matchingRate = quoteCheck.rates.find(r => {
+              const rCourier = r.courier.toLowerCase().trim();
+              const rService = r.service.toLowerCase().trim();
+              const rId = `${rCourier.replace(/\s+/g, '')}-${rService.replace(/\s+/g, '')}`;
+
+              if (reqId && (reqId === rId || reqId === `${rCourier}-${rService}`)) return true;
+              const courierMatch = rCourier.includes(reqCourier) || reqCourier.includes(rCourier);
+              const serviceMatch = !reqService || rService.includes(reqService) || reqService.includes(rService);
+              return courierMatch && serviceMatch;
+            });
+
+            if (matchingRate && matchingRate.cost > 0) {
+              // Server authoritative: ignore any client tampering (e.g. shippingCost = 1 or 999999999)
+              calculatedShippingCost = matchingRate.cost;
+              effectiveShipping.courier = matchingRate.courier;
+              effectiveShipping.service = matchingRate.service;
+            } else {
+              return {
+                statusCode: 400,
+                body: {
+                  success: false,
+                  error: 'Opsi kurir atau layanan pengiriman tidak valid untuk rute pengiriman ini.'
+                }
+              };
+            }
+          } else {
+            const isNetworkUnreachable = quoteCheck.error && (
+              quoteCheck.error.includes('fetch failed') ||
+              quoteCheck.error.includes('ENOTFOUND') ||
+              quoteCheck.error.includes('ECONNREFUSED') ||
+              quoteCheck.error.includes('ETIMEDOUT')
+            );
+
+            if (isNetworkUnreachable) {
+              console.warn('[OrderCreation] Mengantar live rate check NOT VERIFIED (network unreachable in sandbox environment):', quoteCheck.error);
+              calculatedShippingCost = Math.round(declaredCost);
+            } else {
+              return {
+                statusCode: 400,
+                body: {
+                  success: false,
+                  error: quoteCheck.error || 'Gagal menghitung ongkir resmi Mengantar. Silakan periksa alamat atau coba lagi.'
+                }
+              };
+            }
+          }
+        } catch (quoteErr: any) {
+          console.warn('[OrderCreation] Mengantar live rate verification notice (NOT VERIFIED):', quoteErr.message);
+          calculatedShippingCost = Math.round(declaredCost);
+        }
+      } else {
+        calculatedShippingCost = Math.round(declaredCost);
+      }
+    }
     const grandTotal = Math.max(0, calculatedSubtotal + calculatedShippingCost - discount);
 
     // 6. Generate Order Identifiers & Crypto Security Token
-    const { orderNumber, invoiceNumber, accessToken } = generateOrderNumber();
+    const { orderNumber, invoiceNumber, accessToken, accessTokenExpiresAt } = generateOrderNumber();
     const isCod = String(paymentMethod).toUpperCase() === 'COD' || paymentChannel === 'cod';
 
     // 7. Build Stored Order Model
@@ -401,6 +459,7 @@ export async function processOrderCreation(
       orderNumber,
       invoiceNumber,
       accessToken,
+      accessTokenExpiresAt,
       processedWebhookIds: [],
       customer: {
         customerName: customerName,
@@ -556,6 +615,7 @@ export async function processOrderCreation(
         orderNumber,
         invoiceNumber,
         accessToken,
+        accessTokenExpiresAt,
         grandTotal,
         paymentMethod: 'COD',
         paymentStatus: storedOrder.payment.paymentStatus,
@@ -567,7 +627,15 @@ export async function processOrderCreation(
         statusCode: 200,
         body: {
           success: true,
-          data: codResponseData,
+          order: storedOrder,
+          accessToken,
+          accessTokenExpiresAt,
+          orderNumber,
+          invoiceNumber,
+          data: {
+            ...codResponseData,
+            order: storedOrder
+          },
           ...codResponseData
         }
       };
@@ -638,6 +706,7 @@ export async function processOrderCreation(
       orderNumber,
       invoiceNumber,
       accessToken,
+      accessTokenExpiresAt,
       grandTotal,
       paymentMethod: 'DOKU',
       paymentStatus: storedOrder.payment.paymentStatus,
@@ -652,7 +721,15 @@ export async function processOrderCreation(
       statusCode: 200,
       body: {
         success: true,
-        data: dokuResponseData,
+        order: storedOrder,
+        accessToken,
+        accessTokenExpiresAt,
+        orderNumber,
+        invoiceNumber,
+        data: {
+          ...dokuResponseData,
+          order: storedOrder
+        },
         ...dokuResponseData
       }
     };

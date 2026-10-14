@@ -102,8 +102,10 @@ export const OrderPage: React.FC<OrderPageProps> = ({
   // Customer Data
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerProvince, setCustomerProvince] = useState('Jawa Barat');
   const [customerCity, setCustomerCity] = useState('');
   const [customerSubdistrict, setCustomerSubdistrict] = useState('');
+  const [customerPostalCode, setCustomerPostalCode] = useState('46196');
   const [customerAddress, setCustomerAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [allowNoHouseNumber, setAllowNoHouseNumber] = useState(false);
@@ -134,6 +136,11 @@ export const OrderPage: React.FC<OrderPageProps> = ({
   useEffect(() => {
     let isCancelled = false;
     const fetchRates = async () => {
+      if (!customerCity && !customerSubdistrict) {
+        setCourierRates({});
+        setRatesError(null);
+        return;
+      }
       setRatesLoading(true);
       setRatesError(null);
       try {
@@ -142,7 +149,11 @@ export const OrderPage: React.FC<OrderPageProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originCity: 'Kota Tasikmalaya',
-            destinationCity: customerCity || 'Kota Tasikmalaya',
+            originSubdistrict: 'Kecamatan Tamansari',
+            destinationCity: customerCity,
+            destinationDistrict: customerSubdistrict,
+            destinationProvince: customerProvince,
+            destinationPostalCode: customerPostalCode,
             weight: totalWeightInGrams
           })
         });
@@ -152,6 +163,10 @@ export const OrderPage: React.FC<OrderPageProps> = ({
             const newRates: Record<string, number> = {};
             data.rates.forEach((r: any) => {
               if (r.courier && typeof r.cost === 'number' && Number.isFinite(r.cost) && r.cost > 0) {
+                const cLower = r.courier.toLowerCase();
+                if (cLower.includes('jne')) newRates['JNE'] = r.cost;
+                else if (cLower.includes('j&t') || cLower.includes('jnt')) newRates['J&T Express'] = r.cost;
+                else if (cLower.includes('sicepat')) newRates['SiCepat'] = r.cost;
                 newRates[r.courier] = r.cost;
               }
             });
@@ -160,17 +175,17 @@ export const OrderPage: React.FC<OrderPageProps> = ({
               setRatesError(null);
             } else {
               setCourierRates({});
-              setRatesError('Ongkir belum dapat dihitung. Silakan coba lagi.');
+              setRatesError('Gagal menghitung ongkir. Silakan periksa alamat atau coba lagi.');
             }
           } else {
             setCourierRates({});
-            setRatesError('Ongkir belum dapat dihitung. Silakan coba lagi.');
+            setRatesError(data?.error || 'Gagal menghitung ongkir. Silakan periksa alamat atau coba lagi.');
           }
         }
       } catch {
         if (!isCancelled) {
           setCourierRates({});
-          setRatesError('Ongkir belum dapat dihitung. Silakan coba lagi.');
+          setRatesError('Gagal menghubungi server ongkir Mengantar. Silakan periksa alamat atau coba lagi.');
         }
       } finally {
         if (!isCancelled) {
@@ -181,12 +196,12 @@ export const OrderPage: React.FC<OrderPageProps> = ({
 
     fetchRates();
     return () => { isCancelled = true; };
-  }, [customerCity, totalWeightInGrams]);
+  }, [customerCity, customerSubdistrict, customerProvince, customerPostalCode, totalWeightInGrams]);
 
-  // Current shipping cost calculation - SEMUA GRATIS ONGKIR SE-INDONESIA (Rp 0)
-  const actualCourierRate = courierRates[selectedCourier];
-  const shippingCost = 0; // SEMUA GRATIS ONGKIR (baik COD maupun Transfer/QRIS)
-  const finalTotal = currentPackage.promoPrice;
+  // Real shipping cost calculation based on selected Mengantar courier rate
+  const actualCourierRate = courierRates[selectedCourier] || 0;
+  const shippingCost = actualCourierRate;
+  const finalTotal = currentPackage.promoPrice + shippingCost;
 
   useEffect(() => {
     document.title = 'Formulir Pemesanan Resmi Mukena Alisa - saena.my.id';
@@ -217,6 +232,15 @@ export const OrderPage: React.FC<OrderPageProps> = ({
       return;
     }
 
+    if (shippingCost <= 0) {
+      if (ratesLoading) {
+        alert('Sedang menghitung tarif ongkir resmi Mengantar. Mohon tunggu sesaat...');
+        return;
+      }
+      alert(ratesError || 'Gagal menghitung ongkir resmi Mengantar. Silakan periksa Kota & Kecamatan pengiriman.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -232,10 +256,10 @@ export const OrderPage: React.FC<OrderPageProps> = ({
         },
         shippingAddress: {
           address: customerAddress.trim(),
-          province: 'Jawa Barat',
-          city: customerCity || 'Kota Tasikmalaya',
-          district: customerSubdistrict || 'Tamansari',
-          postalCode: '46196'
+          province: customerProvince.trim() || 'Jawa Barat',
+          city: customerCity.trim() || 'Kota Tasikmalaya',
+          district: customerSubdistrict.trim() || 'Tamansari',
+          postalCode: customerPostalCode.trim() || '46196'
         },
         items: [
           {
@@ -251,7 +275,7 @@ export const OrderPage: React.FC<OrderPageProps> = ({
         ],
         courier: selectedCourier,
         service: 'REG',
-        shippingCost: 0,
+        shippingCost: shippingCost,
         paymentMethod: paymentMethod === 'COD' ? 'COD' : 'DOKU',
         paymentChannel: paymentMethod === 'COD' ? 'cod' : selectedDokuChannel,
         notes: notes || undefined,
@@ -269,24 +293,26 @@ export const OrderPage: React.FC<OrderPageProps> = ({
       });
 
       const json = await res.json();
-      if (!res.ok || !json.success || !json.data) {
+      const orderData = json.order || json.data;
+      if (!res.ok || !json.success || !orderData) {
         throw new Error(json.error || 'Gagal menerbitkan pesanan resmi.');
       }
 
-      const orderNumber = json.data.orderNumber;
-      const accessToken = json.data.accessToken;
+      const orderNumber = orderData.orderNumber || json.orderNumber;
+      const accessToken = orderData.accessToken || json.accessToken;
 
       if (accessToken) {
         try {
           sessionStorage.setItem(`order_token_${orderNumber}`, accessToken);
+          localStorage.setItem(`order_token_${orderNumber}`, accessToken);
         } catch {}
       }
 
       if (onNavigateToThankYou) {
         onNavigateToThankYou(orderNumber);
       } else {
-        const tokenQuery = accessToken ? `&token=${encodeURIComponent(accessToken)}` : '';
-        window.location.href = `/thank-you?order=${encodeURIComponent(orderNumber)}${tokenQuery}`;
+        const tokenQuery = accessToken ? `?token=${encodeURIComponent(accessToken)}` : '';
+        window.location.href = `/order/${encodeURIComponent(orderNumber)}${tokenQuery}`;
       }
     } catch (err: any) {
       alert(`Terjadi kendala saat memproses pesanan: ${err.message || 'Silakan coba lagi.'}`);
@@ -512,7 +538,12 @@ export const OrderPage: React.FC<OrderPageProps> = ({
                       required
                       placeholder="Contoh: Tasikmalaya / Bandung / Jakarta"
                       value={customerCity}
-                      onChange={(e) => setCustomerCity(e.target.value)}
+                      onChange={(e) => {
+                        setCustomerCity(e.target.value);
+                        setCustomerSubdistrict('');
+                        setCustomerPostalCode('');
+                        setCourierRates({});
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#1C3B2B] focus:border-transparent outline-none"
                     />
                   </div>
@@ -529,7 +560,10 @@ export const OrderPage: React.FC<OrderPageProps> = ({
                       required
                       placeholder="Contoh: Tamansari / Sukasari"
                       value={customerSubdistrict}
-                      onChange={(e) => setCustomerSubdistrict(e.target.value)}
+                      onChange={(e) => {
+                        setCustomerSubdistrict(e.target.value);
+                        setCourierRates({});
+                      }}
                       className={`w-full px-3.5 py-2.5 rounded-xl border focus:ring-2 focus:ring-[#1C3B2B] focus:border-transparent outline-none transition-all ${
                         addressValidationAttempted && !addressValidation.hasSubdistrict
                           ? 'border-rose-400 bg-rose-50/30'
@@ -676,13 +710,15 @@ export const OrderPage: React.FC<OrderPageProps> = ({
                       <p className="text-[11px] text-gray-500">{courier.desc}</p>
                       <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between text-[11px]">
                         <span className="text-gray-500">Tarif ({totalWeightInGrams}gr):</span>
-                        {hasValidRate ? (
-                          <span className="font-bold text-emerald-700">
-                            GRATIS <del className="text-gray-400 font-normal">Rp {rate.toLocaleString('id-ID')}</del>
+                        {ratesLoading ? (
+                          <span className="text-gray-400 italic">Menghitung...</span>
+                        ) : hasValidRate ? (
+                          <span className="font-bold text-[#1C3B2B]">
+                            Rp {rate.toLocaleString('id-ID')}
                           </span>
                         ) : (
-                          <span className="font-bold text-emerald-700">
-                            GRATIS ONGKIR
+                          <span className="text-amber-700 font-medium">
+                            Belum dihitung
                           </span>
                         )}
                       </div>
@@ -699,9 +735,11 @@ export const OrderPage: React.FC<OrderPageProps> = ({
               )}
 
               {ratesError && (
-                <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>Ongkir belum dapat dihitung. Silakan coba lagi. (Promo aktif: Seluruh pesanan tetap Bebas Ongkir Rp 0).</span>
+                <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span>{ratesError}</span>
+                  </div>
                 </div>
               )}
 
@@ -866,23 +904,28 @@ export const OrderPage: React.FC<OrderPageProps> = ({
                 <span className="font-semibold text-emerald-800">Mengantar.com ({selectedCourier})</span>
               </div>
               <div className="flex justify-between items-center text-gray-600">
-                <span>Ongkos Kirim Mengantar:</span>
-                <span className="text-emerald-700 font-bold flex items-center gap-1.5">
-                  <span>Rp 0 (GRATIS ONGKIR SE-INDONESIA)</span>
-                  {typeof actualCourierRate === 'number' && actualCourierRate > 0 && (
-                    <del className="text-gray-400 font-normal">Rp {actualCourierRate.toLocaleString('id-ID')}</del>
-                  )}
-                </span>
+                <span>Ongkos Kirim Mengantar ({selectedCourier}):</span>
+                {ratesLoading ? (
+                  <span className="text-gray-400 italic">Menghitung ongkir...</span>
+                ) : shippingCost > 0 ? (
+                  <span className="text-[#1C3B2B] font-bold">
+                    Rp {shippingCost.toLocaleString('id-ID')}
+                  </span>
+                ) : (
+                  <span className="text-amber-700 font-medium">
+                    {ratesError || 'Belum dihitung (isi kota & kecamatan)'}
+                  </span>
+                )}
               </div>
 
               {paymentMethod === 'COD' && (
                 <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-900 space-y-1">
                   <div className="flex items-start gap-1.5 font-bold">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Metode COD: Bebas Ongkos Kirim (Gratis)!</span>
+                    <span>Metode COD: Bayar Tunai ke Kurir</span>
                   </div>
                   <p className="text-[10px] text-emerald-800 leading-relaxed">
-                    Anda cukup menyiapkan uang pas sebesar <strong>Rp {finalTotal.toLocaleString('id-ID')}</strong> kepada kurir Mengantar saat paket tiba di alamat Anda. Tidak ada biaya tambahan apapun.
+                    Siapkan uang pas sebesar <strong>Rp {finalTotal.toLocaleString('id-ID')}</strong> (sudah termasuk produk + ongkir resmi kurir) kepada kurir Mengantar saat paket tiba di alamat Anda.
                   </p>
                 </div>
               )}
